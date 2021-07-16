@@ -260,7 +260,7 @@ FEATURES = {
     'ALLOW_COURSE_RERUNS': True,
 
     # Certificates Web/HTML Views
-    'CERTIFICATES_HTML_VIEW': False,
+    'CERTIFICATES_HTML_VIEW': True,
 
     # Teams feature
     'ENABLE_TEAMS': True,
@@ -280,7 +280,7 @@ FEATURES = {
     # Special Exams, aka Timed and Proctored Exams
     'ENABLE_SPECIAL_EXAMS': False,
 
-    'ORGANIZATIONS_APP': False,
+    'ORGANIZATIONS_APP': True,
 
     # Show the language selector in the header
     'SHOW_HEADER_LANGUAGE_SELECTOR': False,
@@ -342,7 +342,7 @@ FEATURES = {
     # .. toggle_tickets: 'https://github.com/edx/edx-platform/pull/21616'
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': False,
+    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': True,
 
     ### ORA Feature Flags ###
 
@@ -357,7 +357,7 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_ORA_TEAM_SUBMISSIONS': False,
+    'ENABLE_ORA_TEAM_SUBMISSIONS': True,
 
     # .. toggle_name: ENABLE_ORA_ALL_FILE_URLS
     # .. toggle_implementation: DjangoSetting
@@ -372,7 +372,7 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_ORA_ALL_FILE_URLS': False,
+    'ENABLE_ORA_ALL_FILE_URLS': True,
 
     # .. toggle_name: ENABLE_ORA_USER_STATE_UPLOAD_DATA
     # .. toggle_implementation: DjangoSetting
@@ -386,7 +386,7 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_ORA_USER_STATE_UPLOAD_DATA': False,
+    'ENABLE_ORA_USER_STATE_UPLOAD_DATA': True,
 
     # .. toggle_name: DEPRECATE_OLD_COURSE_KEYS_IN_STUDIO
     # .. toggle_implementation: DjangoSetting
@@ -404,6 +404,8 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/DEPR-58
     # .. toggle_status: supported
     'DEPRECATE_OLD_COURSE_KEYS_IN_STUDIO': True,
+
+    'CUSTOM_CERTIFICATE_TEMPLATES_ENABLED': True,
 }
 
 ENABLE_JASMINE = False
@@ -632,12 +634,12 @@ CSRF_TRUSTED_ORIGINS = []
 
 #################### CAPA External Code Evaluation #############################
 XQUEUE_INTERFACE = {
-    'url': 'http://localhost:18040',
-    'basic_auth': ['edx', 'edx'],
-    'django_auth': {
-        'username': 'lms',
-        'password': 'password'
-    }
+  "django_auth": {
+    "username": "lms",
+    "password": "uKDGo3wV"
+  },
+  "url": "http://xqueue.courses.steamforvietnam.org",
+  "callback_url": "http://courses.steamforvietnam.org"
 }
 
 ################################# Middleware ###################################
@@ -2066,7 +2068,7 @@ FINANCIAL_REPORTS = {
     'ROOT_PATH': 'sandbox',
 }
 
-CORS_ORIGIN_WHITELIST = ['live.steamforvietnam.org', 'www.live.steamforvietnam.org']
+CORS_ORIGIN_WHITELIST = ['live.steamforvietnam.org', 'www.live.steamforvietnam.org', 'live.steamforvietnam.net', 'www.live.steamforvietnam.net']
 CORS_ORIGIN_ALLOW_ALL = False
 
 LOGIN_REDIRECT_WHITELIST = []

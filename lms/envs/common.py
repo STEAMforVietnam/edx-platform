@@ -285,7 +285,7 @@ FEATURES = {
     'MILESTONES_APP': True,
 
     # Organizations application flag
-    'ORGANIZATIONS_APP': False,
+    'ORGANIZATIONS_APP': True,
 
     # Prerequisite courses feature flag
     'ENABLE_PREREQUISITE_COURSES': True,
@@ -314,7 +314,7 @@ FEATURES = {
     'LICENSING': False,
 
     # Certificates Web/HTML Views
-    'CERTIFICATES_HTML_VIEW': False,
+    'CERTIFICATES_HTML_VIEW': True,
 
     # Course discovery feature
     'ENABLE_COURSE_DISCOVERY': False,
@@ -423,7 +423,7 @@ FEATURES = {
     # .. toggle_tickets: 'https://github.com/edx/edx-platform/pull/21616'
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': False,
+    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': True,
 
     # .. toggle_name: ENABLE_COURSEWARE_MICROFRONTEND
     # .. toggle_implementation: DjangoSetting
@@ -451,7 +451,7 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_ORA_TEAM_SUBMISSIONS': False,
+    'ENABLE_ORA_TEAM_SUBMISSIONS': True,
 
     # .. toggle_name: ENABLE_ORA_ALL_FILE_URLS
     # .. toggle_implementation: DjangoSetting
@@ -466,7 +466,7 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_ORA_ALL_FILE_URLS': False,
+    'ENABLE_ORA_ALL_FILE_URLS': True,
 
     # .. toggle_name: ENABLE_ORA_USER_STATE_UPLOAD_DATA
     # .. toggle_implementation: DjangoSetting
@@ -480,7 +480,9 @@ FEATURES = {
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_status: supported
     # .. toggle_warnings: None
-    'ENABLE_ORA_USER_STATE_UPLOAD_DATA': False,
+    'ENABLE_ORA_USER_STATE_UPLOAD_DATA': True,
+
+    'CUSTOM_CERTIFICATE_TEMPLATES_ENABLED': True,
 }
 
 # Settings for the course reviews tool template and identification key, set either to None to disable course reviews
@@ -503,12 +505,12 @@ GENERATE_PROFILE_SCORES = False
 # Used with XQueue
 XQUEUE_WAITTIME_BETWEEN_REQUESTS = 5  # seconds
 XQUEUE_INTERFACE = {
-    'url': 'http://localhost:18040',
-    'basic_auth': ['edx', 'edx'],
-    'django_auth': {
-        'username': 'lms',
-        'password': 'password'
-    }
+  "django_auth": {
+    "username": "lms",
+    "password": "uKDGo3wV"
+  },
+  "url": "http://xqueue.courses.steamforvietnam.org",
+  "callback_url": "http://courses.steamforvietnam.org"
 }
 
 # Used with Email sending
@@ -1226,7 +1228,7 @@ MEDIA_URL = '/media/'
 # Locale/Internationalization
 CELERY_TIMEZONE = 'UTC'
 TIME_ZONE = 'UTC'
-LANGUAGE_CODE = 'en'  # http://www.i18nguy.com/unicode/language-identifiers.html
+LANGUAGE_CODE = 'vi'  # http://www.i18nguy.com/unicode/language-identifiers.html
 # these languages display right to left
 LANGUAGES_BIDI = ("he", "ar", "fa", "ur", "fa-ir", "rtl")
 
@@ -2777,7 +2779,7 @@ if FEATURES.get('ENABLE_CORS_HEADERS'):
         'use-jwt-cookie',
     )
 
-CORS_ORIGIN_WHITELIST = ['live.steamforvietnam.org', 'www.live.steamforvietnam.org']
+CORS_ORIGIN_WHITELIST = ['live.steamforvietnam.org', 'www.live.steamforvietnam.org', 'live.steamforvietnam.net', 'www.live.steamforvietnam.net']
 CORS_ORIGIN_ALLOW_ALL = False
 # Default cache expiration for the cross-domain proxy HTML page.
 # This is a static page that can be iframed into an external page

@@ -4820,7 +4820,7 @@ msgstr ""
 
 #: lms/static/js/student_account/views/account_settings_factory.js
 msgid "Email Address (Sign In)"
-msgstr "Địa chỉ Email (Sign In)"
+msgstr "Địa chỉ Email (Đăng nhập)"
 
 #: lms/static/js/student_account/views/account_settings_factory.js
 msgid ""
@@ -8496,7 +8496,7 @@ msgstr "Có lỗi xảy ra. Hãy tải lại trang."
 
 #: lms/templates/student_account/form_field.underscore
 msgid "Need help logging in?"
-msgstr ""
+msgstr "Bạn có cần trợ giúp đăng nhập không?"
 
 #: lms/templates/student_account/hinted_login.underscore
 #: lms/templates/student_account/login.underscore
@@ -8537,23 +8537,23 @@ msgstr "Đăng ký với thông tin của tổ chức / trường"
 #: lms/templates/student_account/institution_register.underscore
 #: lms/templates/student_account/register.underscore
 msgid "Create an Account"
-msgstr ""
+msgstr "Tạo một tài khoản"
 
 #: lms/templates/student_account/login.underscore
 msgid "First time here?"
-msgstr ""
+msgstr "Bạn chưa có tài khoản?"
 
 #: lms/templates/student_account/login.underscore
 msgid "Create an Account."
-msgstr ""
+msgstr "Tạo một tài khoản tại đây."
 
 #: lms/templates/student_account/login.underscore
 msgid "Sign in to continue learning as {email}"
-msgstr ""
+msgstr "Đăng nhập để tiếp tục học với email {email}"
 
 #: lms/templates/student_account/login.underscore
 msgid "Sign in to continue learning"
-msgstr ""
+msgstr "Đăng nhập để tiếp tục học"
 
 #: lms/templates/student_account/login.underscore
 msgid ""
@@ -8578,7 +8578,7 @@ msgstr ""
 
 #: lms/templates/student_account/login.underscore
 msgid "Sign In"
-msgstr ""
+msgstr "Đăng nhập"
 
 #: lms/templates/student_account/login.underscore
 msgid ""

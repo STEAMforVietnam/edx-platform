@@ -393,7 +393,7 @@ def _get_source_address(course_id, course_title, course_language, truncate=True)
         from_addr_format = u'{name} {email}'.format(
             # Translators: Bulk email from address e.g. ("Physics 101" Course Staff)
             name=_(u'"{course_title}" Course Staff'),
-            email=u'<{course_name}-{from_email}>',  # xss-lint: disable=python-wrap-html
+            email=u'<{from_email}>',  # xss-lint: disable=python-wrap-html
         )
 
     def format_address(course_title_no_quotes):

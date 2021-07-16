@@ -10411,6 +10411,9 @@ msgstr ""
 msgid "The email address you used to register with {platform_name}"
 msgstr "Địa chỉ email bạn đã được sử dụng để đăng ký với {platform_name}"
 
+msgid "Need help logging in?"
+msgstr "Bạn cần trợ giúp đăng nhập?"
+
 #. Translators: These instructions appear on the registration form,
 #. immediately
 #. below a field meant to hold the user's email address.

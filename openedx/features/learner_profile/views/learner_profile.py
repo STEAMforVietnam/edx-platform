@@ -114,7 +114,7 @@ def learner_profile_context(request, profile_username, user_is_staff):
         'show_dashboard_tabs': True,
         'disable_courseware_js': True,
         'nav_hidden': True,
-        'records_url': get_credentials_records_url(),
+        'records_url': "", # get_credentials_records_url(),
     }
 
     if own_profile or user_is_staff:
