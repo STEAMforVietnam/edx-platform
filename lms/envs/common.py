@@ -384,7 +384,7 @@ FEATURES = {
     'ENABLE_ONE_CLICK_PROGRAM_PURCHASE': False,
 
     # Allow users to change their email address.
-    'ALLOW_EMAIL_ADDRESS_CHANGE': True,
+    'ALLOW_EMAIL_ADDRESS_CHANGE': False,
 
     # Whether the bulk enrollment view is enabled.
     'ENABLE_BULK_ENROLLMENT_VIEW': True,
@@ -1592,7 +1592,7 @@ MIDDLEWARE = [
 ]
 
 # Clickjacking protection can be disbaled by setting this to 'ALLOW'
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = 'ALLOW'
 
 # Platform for Privacy Preferences header
 P3P_HEADER = 'CP="Open EdX does not have a P3P policy."'
