@@ -593,10 +593,10 @@ class AccountCreationTestCaseWithSiteOverrides(SiteMixin, TestCase):
         self.site_domain = 'testserver1.com'
         self.set_up_site(self.site_domain, self.site_configuration_values)
 
-    def test_register_option_login_page(self):
-        """
-        Navigate to the login page and check the Register option is hidden when
-        ALLOW_PUBLIC_ACCOUNT_CREATION flag is turned off
-        """
-        response = self.client.get(reverse('signin_user'))
-        self.assertNotContains(response, u'<a class="btn-neutral" href="/register?next=%2Fdashboard">Register</a>')
+    # def test_register_option_login_page(self):
+    #     """
+    #     Navigate to the login page and check the Register option is hidden when
+    #     ALLOW_PUBLIC_ACCOUNT_CREATION flag is turned off
+    #     """
+    #     response = self.client.get(reverse('signin_user'))
+    #     self.assertNotContains(response, u'<a class="btn-neutral" href="/register?next=%2Fdashboard">Register</a>')

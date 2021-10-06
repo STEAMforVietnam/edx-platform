@@ -631,29 +631,21 @@ class CourseTabView(EdxFragmentView):
             if CourseTabView.course_open_for_learner_enrollment(course):
                 PageLevelMessages.register_warning_message(
                     request,
-                    Text(_(u"To see course content, {sign_in_link} or {register_link}.")).format(
+                    Text(_(u"To see course content, {sign_in_link}.")).format(
                         sign_in_link=HTML(u'<a href="/login?next={current_url}">{sign_in_label}</a>').format(
                             sign_in_label=_("sign in"),
                             current_url=urlquote_plus(request.path),
-                        ),
-                        register_link=HTML(u'<a href="/register?next={current_url}">{register_label}</a>').format(
-                            register_label=_("register"),
-                            current_url=urlquote_plus(request.path),
-                        ),
+                        )
                     )
                 )
             else:
                 PageLevelMessages.register_warning_message(
                     request,
-                    Text(_(u"{sign_in_link} or {register_link}.")).format(
+                    Text(_(u"{sign_in_link}.")).format(
                         sign_in_link=HTML(u'<a href="/login?next={current_url}">{sign_in_label}</a>').format(
                             sign_in_label=_("Sign in"),
                             current_url=urlquote_plus(request.path),
-                        ),
-                        register_link=HTML(u'<a href="/register?next={current_url}">{register_label}</a>').format(
-                            register_label=_("register"),
-                            current_url=urlquote_plus(request.path),
-                        ),
+                        )
                     )
                 )
         else:
