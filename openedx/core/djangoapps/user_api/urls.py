@@ -4,8 +4,7 @@ Defines the URL routes for this app.
 
 
 from django.conf import settings
-from django.conf.urls import include, url
-from rest_framework import routers
+from django.conf.urls import url
 
 from ..profile_images.views import ProfileImageView
 from .accounts.views import (
@@ -18,8 +17,6 @@ from .accounts.views import (
     LMSAccountRetirementView,
     UsernameReplacementView
 )
-from . import views as user_api_views
-from .models import UserPreference
 from .preferences.views import PreferencesDetailView, PreferencesView
 from .verification_api.views import IDVerificationStatusView, IDVerificationStatusDetailsView
 
@@ -72,10 +69,6 @@ RETIREMENT_POST = AccountRetirementView.as_view({
 RETIREMENT_LMS_POST = LMSAccountRetirementView.as_view({
     'post': 'post',
 })
-
-USER_API_ROUTER = routers.DefaultRouter()
-USER_API_ROUTER.register(r'users', user_api_views.UserViewSet)
-USER_API_ROUTER.register(r'user_prefs', user_api_views.UserPreferenceViewSet)
 
 urlpatterns = [
     url(
@@ -177,32 +170,5 @@ urlpatterns = [
         r'^v1/preferences/{}/(?P<preference_key>[a-zA-Z0-9_]+)$'.format(settings.USERNAME_PATTERN),
         PreferencesDetailView.as_view(),
         name='preferences_detail_api'
-    ),
-    # Moved from user_api/legacy_urls.py
-    url(r'^v1/', include(USER_API_ROUTER.urls)),
-
-    # Moved from user_api/legacy_urls.py
-    url(
-        r'^v1/preferences/(?P<pref_key>{})/users/$'.format(UserPreference.KEY_REGEX),
-        user_api_views.PreferenceUsersListView.as_view()
-    ),
-
-    # Moved from user_api/legacy_urls.py
-    url(
-        r'^v1/forum_roles/(?P<name>[a-zA-Z]+)/users/$',
-        user_api_views.ForumRoleUsersListView.as_view()
-    ),
-
-    # Moved from user_api/legacy_urls.py
-    url(
-        r'^v1/preferences/email_opt_in/$',
-        user_api_views.UpdateEmailOptInPreference.as_view(),
-        name="preferences_email_opt_in"
-    ),
-
-    # Moved from user_api/legacy_urls.py
-    url(
-        r'^v1/preferences/time_zones/$',
-        user_api_views.CountryTimeZoneListView.as_view(),
     ),
 ]

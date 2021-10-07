@@ -54,10 +54,6 @@ to the browser that the cookie should be sent only over an
 SSL-protected channel.  Otherwise, a session hijacker could copy
 the entire cookie and use it to impersonate the victim.
 
-Custom Attributes:
-    safe_sessions.user_mismatch: 'request-response-mismatch' | 'request-session-mismatch'
-        This attribute can be one of the above two values which correspond to the kind of comparison
-        that failed when processing the response. See SafeSessionMiddleware._verify_user
 """
 
 
@@ -76,7 +72,6 @@ from django.http import HttpResponse
 from django.utils.crypto import get_random_string
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.encoding import python_2_unicode_compatible
-from edx_django_utils.monitoring import set_custom_attribute
 
 from six import text_type  # pylint: disable=ungrouped-imports
 
@@ -90,7 +85,7 @@ class SafeCookieError(Exception):
     An exception class for safe cookie related errors.
     """
     def __init__(self, error_message):
-        super(SafeCookieError, self).__init__(error_message)  # lint-amnesty, pylint: disable=super-with-arguments
+        super(SafeCookieError, self).__init__(error_message)
         log.error(error_message)
 
 
@@ -157,7 +152,7 @@ class SafeCookieData(object):
             raw_cookie_components = six.text_type(safe_cookie_string).split(cls.SEPARATOR)
             safe_cookie_data = SafeCookieData(*raw_cookie_components)
         except TypeError:
-            raise SafeCookieError(  # lint-amnesty, pylint: disable=raise-missing-from
+            raise SafeCookieError(
                 u"SafeCookieData BWC parse error: {0!r}.".format(safe_cookie_string)
             )
         else:
@@ -287,7 +282,7 @@ class SafeSessionMiddleware(SessionMiddleware, MiddlewareMixin):
             else:
                 request.COOKIES[settings.SESSION_COOKIE_NAME] = safe_cookie_data.session_id  # Step 2
 
-        process_request_response = super(SafeSessionMiddleware, self).process_request(request)  # Step 3  # lint-amnesty, pylint: disable=assignment-from-no-return, super-with-arguments
+        process_request_response = super(SafeSessionMiddleware, self).process_request(request)  # Step 3
         if process_request_response:
             # The process_request pipeline has been short circuited so
             # return the response.
@@ -326,7 +321,7 @@ class SafeSessionMiddleware(SessionMiddleware, MiddlewareMixin):
         Step 4. Delete the cookie, if it's marked for deletion.
 
         """
-        response = super(SafeSessionMiddleware, self).process_response(request, response)  # Step 1  # lint-amnesty, pylint: disable=super-with-arguments
+        response = super(SafeSessionMiddleware, self).process_response(request, response)  # Step 1
 
         if not _is_cookie_marked_for_deletion(request) and _is_cookie_present(response):
             try:
@@ -377,24 +372,18 @@ class SafeSessionMiddleware(SessionMiddleware, MiddlewareMixin):
                 # conditionally set the log level.
                 log_func = log.debug if request.user.id is None else log.warning
                 log_func(
-                    (
-                        "SafeCookieData user at request '{0}' does not match user at response: '{1}' "
-                        "for request path '{2}'"
-                    ).format(
-                        request.safe_cookie_verified_user_id, request.user.id, request.path,
+                    u"SafeCookieData user at request '{0}' does not match user at response: '{1}'".format(
+                        request.safe_cookie_verified_user_id,
+                        request.user.id,
                     ),
                 )
-                set_custom_attribute("safe_sessions.user_mismatch", "request-response-mismatch")
             if request.safe_cookie_verified_user_id != userid_in_session:
                 log.warning(
-                    (
-                        "SafeCookieData user at request '{0}' does not match user in session: '{1}' "
-                        "for request path '{2}'"
-                    ).format(  # pylint: disable=logging-format-interpolation
-                        request.safe_cookie_verified_user_id, userid_in_session, request.path,
+                    u"SafeCookieData user at request '{0}' does not match user in session: '{1}'".format(  # pylint: disable=logging-format-interpolation
+                        request.safe_cookie_verified_user_id,
+                        userid_in_session,
                     ),
                 )
-                set_custom_attribute("safe_sessions.user_mismatch", "request-session-mismatch")
 
     @staticmethod
     def get_user_id_from_session(request):

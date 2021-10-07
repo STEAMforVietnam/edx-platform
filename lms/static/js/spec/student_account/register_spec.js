@@ -22,7 +22,6 @@
                         name: 'Xsy M. Education',
                         username: 'Xsy',
                         password: 'xsyisawesome',
-                        confirm_password: 'xsyisawesome',
                         level_of_education: 'p',
                         gender: 'm',
                         year_of_birth: 2014,
@@ -66,8 +65,7 @@
                             email: '',
                             username: '',
                             password: '',
-                            confirm_email: '',
-                            confirm_password: ''
+                            confirm_email: ''
                         }
                     },
                     VALIDATION_DECISIONS_NEGATIVE = {
@@ -75,13 +73,12 @@
                             email: 'Error.',
                             username: 'Error.',
                             password: 'Error.',
-                            confirm_email: 'Error',
-                            confirm_password: 'Error.'
+                            confirm_email: 'Error'
                         }
                     },
                     FORM_DESCRIPTION = {
                         method: 'post',
-                        submit_url: '/api/user/v1/account/registration/',
+                        submit_url: '/user_api/v1/account/registration/',
                         validation_url: '/api/user/v1/validation/registration',
                         fields: [
                             {
@@ -132,16 +129,6 @@
                                 type: 'password',
                                 required: true,
                                 instructions: 'Enter your password.',
-                                restrictions: {}
-                            },
-                            {
-                                placeholder: '',
-                                name: 'confirm_password',
-                                label: 'Confirm Password',
-                                defaultValue: '',
-                                type: 'text',
-                                required: true,
-                                instructions: 'Re-enter your password.',
                                 restrictions: {}
                             },
                             {
@@ -261,7 +248,6 @@
                     $name = $('#register-name');
                     $username = $('#register-username');
                     $password = $('#register-password');
-                    $confirmPassword = $('#register-confirm_password');
                     $levelOfEducation = $('#register-level_of_education');
                     $gender = $('#register-gender');
                     $yearOfBirth = $('#register-year_of_birth');
@@ -385,20 +371,6 @@
                     expect($('.button-oa2-google-oauth2')).toBeVisible();
                     expect($('.button-oa2-facebook')).toBeVisible();
                 });
-
-                it('does not display the registration form', function() {
-                    var thirdPartyAuthView = new RegisterView({
-                        fields: FORM_DESCRIPTION.fields,
-                        model: model,
-                        thirdPartyAuth: THIRD_PARTY_AUTH,
-                        platformName: PLATFORM_NAME,
-                        is_require_third_party_auth_enabled: true
-                    });
-
-                    expect(thirdPartyAuthView).not.toContain(view.$submitButton);
-                    expect(thirdPartyAuthView).not.toContain($('form-field'));
-                });
-
 
                 it('validates registration form fields on form submission', function() {
                     createRegisterView(this);

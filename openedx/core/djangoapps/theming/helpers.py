@@ -13,7 +13,6 @@ from logging import getLogger
 import crum
 from django.conf import settings
 
-from edx_toggles.toggles import SettingToggle
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.theming.helpers_dirs import (
     Theme,
@@ -28,7 +27,7 @@ logger = getLogger(__name__)  # pylint: disable=invalid-name
 
 
 @request_cached()
-def get_template_path(relative_path, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
+def get_template_path(relative_path, **kwargs):
     """
     The calculated value is cached for the lifetime of the current request.
     """
@@ -316,12 +315,10 @@ def is_comprehensive_theming_enabled():
     Returns:
          (bool): True if comprehensive theming is enabled else False
     """
-    ENABLE_COMPREHENSIVE_THEMING = SettingToggle("ENABLE_COMPREHENSIVE_THEMING", default=False)
-
-    if ENABLE_COMPREHENSIVE_THEMING.is_enabled() and current_request_has_associated_site_theme():
+    if settings.ENABLE_COMPREHENSIVE_THEMING and current_request_has_associated_site_theme():
         return True
 
-    return ENABLE_COMPREHENSIVE_THEMING.is_enabled()
+    return settings.ENABLE_COMPREHENSIVE_THEMING
 
 
 def get_config_value_from_site_or_settings(name, site=None, site_config_name=None):

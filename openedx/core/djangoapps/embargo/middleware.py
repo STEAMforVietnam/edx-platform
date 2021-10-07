@@ -34,7 +34,7 @@ from django.core.exceptions import MiddlewareNotUsed
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 from django.shortcuts import redirect
-from ipware.ip import get_client_ip
+from ipware.ip import get_ip
 
 from openedx.core.lib.request_utils import course_id_from_url
 
@@ -62,11 +62,7 @@ class EmbargoMiddleware(MiddlewareMixin):
         # If embargoing is turned off, make this middleware do nothing
         if not settings.FEATURES.get('EMBARGO'):
             raise MiddlewareNotUsed()
-<<<<<<< HEAD
-        super(EmbargoMiddleware, self).__init__(*args, **kwargs)  # lint-amnesty, pylint: disable=super-with-arguments
-=======
-        super().__init__(*args, **kwargs)
->>>>>>> 5d7cd3d278cf9ff593e20b4eebd5aad1249d3308
+        super(EmbargoMiddleware, self).__init__(*args, **kwargs)
 
     def process_request(self, request):
         """Block requests based on embargo rules.
@@ -87,14 +83,14 @@ class EmbargoMiddleware(MiddlewareMixin):
             if pattern.match(request.path) is not None:
                 return None
 
-        ip_address = get_client_ip(request)[0]
+        ip_address = get_ip(request)
         ip_filter = IPFilter.current()
 
         if ip_filter.enabled and ip_address in ip_filter.blacklist_ips:
             log.info(
                 (
-                    "User %s was blocked from accessing %s "
-                    "because IP address %s is blacklisted."
+                    u"User %s was blocked from accessing %s "
+                    u"because IP address %s is blacklisted."
                 ), request.user.id, request.path, ip_address
             )
 
@@ -112,8 +108,8 @@ class EmbargoMiddleware(MiddlewareMixin):
         elif ip_filter.enabled and ip_address in ip_filter.whitelist_ips:
             log.info(
                 (
-                    "User %s was allowed access to %s because "
-                    "IP address %s is whitelisted."
+                    u"User %s was allowed access to %s because "
+                    u"IP address %s is whitelisted."
                 ),
                 request.user.id, request.path, ip_address
             )

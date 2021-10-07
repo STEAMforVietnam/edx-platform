@@ -64,7 +64,7 @@ def intercept_errors(api_error, ignore_errors=None):
                             func_name=func.__name__,
                             args=args,
                             kwargs=kwargs,
-                            exception=ex.developer_message if hasattr(ex, 'developer_message') else repr(ex)  # lint-amnesty, pylint: disable=no-member
+                            exception=ex.developer_message if hasattr(ex, 'developer_message') else repr(ex)
                         )
                         LOGGER.warning(msg)
                         raise
@@ -80,11 +80,11 @@ def intercept_errors(api_error, ignore_errors=None):
                     func_name=func.__name__,
                     args=args,
                     kwargs=kwargs,
-                    exception=ex.developer_message if hasattr(ex, 'developer_message') else repr(ex),  # lint-amnesty, pylint: disable=no-member
+                    exception=ex.developer_message if hasattr(ex, 'developer_message') else repr(ex),
                     caller=caller.strip(),
                 )
                 LOGGER.exception(msg)
-                raise api_error(msg)  # lint-amnesty, pylint: disable=raise-missing-from
+                raise api_error(msg)
         return _wrapped
     return _decorator
 
@@ -347,13 +347,13 @@ class LocalizedJSONEncoder(DjangoJSONEncoder):
     JSON handler that evaluates ugettext_lazy promises.
     """
     # pylint: disable=method-hidden
-    def default(self, obj):  # lint-amnesty, pylint: disable=arguments-differ
+    def default(self, obj):
         """
         Forces evaluation of ugettext_lazy promises.
         """
         if isinstance(obj, Promise):
             return force_text(obj)
-        super(LocalizedJSONEncoder, self).default(obj)  # lint-amnesty, pylint: disable=super-with-arguments
+        super(LocalizedJSONEncoder, self).default(obj)
 
 
 def serializer_is_dirty(preference_serializer):

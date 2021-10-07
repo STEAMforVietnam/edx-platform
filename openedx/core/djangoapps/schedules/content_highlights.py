@@ -1,5 +1,5 @@
 """
-Contains methods for accessing course highlights. Course highlights is a
+Contains methods for accessing weekly course highlights. Weekly highlights is a
 schedule experience built on the Schedules app.
 """
 
@@ -7,6 +7,7 @@ schedule experience built on the Schedules app.
 import logging
 
 from openedx.core.djangoapps.course_date_signals.utils import spaced_out_sections
+from openedx.core.djangoapps.schedules.config import COURSE_UPDATE_WAFFLE_FLAG
 from openedx.core.djangoapps.schedules.exceptions import CourseUpdateDoesNotExist
 from openedx.core.lib.request_utils import get_request_or_stub
 from xmodule.modulestore.django import modulestore
@@ -14,32 +15,16 @@ from xmodule.modulestore.django import modulestore
 log = logging.getLogger(__name__)
 
 
-def get_all_course_highlights(course_key):
+def course_has_highlights(course_key):
     """
+    Does the course have any highlights for any section/week in it?
     This ignores access checks, since highlights may be lurking in currently
     inaccessible content.
-    Returns a list of all the section highlights in the course
     """
     try:
         course = _get_course_with_highlights(course_key)
 
     except CourseUpdateDoesNotExist:
-        return []
-    else:
-        highlights = [section.highlights for section in course.get_children() if not section.hide_from_toc]
-        return highlights
-
-
-def course_has_highlights(course):
-    """
-    Does the course have any highlights for any section/week in it?
-    This ignores access checks, since highlights may be lurking in currently
-    inaccessible content.
-
-    Arguments:
-        course (CourseDescriptor): course object to check
-    """
-    if not course.highlights_enabled_for_messaging:
         return False
 
     else:
@@ -51,26 +36,10 @@ def course_has_highlights(course):
 
         if not highlights_are_available:
             log.warning(
-                'Course team enabled highlights and provided no highlights in {}'.format(course.id)
+                'Course team enabled highlights and provided no highlights in {}'.format(course_key)
             )
 
         return highlights_are_available
-
-
-def course_has_highlights_from_store(course_key):
-    """
-    Does the course have any highlights for any section/week in it?
-    This ignores access checks, since highlights may be lurking in currently
-    inaccessible content.
-
-    Arguments:
-        course_key (CourseKey): course to lookup from the modulestore
-    """
-    try:
-        course = _get_course_descriptor(course_key)
-    except CourseUpdateDoesNotExist:
-        return False
-    return course_has_highlights(course)
 
 
 def get_week_highlights(user, course_key, week_num):
@@ -107,6 +76,11 @@ def get_next_section_highlights(user, course_key, start_date, target_date):
 
 def _get_course_with_highlights(course_key):
     """ Gets Course descriptor iff highlights are enabled for the course """
+    if not COURSE_UPDATE_WAFFLE_FLAG.is_enabled(course_key):
+        raise CourseUpdateDoesNotExist(
+            '{} Course Update Messages waffle flag is disabled.'.format(course_key)
+        )
+
     course_descriptor = _get_course_descriptor(course_key)
     if not course_descriptor.highlights_enabled_for_messaging:
         raise CourseUpdateDoesNotExist(

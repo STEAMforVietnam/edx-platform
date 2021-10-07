@@ -6,18 +6,20 @@ Utility methods for the account settings.
 import re
 
 import waffle
-from completion.waffle import ENABLE_COMPLETION_TRACKING_SWITCH
+from completion import waffle as completion_waffle
 from completion.models import BlockCompletion
 from django.conf import settings
 from django.utils.translation import ugettext as _
 from six import text_type
-from six.moves import range  # lint-amnesty, pylint: disable=unused-import
+from six.moves import range
 from six.moves.urllib.parse import urlparse  # pylint: disable=import-error
 
-from common.djangoapps.third_party_auth.config.waffle import ENABLE_MULTIPLE_SSO_ACCOUNTS_ASSOCIATION_TO_SAML_USER
 from openedx.core.djangoapps.site_configuration.models import SiteConfiguration
 from openedx.core.djangoapps.theming.helpers import get_config_value_from_site_or_settings, get_current_site
-from openedx.core.djangoapps.user_api.config.waffle import ENABLE_MULTIPLE_USER_ENTERPRISES_FEATURE
+from openedx.core.djangoapps.user_api.config.waffle import (
+    ENABLE_MULTIPLE_USER_ENTERPRISES_FEATURE,
+    waffle as user_api_waffle
+)
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
 
@@ -116,7 +118,7 @@ def retrieve_last_sitewide_block_completed(user):
     :return: block_lms_url
 
     """
-    if not ENABLE_COMPLETION_TRACKING_SWITCH.is_enabled():
+    if not completion_waffle.waffle().is_enabled(completion_waffle.ENABLE_COMPLETION_TRACKING):
         return
 
     latest_completions_by_course = BlockCompletion.latest_blocks_completed_all_courses(user)
@@ -197,14 +199,4 @@ def is_multiple_user_enterprises_feature_enabled():
     Returns:
         Boolean value representing switch status
     """
-    return ENABLE_MULTIPLE_USER_ENTERPRISES_FEATURE.is_enabled()
-
-
-def is_multiple_sso_accounts_association_to_saml_user_enabled():
-    """
-    Checks to see if the django-waffle switch for enabling the multiple sso accounts association to saml user is active
-
-    Returns:
-        Boolean value representing switch status
-    """
-    return ENABLE_MULTIPLE_SSO_ACCOUNTS_ASSOCIATION_TO_SAML_USER.is_enabled()
+    return user_api_waffle().is_enabled(ENABLE_MULTIPLE_USER_ENTERPRISES_FEATURE)

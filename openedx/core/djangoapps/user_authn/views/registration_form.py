@@ -10,7 +10,7 @@ import six
 
 from django import forms
 from django.conf import settings
-from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
+from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
 from django.core.validators import RegexValidator, ValidationError, slug_re
 from django.forms import widgets
@@ -108,8 +108,8 @@ class UsernameField(forms.CharField):
 
     default_validators = [validate_username]
 
-    def __init__(self, *args, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
-        super(UsernameField, self).__init__(  # lint-amnesty, pylint: disable=super-with-arguments
+    def __init__(self, *args, **kwargs):
+        super(UsernameField, self).__init__(
             min_length=accounts.USERNAME_MIN_LENGTH,
             max_length=accounts.USERNAME_MAX_LENGTH,
             error_messages={
@@ -127,7 +127,7 @@ class UsernameField(forms.CharField):
         """
 
         value = self.to_python(value).strip()
-        return super(UsernameField, self).clean(value)  # lint-amnesty, pylint: disable=super-with-arguments
+        return super(UsernameField, self).clean(value)
 
 
 class AccountCreationForm(forms.Form):
@@ -172,7 +172,7 @@ class AccountCreationForm(forms.Form):
         do_third_party_auth=True,
         tos_required=True
     ):
-        super(AccountCreationForm, self).__init__(data)  # lint-amnesty, pylint: disable=super-with-arguments
+        super(AccountCreationForm, self).__init__(data)
 
         extra_fields = extra_fields or {}
         self.extended_profile_fields = extended_profile_fields or {}
@@ -200,13 +200,6 @@ class AccountCreationForm(forms.Form):
                                 "required": _("To enroll, you must follow the honor code.")
                             }
                         )
-                elif field_name == "confirm_password":
-                    if field_value == "required" and data.get("password"):
-                        self.fields[field_name] = forms.CharField(
-                            error_messages={
-                                "required": _("Please confirm password.")
-                            }
-                        )    
                 else:
                     required = field_value == "required"
                     min_length = 1
@@ -238,16 +231,6 @@ class AccountCreationForm(forms.Form):
             temp_user = User(username=username, email=email) if username else None
             validate_password(password, temp_user)
         return password
-
-    def clean_confirm_password(self):
-        """Enforce confirm password policies (if applicable)"""
-        confirm_password = self.cleaned_data["confirm_password"]
-        if (
-                "password" in self.cleaned_data and
-                self.cleaned_data["password"] != confirm_password
-        ):
-            raise ValidationError(_("The passwords must match."))
-        return confirm_password
 
     def clean_email(self):
         """ Enforce email restrictions (if applicable) """
@@ -316,7 +299,6 @@ class RegistrationFormFactory(object):
 
     EXTRA_FIELDS = [
         "confirm_email",
-        "confirm_password",
         "first_name",
         "last_name",
         "city",
@@ -581,25 +563,6 @@ class RegistrationFormFactory(object):
             restrictions=password_validators_restrictions(),
             required=required
         )
-
-    def _add_confirm_password_field(self, form_desc, required=True):
-        """Add a password confirmation field to a form description
-        Args:
-            form_desc: A form description
-            required: Whether this field is required. Defaults to True.
-        """
-        confirm_password_label = _(u"Confirm Password")
-
-        error_msg = _(u"Please confirm password.")
-
-        form_desc.add_field(
-            "confirm_password",
-            label=confirm_password_label,
-            field_type="password",
-            instructions=password_validators_instruction_texts(),
-            restrictions=password_validators_restrictions(),
-            required=required
-        )        
 
     def _add_level_of_education_field(self, form_desc, required=True):
         """Add a level of education field to a form description.

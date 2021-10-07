@@ -1,5 +1,5 @@
 """
-Authn API Views
+Logistration API Views
 """
 
 from django.conf import settings
@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
-from openedx.core.djangoapps.user_authn.views.utils import third_party_auth_context
+from openedx.core.djangoapps.user_authn.utils import third_party_auth_context
 
 REDIRECT_KEY = 'redirect_to'
 
@@ -26,7 +26,7 @@ class TPAContextView(APIView):
     """
     throttle_classes = [ThirdPartyAuthContextThrottle]
 
-    def get(self, request, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
+    def get(self, request, **kwargs):
         """
         Returns the context for third party auth providers and the currently running pipeline.
 

@@ -1,3 +1,5 @@
+#-*- coding: utf-8 -*-
+
 """
 Exam Settings View Tests
 """
@@ -30,7 +32,7 @@ class TestExamSettingsView(CourseTestCase, UrlResetMixin):
         """
         Set up the for the exam settings view tests.
         """
-        super().setUp()
+        super(TestExamSettingsView, self).setUp()
         self.reset_urls()
 
     @staticmethod

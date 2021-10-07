@@ -8,7 +8,7 @@ from os.path import abspath, dirname, join
 
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
-# pylint: enable=unicode-format-string  # lint-amnesty, pylint: disable=bad-option-value
+# pylint: enable=unicode-format-string
 #####################################################################
 from edx_django_utils.plugins import add_plugins
 
@@ -117,6 +117,9 @@ FEATURES['PREVENT_CONCURRENT_LOGINS'] = False
 ########################### Milestones #################################
 FEATURES['MILESTONES_APP'] = True
 
+########################### Milestones #################################
+FEATURES['ORGANIZATIONS_APP'] = True
+
 ########################### Entrance Exams #################################
 FEATURES['ENTRANCE_EXAMS'] = True
 
@@ -139,7 +142,7 @@ FEATURES['CERTIFICATES_HTML_VIEW'] = True
 
 
 ########################## Course Discovery #######################
-LANGUAGE_MAP = {'terms': {lang: display for lang, display in ALL_LANGUAGES}, 'name': 'Language'}  # lint-amnesty, pylint: disable=unnecessary-comprehension
+LANGUAGE_MAP = {'terms': {lang: display for lang, display in ALL_LANGUAGES}, 'name': 'Language'}
 COURSE_DISCOVERY_MEANINGS = {
     'org': {
         'name': 'Organization',
@@ -179,6 +182,9 @@ FEATURES['ENABLE_COSMETIC_DISPLAY_PRICE'] = True
 
 ######################### Program Enrollments #####################
 FEATURES['ENABLE_ENROLLMENT_RESET'] = True
+
+######################### New Courseware MFE #####################
+FEATURES['ENABLE_COURSEWARE_MICROFRONTEND'] = True
 
 ########################## Third Party Auth #######################
 
@@ -266,7 +272,7 @@ EDXNOTES_CLIENT_NAME = 'edx_notes_api-backend-service'
 ############## Settings for Microfrontends  #########################
 LEARNING_MICROFRONTEND_URL = 'http://localhost:2000'
 ACCOUNT_MICROFRONTEND_URL = 'http://localhost:1997'
-AUTHN_MICROFRONTEND_URL = 'http://localhost:1999'
+LOGISTRATION_MICROFRONTEND_URL = 'http://localhost:1999'
 
 ############## Docker based devstack settings #######################
 

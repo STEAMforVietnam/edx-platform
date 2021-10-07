@@ -42,7 +42,7 @@ class BackpopulateProgramCredentialsTests(CatalogIntegrationMixin, CredentialsAp
     SAME_COURSE = 'same_course'
 
     def setUp(self):
-        super(BackpopulateProgramCredentialsTests, self).setUp()  # lint-amnesty, pylint: disable=super-with-arguments
+        super(BackpopulateProgramCredentialsTests, self).setUp()
 
         self.alice = UserFactory()
         self.bob = UserFactory()
@@ -289,8 +289,8 @@ class BackpopulateProgramCredentialsTests(CatalogIntegrationMixin, CredentialsAp
         passing_status = CertificateStatuses.downloadable
         failing_status = CertificateStatuses.notpassing
 
-        assert passing_status in CertificateStatuses.PASSED_STATUSES
-        assert failing_status not in CertificateStatuses.PASSED_STATUSES
+        self.assertIn(passing_status, CertificateStatuses.PASSED_STATUSES)
+        self.assertNotIn(failing_status, CertificateStatuses.PASSED_STATUSES)
 
         GeneratedCertificateFactory(
             user=self.alice,
@@ -382,7 +382,7 @@ class BackpopulateProgramCredentialsTests(CatalogIntegrationMixin, CredentialsAp
 
         call_command('backpopulate_program_credentials', commit=True)
 
-        assert mock_log.called
+        self.assertTrue(mock_log.called)
 
         calls = [
             mock.call(self.alice.username),

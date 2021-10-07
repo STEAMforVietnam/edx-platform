@@ -3,13 +3,15 @@ Django REST Framework serializers for the User API application
 """
 
 
-from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
-from django.utils.timezone import now  # lint-amnesty, pylint: disable=unused-import
+from django.contrib.auth.models import User
+from django.utils.timezone import now
 from rest_framework import serializers
 
 from lms.djangoapps.verify_student.models import (
+    IDVerificationAttempt,
     ManualVerification,
-    SoftwareSecurePhotoVerification
+    SoftwareSecurePhotoVerification,
+    SSOVerification
 )
 
 from .models import UserPreference
@@ -101,15 +103,48 @@ class CountryTimeZoneSerializer(serializers.Serializer):  # pylint: disable=abst
     description = serializers.CharField()
 
 
-class IDVerificationDetailsSerializer(serializers.Serializer):  # lint-amnesty, pylint: disable=abstract-method, missing-class-docstring
+class IDVerificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer that generates a representation of a user's ID verification status.
+    """
+    is_verified = serializers.SerializerMethodField()
+
+    def get_is_verified(self, obj):
+        """
+        Return a boolean indicating if a the user is verified.
+        """
+        return obj.status == 'approved' and obj.expiration_datetime > now()
+
+
+class SoftwareSecurePhotoVerificationSerializer(IDVerificationSerializer):
+
+    class Meta(object):
+        fields = ('status', 'expiration_datetime', 'is_verified')
+        model = SoftwareSecurePhotoVerification
+
+
+class SSOVerificationSerializer(IDVerificationSerializer):
+
+    class Meta(object):
+        fields = ('status', 'expiration_datetime', 'is_verified')
+        model = SSOVerification
+
+
+class ManualVerificationSerializer(IDVerificationSerializer):
+
+    class Meta(object):
+        fields = ('status', 'expiration_datetime', 'is_verified')
+        model = ManualVerification
+
+
+class IDVerificationDetailsSerializer(serializers.Serializer):
     type = serializers.SerializerMethodField()
     status = serializers.CharField()
     expiration_datetime = serializers.DateTimeField()
     message = serializers.SerializerMethodField()
     updated_at = serializers.DateTimeField()
-    receipt_id = serializers.SerializerMethodField()
 
-    def get_type(self, obj):  # lint-amnesty, pylint: disable=missing-function-docstring
+    def get_type(self, obj):
         if isinstance(obj, SoftwareSecurePhotoVerification):
             return 'Software Secure'
         elif isinstance(obj, ManualVerification):
@@ -117,16 +152,10 @@ class IDVerificationDetailsSerializer(serializers.Serializer):  # lint-amnesty, 
         else:
             return 'SSO'
 
-    def get_message(self, obj):  # lint-amnesty, pylint: disable=missing-function-docstring
+    def get_message(self, obj):
         if isinstance(obj, SoftwareSecurePhotoVerification):
             return obj.error_msg
         elif isinstance(obj, ManualVerification):
             return obj.reason
         else:
             return ''
-
-    def get_receipt_id(self, obj):
-        if isinstance(obj, SoftwareSecurePhotoVerification):
-            return obj.receipt_id
-        else:
-            return None
