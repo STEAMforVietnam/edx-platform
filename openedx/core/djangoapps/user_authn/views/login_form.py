@@ -12,6 +12,8 @@ from django.urls import reverse
 from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
+from django.http import Http404
+
 
 import third_party_auth
 from edxmako.shortcuts import render_to_response
@@ -135,6 +137,11 @@ def login_and_registration_form(request, initial_mode="login"):
         initial_mode (string): Either "login" or "register".
 
     """
+
+    # Remove ability to fill in register form after steamID implementation
+    if initial_mode == "register":
+        raise Http404
+
     # Determine the URL to redirect to following login/registration/third_party_auth
     redirect_to = get_next_url_for_login_page(request)
 
