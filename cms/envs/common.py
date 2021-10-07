@@ -582,7 +582,7 @@ FRONTEND_LOGIN_URL = lambda settings: settings.LMS_ROOT_URL + '/login'
 derived('FRONTEND_LOGIN_URL')
 FRONTEND_LOGOUT_URL = lambda settings: settings.LMS_ROOT_URL + '/logout'
 derived('FRONTEND_LOGOUT_URL')
-FRONTEND_REGISTER_URL = lambda settings: settings.LMS_ROOT_URL + '/register'
+FRONTEND_REGISTER_URL = lambda settings: settings.LMS_ROOT_URL + '/'
 derived('FRONTEND_REGISTER_URL')
 
 LMS_ENROLLMENT_API_PATH = "/api/enrollment/v1/"
