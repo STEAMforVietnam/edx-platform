@@ -138,9 +138,9 @@ def login_and_registration_form(request, initial_mode="login"):
 
     """
 
-    # Remove ability to fill in register form after steamID implementation
-    if initial_mode == "register":
-        raise Http404
+    ## Remove ability to fill in register form after steamID implementation
+    #if initial_mode == "register":
+    #    raise Http404
 
     # Determine the URL to redirect to following login/registration/third_party_auth
     redirect_to = get_next_url_for_login_page(request)
