@@ -39,11 +39,11 @@
                     </button>
                 <% } %>
             </div>
-            <div class="section-title lines">
+            <!-- <div class="section-title lines">
                 <h3>
                     <span class="text"><%- gettext("or create a new one here") %></span>
                 </h3>
-            </div>
+            </div> -->
         <% } else { %>
             <h2><%- gettext('Create an Account')%></h2>
         <% } %>
@@ -51,9 +51,9 @@
         <span class="auto-register-message"><%- context.autoRegisterWelcomeMessage %></span>
     <% } %>
 
-    <%= context.fields %>
+    <!-- <%= context.fields %> -->
 
-    <div class="form-field checkbox-optional_fields_toggle">
+    <!-- <div class="form-field checkbox-optional_fields_toggle">
         <input type="checkbox" id="toggle_optional_fields" class="input-block checkbox"">
         <label for="toggle_optional_fields">
             <span class="label-text">
@@ -65,5 +65,5 @@
 
     <button type="submit" class="action action-primary action-update js-register register-button">
     	<% if ( context.registerFormSubmitButtonText ) { %><%- context.registerFormSubmitButtonText %><% } else { %><%- gettext("Create Account") %><% } %>
-    </button>
+    </button> -->
 </form>

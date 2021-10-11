@@ -294,7 +294,7 @@ FEATURES = {
     'ENABLE_XBLOCK_XML_VALIDATION': True,
 
     # Allow public account creation
-    'ALLOW_PUBLIC_ACCOUNT_CREATION': False,
+    'ALLOW_PUBLIC_ACCOUNT_CREATION': True,
 
     # Whether or not the dynamic EnrollmentTrackUserPartition should be registered.
     'ENABLE_ENROLLMENT_TRACK_USER_PARTITION': True,
@@ -582,7 +582,7 @@ FRONTEND_LOGIN_URL = lambda settings: settings.LMS_ROOT_URL + '/login'
 derived('FRONTEND_LOGIN_URL')
 FRONTEND_LOGOUT_URL = lambda settings: settings.LMS_ROOT_URL + '/logout'
 derived('FRONTEND_LOGOUT_URL')
-FRONTEND_REGISTER_URL = lambda settings: settings.LMS_ROOT_URL + '/'
+FRONTEND_REGISTER_URL = lambda settings: settings.LMS_ROOT_URL + '/register'
 derived('FRONTEND_REGISTER_URL')
 
 LMS_ENROLLMENT_API_PATH = "/api/enrollment/v1/"
