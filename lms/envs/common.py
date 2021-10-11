@@ -370,7 +370,7 @@ FEATURES = {
     'ENABLE_XBLOCK_XML_VALIDATION': True,
 
     # Allow public account creation
-    'ALLOW_PUBLIC_ACCOUNT_CREATION': False,
+    'ALLOW_PUBLIC_ACCOUNT_CREATION': True,
 
     # Enable footer banner for cookie consent.
     # See https://cookieconsent.insites.com/ for more.
