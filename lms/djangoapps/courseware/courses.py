@@ -72,7 +72,7 @@ log = logging.getLogger(__name__)
 # Used by get_course_assignments below. You shouldn't need to use this type directly.
 _Assignment = namedtuple(
     'Assignment', ['block_key', 'title', 'url', 'date', 'contains_gated_content', 'complete', 'past_due',
-                   'assignment_type', 'extra_info']
+                   'assignment_type', 'extra_info', 'section_name']
 )
 
 
@@ -502,6 +502,8 @@ def get_course_assignment_date_blocks(course, user, request, num_return=None,
     date_blocks = []
     for assignment in get_course_assignments(course.id, user, include_access=include_access):
         date_block = CourseAssignmentDate(course, user)
+        date_block.section_name = assignment.section_name
+        date_block.block_key = assignment.block_key
         date_block.date = assignment.date
         date_block.contains_gated_content = assignment.contains_gated_content
         date_block.complete = assignment.complete
@@ -532,6 +534,7 @@ def get_course_assignments(course_key, user, include_access=False):
     now = datetime.now(pytz.UTC)
     assignments = []
     for section_key in block_data.get_children(course_usage_key):
+        section_name = block_data.get_xblock_field(section_key, 'display_name', _('Assignment'))
         for subsection_key in block_data.get_children(section_key):
             due = block_data.get_xblock_field(subsection_key, 'due')
             graded = block_data.get_xblock_field(subsection_key, 'graded', False)
@@ -551,7 +554,7 @@ def get_course_assignments(course_key, user, include_access=False):
                 complete = is_block_structure_complete_for_assignments(block_data, subsection_key)
                 past_due = not complete and due < now
                 assignments.append(_Assignment(
-                    subsection_key, title, url, due, contains_gated_content, complete, past_due, assignment_type, None
+                    subsection_key, title, url, due, contains_gated_content, complete, past_due, assignment_type, None, section_name
                 ))
 
             # Load all dates for ORA blocks as separate assignments
@@ -618,7 +621,8 @@ def get_course_assignments(course_key, user, include_access=False):
                             complete,
                             past_due,
                             assignment_type,
-                            _("Open Response Assessment due dates are set by your instructor and can't be shifted.")
+                            _("Open Response Assessment due dates are set by your instructor and can't be shifted."),
+                            section_name,
                         ))
 
     return assignments

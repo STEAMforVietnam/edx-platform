@@ -63,6 +63,8 @@ class DateSummarySerializer(serializers.Serializer):
     """
     Serializer for Date Summary Objects.
     """
+    block_key = serializers.CharField(default=None)
+    section_name = serializers.CharField(default=None)
     assignment_type = serializers.CharField(default=None)
     complete = serializers.NullBooleanField()
     date = serializers.DateTimeField()
