@@ -5,9 +5,58 @@ Dates Tab Serializers. Represents the relevant dates for a Course.
 
 
 from rest_framework import serializers
+from rest_framework.reverse import reverse
 
 from lms.djangoapps.courseware.date_summary import VerificationDeadlineDate
 from lms.djangoapps.course_home_api.mixins import DatesBannerSerializerMixin
+
+
+class GradedTotalSerializer(serializers.Serializer):
+    earned = serializers.FloatField()
+    possible = serializers.FloatField()
+
+
+class SubsectionScoresSerializer(serializers.Serializer):
+    """
+    Serializer for subsections in section_scores
+    """
+    display_name = serializers.CharField()
+    due = serializers.DateTimeField()
+    format = serializers.CharField()
+    graded = serializers.BooleanField()
+    graded_total = GradedTotalSerializer()
+    percent_graded = serializers.FloatField()
+    problem_scores = serializers.SerializerMethodField()
+    show_correctness = serializers.CharField()
+    show_grades = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+
+    def get_url(self, subsection):
+        relative_path = reverse('jump_to', args=[self.context['course_key'], subsection.location])
+        request = self.context['request']
+        return request.build_absolute_uri(relative_path)
+
+    def get_problem_scores(self, subsection):
+        """Problem scores for this subsection"""
+        problem_scores = [
+            {
+                'earned': score.earned,
+                'possible': score.possible,
+            }
+            for score in subsection.problem_scores.values()
+        ]
+        return problem_scores
+
+    def get_show_grades(self, subsection):
+        return subsection.show_grades(self.context['staff_access'])
+
+
+class SectionScoresSerializer(serializers.Serializer):
+    """
+    Serializer for sections in section_scores
+    """
+    display_name = serializers.CharField()
+    subsections = SubsectionScoresSerializer(source='sections', many=True)
 
 
 class DateSummarySerializer(serializers.Serializer):
@@ -46,3 +95,4 @@ class DatesTabSerializer(DatesBannerSerializerMixin, serializers.Serializer):
     has_ended = serializers.BooleanField()
     learner_is_full_access = serializers.BooleanField()
     user_timezone = serializers.CharField()
+    section_scores = SectionScoresSerializer(many=True)
