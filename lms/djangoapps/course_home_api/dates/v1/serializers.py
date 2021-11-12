@@ -63,6 +63,8 @@ class DateSummarySerializer(serializers.Serializer):
     """
     Serializer for Date Summary Objects.
     """
+    earned = serializers.FloatField(default=None)
+    possible = serializers.FloatField(default=None)
     block_key = serializers.CharField(default=None)
     section_name = serializers.CharField(default=None)
     assignment_type = serializers.CharField(default=None)
