@@ -535,12 +535,12 @@ def get_course_assignments(course_key, user, include_access=False):
     course_usage_key = store.make_course_usage_key(course_key)
     block_data = get_course_blocks(user, course_usage_key, allow_start_dates_in_future=True, include_completion=True)
 
+    course_grade = CourseGradeFactory().read(user, course_key=course_key)
     now = datetime.now(pytz.UTC)
     assignments = []
     for section_key in block_data.get_children(course_usage_key):
         section_name = block_data.get_xblock_field(section_key, 'display_name', _('Assignment'))
         for subsection_key in block_data.get_children(section_key):
-            course_grade = CourseGradeFactory().read(user, course_key=course_key)
             grade = course_grade.subsection_grade(subsection_key).graded_total
 
             due = block_data.get_xblock_field(subsection_key, 'due')
