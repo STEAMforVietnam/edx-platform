@@ -55,7 +55,6 @@ class CourseGradeBase(object):
     def subsection_grade(self, subsection_key):
         """
         Returns the subsection grade for the given subsection usage key.
-
         Note: does NOT check whether the user has access to the subsection.
         Assumes that if a grade exists, the user has access to it.  If the
         grade doesn't exist then either the user does not have access to
@@ -91,6 +90,14 @@ class CourseGradeBase(object):
         for chapter_key in course_structure.get_children(self.course_data.location):
             grades[chapter_key] = self._get_chapter_grade_info(course_structure[chapter_key], course_structure)
         return grades
+
+    def subsection_grade(self, subsection_key):
+        """
+        Return total_grade of a subsection (earned and possible)
+        """
+        course_structure = self.course_data.structure
+        grade = self._get_subsection_grade(course_structure[subsection_key], self.force_update_subsections)
+        return grade
 
     @lazy
     def subsection_grades(self):
@@ -189,7 +196,6 @@ class CourseGradeBase(object):
         """
         Make sure any overrides to the grading policy are used.
         This is most relevant for CCX courses.
-
         Right now, we still access the grading policy from the course
         object. Once we get the grading policy from the BlockStructure
         this will no longer be needed - since BlockStructure correctly

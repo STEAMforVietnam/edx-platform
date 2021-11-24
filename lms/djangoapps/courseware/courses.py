@@ -3,7 +3,6 @@ Functions for accessing and displaying courses within the
 courseware.
 """
 
-
 import logging
 from collections import defaultdict, namedtuple
 from datetime import datetime
@@ -11,8 +10,8 @@ from datetime import datetime
 import pytz
 import six
 from crum import get_current_request
+from dateutil.parser import parse as parse_date
 from django.conf import settings
-from django.db.models import Prefetch
 from django.http import Http404, QueryDict
 from django.urls import reverse
 from django.utils.translation import ugettext as _
@@ -24,8 +23,9 @@ from six import text_type
 
 from openedx.core.lib.cache_utils import request_cached
 
-import branding
-from course_modes.models import CourseMode
+from lms.djangoapps.grades.api import CourseGradeFactory
+
+from lms.djangoapps import branding
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.access_response import (
     AuthenticationRequiredAccessError,
@@ -46,8 +46,7 @@ from lms.djangoapps.courseware.date_summary import (
 from lms.djangoapps.courseware.masquerade import check_content_start_date_for_masquerade_user
 from lms.djangoapps.courseware.model_data import FieldDataCache
 from lms.djangoapps.courseware.module_render import get_module
-from edxmako.shortcuts import render_to_string
-from lms.djangoapps.certificates import api as certs_api
+from common.djangoapps.edxmako.shortcuts import render_to_string
 from lms.djangoapps.courseware.access_utils import (
     check_authentication,
     check_enrollment,
@@ -61,9 +60,10 @@ from openedx.core.djangoapps.site_configuration import helpers as configuration_
 from openedx.core.lib.api.view_utils import LazySequence
 from openedx.features.course_duration_limits.access import AuditExpiredError
 from openedx.features.course_experience import RELATIVE_DATES_FLAG
-from static_replace import replace_static_urls
-from survey.utils import SurveyRequiredAccessError, check_survey_required_and_unanswered
-from util.date_utils import strftime_localized
+from openedx.features.course_experience.utils import is_block_structure_complete_for_assignments
+from common.djangoapps.static_replace import replace_static_urls
+from lms.djangoapps.survey.utils import SurveyRequiredAccessError, check_survey_required_and_unanswered
+from common.djangoapps.util.date_utils import strftime_localized
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from xmodule.x_module import STUDENT_VIEW
@@ -73,17 +73,16 @@ log = logging.getLogger(__name__)
 
 # Used by get_course_assignments below. You shouldn't need to use this type directly.
 _Assignment = namedtuple(
-    'Assignment', ['block_key', 'title', 'url', 'date', 'contains_gated_content', 'complete', 'past_due']
+    'Assignment', ['block_key', 'title', 'url', 'date', 'contains_gated_content', 'complete', 'past_due',
+                   'assignment_type', 'extra_info', 'section_name', 'earned', 'possible']
 )
 
 
 def get_course(course_id, depth=0):
     """
     Given a course id, return the corresponding course descriptor.
-
     If the course does not exist, raises a ValueError.  This is appropriate
     for internal use.
-
     depth: The number of levels of children for the modulestore to cache.
     None means infinite depth.  Default is to fetch no children.
     """
@@ -96,9 +95,7 @@ def get_course(course_id, depth=0):
 def get_course_by_id(course_key, depth=0):
     """
     Given a course id, return the corresponding course descriptor.
-
     If such a course does not exist, raises a 404.
-
     depth: The number of levels of children for the modulestore to cache. None means infinite depth
     """
     with modulestore().bulk_operations(course_key):
@@ -114,11 +111,8 @@ def get_course_with_access(user, action, course_key, depth=0, check_if_enrolled=
     Given a course_key, look up the corresponding course descriptor,
     check that the user has the access to perform the specified action
     on the course, and return the descriptor.
-
     Raises a 404 if the course_key is invalid, or the user doesn't have access.
-
     depth: The number of levels of children for the modulestore to cache. None means infinite depth
-
     check_if_enrolled: If true, additionally verifies that the user is either enrolled in the course
       or has staff access.
     check_survey_complete: If true, additionally verifies that the user has either completed the course survey
@@ -137,9 +131,7 @@ def get_course_overview_with_access(user, action, course_key, check_if_enrolled=
     Given a course_key, look up the corresponding course overview,
     check that the user has the access to perform the specified action
     on the course, and return the course overview.
-
     Raises a 404 if the course_key is invalid, or the user doesn't have access.
-
     check_if_enrolled: If true, additionally verifies that the user is either enrolled in the course
       or has staff access.
     """
@@ -155,7 +147,6 @@ def check_course_access(course, user, action, check_if_enrolled=False, check_sur
     """
     Check that the user has the access to perform the specified action
     on the course (CourseDescriptor|CourseOverview).
-
     check_if_enrolled: If true, additionally verifies that the user is enrolled.
     check_survey_complete: If true, additionally verifies that the user has completed the survey.
     """
@@ -201,7 +192,6 @@ def check_course_access_with_redirect(course, user, action, check_if_enrolled=Fa
     """
     Check that the user has the access to perform the specified action
     on the course (CourseDescriptor|CourseOverview).
-
     check_if_enrolled: If true, additionally verifies that the user is enrolled.
     check_survey_complete: If true, additionally verifies that the user has completed the survey.
     """
@@ -256,7 +246,6 @@ def check_course_access_with_redirect(course, user, action, check_if_enrolled=Fa
 def can_self_enroll_in_course(course_key):
     """
     Returns True if the user can enroll themselves in a course.
-
     Note: an example of a course that a user cannot enroll in directly
     is a CCX course. For such courses, a user can only be enrolled by
     a CCX coach.
@@ -293,11 +282,9 @@ def course_open_for_self_enrollment(course_key):
 def find_file(filesystem, dirs, filename):
     """
     Looks for a filename in a list of dirs on a filesystem, in the specified order.
-
     filesystem: an OSFS filesystem
     dirs: a list of path objects
     filename: a string
-
     Returns d / filename if found in dir d, else raises ResourceNotFound.
     """
     for directory in dirs:
@@ -311,7 +298,6 @@ def get_course_about_section(request, course, section_key):
     """
     This returns the snippet of html to be rendered on the course about page,
     given the key for the section.
-
     Valid keys:
     - overview
     - about_sidebar_html
@@ -404,7 +390,6 @@ def get_course_info_usage_key(course, section_key):
 def get_course_info_section_module(request, user, course, section_key):
     """
     This returns the course info module for a given section_key.
-
     Valid keys:
     - handouts
     - guest_handouts
@@ -432,7 +417,6 @@ def get_course_info_section(request, user, course, section_key):
     """
     This returns the snippet of html to be rendered on the course info page,
     given the key for the section.
-
     Valid keys:
     - handouts
     - guest_handouts
@@ -461,25 +445,28 @@ def get_course_date_blocks(course, user, request=None, include_access=False,
     Return the list of blocks to display on the course info page,
     sorted by date.
     """
-    block_classes = [
-        CourseEndDate,
-        CourseStartDate,
-        TodaysDate,
-        VerificationDeadlineDate,
-        VerifiedUpgradeDeadlineDate,
-    ]
-    if not course.self_paced and certs_api.get_active_web_certificate(course):
-        block_classes.insert(0, CertificateAvailableDate)
-
-    blocks = [cls(course, user) for cls in block_classes]
+    blocks = []
     if RELATIVE_DATES_FLAG.is_enabled(course.id):
-        blocks.append(CourseExpiredDate(course, user))
         blocks.extend(get_course_assignment_date_blocks(
             course, user, request, num_return=num_assignments,
             include_access=include_access, include_past_dates=include_past_dates,
         ))
 
-    return sorted((b for b in blocks if b.date and (b.is_enabled or include_past_dates)), key=date_block_key_fn)
+    # Adding these in after the assignment blocks so in the case multiple blocks have the same date,
+    # these blocks will be sorted to come after the assignments. See https://openedx.atlassian.net/browse/AA-158
+    default_block_classes = [
+        CertificateAvailableDate,
+        CourseEndDate,
+        CourseExpiredDate,
+        CourseStartDate,
+        TodaysDate,
+        VerificationDeadlineDate,
+        VerifiedUpgradeDeadlineDate,
+    ]
+    blocks.extend([cls(course, user) for cls in default_block_classes])
+
+    blocks = filter(lambda b: b.is_allowed and b.date and (include_past_dates or b.is_enabled), blocks)
+    return sorted(blocks, key=date_block_key_fn)
 
 
 def date_block_key_fn(block):
@@ -498,14 +485,20 @@ def get_course_assignment_date_blocks(course, user, request, num_return=None,
     if num_return is None in date increasing order.
     """
     date_blocks = []
-    for assignment in get_course_assignments(course.id, user, request, include_access=include_access):
+    for assignment in get_course_assignments(course.id, user, include_access=include_access):
         date_block = CourseAssignmentDate(course, user)
+        date_block.earned = assignment.earned
+        date_block.possible = assignment.possible
+        date_block.section_name = assignment.section_name
+        date_block.block_key = assignment.block_key
         date_block.date = assignment.date
         date_block.contains_gated_content = assignment.contains_gated_content
         date_block.complete = assignment.complete
+        date_block.assignment_type = assignment.assignment_type
         date_block.past_due = assignment.past_due
-        date_block.link = assignment.url
+        date_block.link = request.build_absolute_uri(assignment.url) if assignment.url else ''
         date_block.set_title(assignment.title, link=assignment.url)
+        date_block._extra_info = assignment.extra_info  # pylint: disable=protected-access
         date_blocks.append(date_block)
     date_blocks = sorted((b for b in date_blocks if b.is_enabled or include_past_dates), key=date_block_key_fn)
     if num_return:
@@ -514,11 +507,11 @@ def get_course_assignment_date_blocks(course, user, request, num_return=None,
 
 
 @request_cached()
-def get_course_assignments(course_key, user, request, include_access=False):
+def get_course_assignments(course_key, user, include_access=False):
     """
     Returns a list of assignment (at the subsection/sequential level) due dates for the given course.
-
-    Each returned object is a namedtuple with fields: title, url, date, contains_gated_content, complete, past_due
+    Each returned object is a namedtuple with fields: title, url, date, contains_gated_content, complete, past_due,
+    assignment_type
     """
     store = modulestore()
     course_usage_key = store.make_course_usage_key(course_key)
@@ -527,28 +520,102 @@ def get_course_assignments(course_key, user, request, include_access=False):
     now = datetime.now(pytz.UTC)
     assignments = []
     for section_key in block_data.get_children(course_usage_key):
+        section_name = block_data.get_xblock_field(section_key, 'display_name', _('Assignment'))
         for subsection_key in block_data.get_children(section_key):
+            course_grade = CourseGradeFactory().read(user, course_key=course_key)
+            grade = course_grade.subsection_grade(subsection_key).graded_total
+
             due = block_data.get_xblock_field(subsection_key, 'due')
             graded = block_data.get_xblock_field(subsection_key, 'graded', False)
-            if not due or not graded:
-                continue
+            if due and graded:
+                contains_gated_content = include_access and block_data.get_xblock_field(
+                    subsection_key, 'contains_gated_content', False)
+                title = block_data.get_xblock_field(subsection_key, 'display_name', _('Assignment'))
 
-            contains_gated_content = include_access and block_data.get_xblock_field(
-                subsection_key, 'contains_gated_content', False)
-            title = block_data.get_xblock_field(subsection_key, 'display_name', _('Assignment'))
+                assignment_type = block_data.get_xblock_field(subsection_key, 'format', None)
 
-            url = ''
-            start = block_data.get_xblock_field(subsection_key, 'start')
-            assignment_released = not start or start < now
-            if assignment_released:
-                url = reverse('jump_to', args=[course_key, subsection_key])
-                url = request and request.build_absolute_uri(url)
+                url = None
+                start = block_data.get_xblock_field(subsection_key, 'start')
+                assignment_released = not start or start < now
+                if assignment_released:
+                    url = reverse('jump_to', args=[course_key, subsection_key])
 
-            complete = block_data.get_xblock_field(subsection_key, 'complete', False)
-            past_due = not complete and due < now
-            assignments.append(_Assignment(
-                subsection_key, title, url, due, contains_gated_content, complete, past_due
-            ))
+                complete = is_block_structure_complete_for_assignments(block_data, subsection_key)
+                past_due = not complete and due < now
+                assignments.append(_Assignment(
+                    subsection_key, title, url, due, contains_gated_content, complete, past_due, assignment_type, None, section_name, grade.earned, grade.possible
+                ))
+
+            # Load all dates for ORA blocks as separate assignments
+            descendents = block_data.get_children(subsection_key)
+            while descendents:
+                descendent = descendents.pop()
+                grade = course_grade.subsection_grade(descendent).graded_total
+                descendents.extend(block_data.get_children(descendent))
+                if block_data.get_xblock_field(descendent, 'category', None) == 'openassessment':
+                    graded = block_data.get_xblock_field(descendent, 'graded', False)
+                    has_score = block_data.get_xblock_field(descendent, 'has_score', False)
+                    weight = block_data.get_xblock_field(descendent, 'weight', 1)
+                    if not (graded and has_score and (weight is None or weight > 0)):
+                        continue
+
+                    all_assessments = [{
+                        'name': 'submission',
+                        'due': block_data.get_xblock_field(descendent, 'submission_due'),
+                        'start': block_data.get_xblock_field(descendent, 'submission_start'),
+                        'required': True
+                    }]
+
+                    valid_assessments = block_data.get_xblock_field(descendent, 'valid_assessments')
+                    if valid_assessments:
+                        all_assessments.extend(valid_assessments)
+
+                    assignment_type = block_data.get_xblock_field(descendent, 'format', None)
+                    complete = is_block_structure_complete_for_assignments(block_data, descendent)
+
+                    block_title = block_data.get_xblock_field(descendent, 'title', _('Open Response Assessment'))
+
+                    for assessment in all_assessments:
+                        due = parse_date(assessment.get('due')).replace(tzinfo=pytz.UTC) if assessment.get('due') else None
+                        if due is None:
+                            continue
+
+                        assessment_name = assessment.get('name')
+                        if assessment_name is None:
+                            continue
+
+                        if assessment_name == 'self-assessment':
+                            assessment_type = _("Self Assessment")
+                        elif assessment_name == 'peer-assessment':
+                            assessment_type = _("Peer Assessment")
+                        elif assessment_name == 'staff-assessment':
+                            assessment_type = _("Staff Assessment")
+                        elif assessment_name == 'submission':
+                            assessment_type = _("Submission")
+                        else:
+                            assessment_type = assessment_name
+                        title = "{} ({})".format(block_title, assessment_type)
+                        url = ''
+                        start = parse_date(assessment.get('start')).replace(tzinfo=pytz.UTC) if assessment.get('start') else None
+                        assignment_released = not start or start < now
+                        if assignment_released:
+                            url = reverse('jump_to', args=[course_key, descendent])
+
+                        past_due = not complete and due and due < now
+                        assignments.append(_Assignment(
+                            descendent,
+                            title,
+                            url,
+                            due,
+                            False,
+                            complete,
+                            past_due,
+                            assignment_type,
+                            _("Open Response Assessment due dates are set by your instructor and can't be shifted."),
+                            section_name,
+                            grade.earned,
+                            grade.possible
+                        ))
 
     return assignments
 
@@ -560,7 +627,6 @@ def get_course_syllabus_section(course, section_key):
     """
     This returns the snippet of html to be rendered on the syllabus page,
     given the key for the section.
-
     Valid keys:
     - syllabus
     - guest_syllabus
@@ -602,11 +668,7 @@ def get_courses(user, org=None, filter_=None):
         org=org,
         filter_=filter_,
     ).prefetch_related(
-        Prefetch(
-            'modes',
-            queryset=CourseMode.objects.exclude(mode_slug__in=CourseMode.CREDIT_MODES),
-            to_attr='selectable_modes',
-        ),
+        'modes',
     ).select_related(
         'image_set'
     )
@@ -681,7 +743,6 @@ def get_cms_block_link(block, page):
 def get_studio_url(course, page):
     """
     Get the Studio URL of the page that is passed in.
-
     Args:
         course (CourseDescriptor)
     """
@@ -722,11 +783,9 @@ def get_current_child(xmodule, min_depth=None, requested_child=None):
     Get the xmodule.position's display item of an xmodule that has a position and
     children.  If xmodule has no position or is out of bounds, return the first
     child with children of min_depth.
-
     For example, if chapter_one has no position set, with two child sections,
     section-A having no children and section-B having a discussion unit,
     `get_current_child(chapter, min_depth=1)`  will return section-B.
-
     Returns None only if there are no children at all.
     """
     # TODO: convert this method to use the Course Blocks API
@@ -781,7 +840,6 @@ def get_current_child(xmodule, min_depth=None, requested_child=None):
 def get_course_chapter_ids(course_key):
     """
     Extracts the chapter block keys from a course structure.
-
     Arguments:
         course_key (CourseLocator): The course key
     Returns:
