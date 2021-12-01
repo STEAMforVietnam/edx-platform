@@ -12,6 +12,8 @@ from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthenticat
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
 from opaque_keys.edx.keys import CourseKey
 
+
+from common.djangoapps.student.models import CourseEnrollment
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.context_processor import user_timezone_locale_prefs
 from lms.djangoapps.courseware.courses import get_course_date_blocks, get_course_with_access
@@ -20,8 +22,13 @@ from lms.djangoapps.courseware.masquerade import setup_masquerade
 from lms.djangoapps.course_home_api.dates.v1.serializers import DatesTabSerializer
 from lms.djangoapps.course_home_api.toggles import course_home_mfe_dates_tab_is_active
 from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
-from openedx.features.course_experience.utils import dates_banner_should_display
 from openedx.features.content_type_gating.models import ContentTypeGatingConfig
+
+from lms.djangoapps.grades.api import CourseGradeFactory
+
+from lms.djangoapps.courseware.courses import (
+    get_course_with_access,
+)
 
 
 class DatesTabView(RetrieveAPIView):
@@ -85,13 +92,23 @@ class DatesTabView(RetrieveAPIView):
         monitoring_utils.set_custom_attribute('is_staff', request.user.is_staff)
 
         course = get_course_with_access(request.user, 'load', course_key, check_if_enrolled=False)
+        is_staff = bool(has_access(request.user, 'staff', course_key))
 
         _, request.user = setup_masquerade(
             request,
             course_key,
-            staff_access=has_access(request.user, 'staff', course_key),
+            staff_access=is_staff,
             reset_masquerade_data=True,
         )
+
+        if not CourseEnrollment.is_enrolled(request.user, course_key) and not is_staff:
+            return Response('User not enrolled.', status=401)
+
+        ##########
+
+        course_grade = CourseGradeFactory().read(request.user, course)
+
+        ##########
 
         blocks = get_course_date_blocks(course, request.user, request, include_access=True, include_past_dates=True)
 
@@ -109,9 +126,12 @@ class DatesTabView(RetrieveAPIView):
             'course_date_blocks': [block for block in blocks if not isinstance(block, TodaysDate)],
             'learner_is_full_access': learner_is_full_access,
             'user_timezone': user_timezone,
+            'section_scores': list(course_grade.chapter_grades.values()),
         }
         context = self.get_serializer_context()
         context['learner_is_full_access'] = learner_is_full_access
+        context['staff_access'] = is_staff
+        context['course_key'] = course_key
         serializer = self.get_serializer_class()(data, context=context)
 
         return Response(serializer.data)
