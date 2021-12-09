@@ -13942,7 +13942,7 @@ msgid "Discussion"
 msgstr "Thảo Luận"
 
 msgid "Dates"
-msgstr "Ngày"
+msgstr "Thời khoá biểu"
 
 msgid "Entrance Exam"
 msgstr "Bài kiểm tra đầu vào"
