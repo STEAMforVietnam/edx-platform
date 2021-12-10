@@ -10,7 +10,7 @@ from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthenticat
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
 from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
 
-from common.djangoapps.student.models import CourseEnrollment
+from student.models import CourseEnrollment
 from lms.djangoapps.course_api.api import course_detail
 from lms.djangoapps.course_home_api.course_metadata.serializers import CourseHomeMetadataSerializer
 from lms.djangoapps.courseware.access import has_access

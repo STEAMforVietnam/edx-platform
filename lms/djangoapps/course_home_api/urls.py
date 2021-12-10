@@ -14,7 +14,7 @@ urlpatterns = []
 # URL for Course metadata content
 urlpatterns += [
     re_path(
-        fr'course_metadata/{settings.COURSE_KEY_PATTERN}',
+        fr'v1/course_metadata/{settings.COURSE_KEY_PATTERN}',
         CourseHomeMetadataView.as_view(),
         name='course-metadata'
     ),
@@ -23,7 +23,7 @@ urlpatterns += [
 # Dates Tab URLs
 urlpatterns += [
     re_path(
-        r'v1/dates/{}'.format(settings.COURSE_KEY_PATTERN),
+        fr'v1/dates/{settings.COURSE_KEY_PATTERN}',
         views.DatesTabView.as_view(),
         name='course-home-dates-tab'
     ),

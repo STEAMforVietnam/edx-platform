@@ -4,10 +4,9 @@ Courseware API Mixins.
 
 from babel.numbers import get_currency_symbol
 
-from common.djangoapps.course_modes.models import CourseMode
+from course_modes.models import CourseMode
 from lms.djangoapps.courseware.utils import can_show_verified_upgrade, verified_upgrade_deadline_link
 from openedx.features.course_duration_limits.access import get_user_course_expiration_date
-from common.djangoapps.track import segment
 
 
 def serialize_upgrade_info(user, course_overview, enrollment):

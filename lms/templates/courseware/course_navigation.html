@@ -50,6 +50,7 @@ if course is not None:
                     % if tab.name == 'Dates':
                       <% tab_link = mfe_url + '/dates' %>
                     %endif
+                    <p hidden>${tab.name} - ${tab_link}</p>
                     <li class="nav-item ${'active' if tab_is_active else ''}">
                         <a href="${tab_link}" class="nav-link">
                             ${_(tab.name)}
