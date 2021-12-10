@@ -47,8 +47,6 @@ class DatesTabView(RetrieveAPIView):
             link: (str) An absolute link to content related to the date event
                 (ex. verified link or link to assignment)
             title: (str) The title of the date event
-        display_reset_dates_text: (bool) Indicates whether the reset dates banner should be shown
-            for the given user
         learner_is_full_access: (bool) Indicates if the user is verified in the course
         user_timezone: (str) The user's preferred timezone
         verified_upgrade_link: (str) The link for upgrading to the Verified track in a course
@@ -83,7 +81,6 @@ class DatesTabView(RetrieveAPIView):
 
 
         blocks = get_course_date_blocks(course, request.user, request, include_access=True, include_past_dates=True)
-        #display_reset_dates_text, _ = dates_banner_should_display(course_key, request)
 
         learner_is_full_access = False
         enrollment = get_enrollment(request.user.username, course_key_string)
