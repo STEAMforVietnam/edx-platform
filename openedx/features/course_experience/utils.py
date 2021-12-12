@@ -313,4 +313,6 @@ def is_block_structure_complete_for_assignments(block_data, block_key):
     weight = block_data.get_xblock_field(block_key, 'weight', 1)
     scored = has_score and (weight is None or weight > 0)
 
-    return complete or not graded or not scored
+    # return complete or not graded or not scored
+
+    return complete or not scored
