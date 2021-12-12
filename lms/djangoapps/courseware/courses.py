@@ -11,6 +11,7 @@ from datetime import datetime
 import pytz
 import six
 from crum import get_current_request
+from dateutil.parser import parse as parse_date
 from django.conf import settings
 from django.db.models import Prefetch
 from django.http import Http404, QueryDict
@@ -543,9 +544,10 @@ def get_course_assignments(course_key, user, request, include_access=False):
             grade = course_grade.subsection_grade(subsection_key).graded_total
 
             due = block_data.get_xblock_field(subsection_key, 'due')
-            graded = block_data.get_xblock_field(subsection_key, 'graded', False)
+            #graded = block_data.get_xblock_field(subsection_key, 'graded', False)
 
-            if due and graded:
+            #if due and graded:
+            if due:
                 contains_gated_content = include_access and block_data.get_xblock_field(
                     subsection_key, 'contains_gated_content', False)
                 title = block_data.get_xblock_field(subsection_key, 'display_name', _('Assignment'))
@@ -569,13 +571,14 @@ def get_course_assignments(course_key, user, request, include_access=False):
             descendents = block_data.get_children(subsection_key)
             while descendents:
                 descendent = descendents.pop()
-                #grade = course_grade.subsection_grade(descendent).graded_total
+                grade = course_grade.subsection_grade(descendent).graded_total
                 descendents.extend(block_data.get_children(descendent))
                 if block_data.get_xblock_field(descendent, 'category', None) == 'openassessment':
-                    graded = block_data.get_xblock_field(descendent, 'graded', False)
+                    # graded = block_data.get_xblock_field(descendent, 'graded', False)
                     has_score = block_data.get_xblock_field(descendent, 'has_score', False)
                     weight = block_data.get_xblock_field(descendent, 'weight', 1)
-                    if not (graded and has_score and (weight is None or weight > 0)):
+                    #if not (graded and has_score and (weight is None or weight > 0)):
+                    if not (has_score and (weight is None or weight > 0)):
                         continue
 
                     all_assessments = [{
