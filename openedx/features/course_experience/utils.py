@@ -295,3 +295,24 @@ def dates_banner_should_display(course_key, request):
                             break
 
     return missed_deadlines, getattr(course_enrollment, 'mode', None)
+
+def is_block_structure_complete_for_assignments(block_data, block_key):
+    """
+    Considers a block complete only if all scored & graded leaf blocks are complete.
+
+    This is different from the normal `complete` flag because children of the block that are informative (like
+    readings or videos) do not count. We only care about actual homework content.
+    """
+    children = block_data.get_children(block_key)
+    if children:
+        return all(is_block_structure_complete_for_assignments(block_data, child_key) for child_key in children)
+
+    complete = block_data.get_xblock_field(block_key, 'complete', False)
+    graded = block_data.get_xblock_field(block_key, 'graded', False)
+    has_score = block_data.get_xblock_field(block_key, 'has_score', False)
+    weight = block_data.get_xblock_field(block_key, 'weight', 1)
+    scored = has_score and (weight is None or weight > 0)
+
+    # return complete or not graded or not scored
+
+    return complete or not scored
