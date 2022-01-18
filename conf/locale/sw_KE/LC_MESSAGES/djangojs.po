@@ -1,6 +1,6 @@
 # #-#-#-#-#  djangojs-partial.po (edx-platform)  #-#-#-#-#
 # edX community translations have been downloaded from Swahili (Kenya) (http://www.transifex.com/open-edx/edx-platform/language/sw_KE/).
-# Copyright (C) 2020 EdX
+# Copyright (C) 2021 EdX
 # This file is distributed under the GNU AFFERO GENERAL PUBLIC LICENSE.
 #
 # Translators:
@@ -17,7 +17,7 @@
 # YAHAYA MWAVURIZI <translations_1@camara.ie>, 2017
 # #-#-#-#-#  djangojs-studio.po (edx-platform)  #-#-#-#-#
 # edX community translations have been downloaded from Swahili (Kenya) (http://www.transifex.com/open-edx/edx-platform/language/sw_KE/).
-# Copyright (C) 2020 EdX
+# Copyright (C) 2021 EdX
 # This file is distributed under the GNU AFFERO GENERAL PUBLIC LICENSE.
 #
 # Translators:
@@ -31,9 +31,9 @@
 # YAHAYA MWAVURIZI <translations_1@camara.ie>, 2017
 # #-#-#-#-#  djangojs-account-settings-view.po (0.1a)  #-#-#-#-#
 # edX community translations have been downloaded from Swahili (Kenya) (https://www.transifex.com/open-edx/teams/6205/sw_KE/).
-# Copyright (C) 2020 EdX
+# Copyright (C) 2021 EdX
 # This file is distributed under the GNU AFFERO GENERAL PUBLIC LICENSE.
-# EdX Team <info@edx.org>, 2020.
+# EdX Team <info@edx.org>, 2021.
 #
 # Translators:
 # YAHAYA MWAVURIZI <translations_1@camara.ie>, 2019
@@ -41,7 +41,7 @@
 #
 # #-#-#-#-#  underscore.po (edx-platform)  #-#-#-#-#
 # edX community translations have been downloaded from Swahili (Kenya) (http://www.transifex.com/open-edx/edx-platform/language/sw_KE/)
-# Copyright (C) 2020 edX
+# Copyright (C) 2021 edX
 # This file is distributed under the GNU AFFERO GENERAL PUBLIC LICENSE.
 #
 # Translators:
@@ -55,7 +55,7 @@
 # YAHAYA MWAVURIZI <translations_1@camara.ie>, 2017
 # #-#-#-#-#  underscore-studio.po (edx-platform)  #-#-#-#-#
 # edX community translations have been downloaded from Swahili (Kenya) (http://www.transifex.com/open-edx/edx-platform/language/sw_KE/)
-# Copyright (C) 2020 edX
+# Copyright (C) 2021 edX
 # This file is distributed under the GNU AFFERO GENERAL PUBLIC LICENSE.
 #
 # Translators:
@@ -71,8 +71,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: edx-platform\n"
 "Report-Msgid-Bugs-To: openedx-translation@googlegroups.com\n"
-"POT-Creation-Date: 2020-07-19 20:42+0000\n"
-"PO-Revision-Date: 2020-06-14 20:45+0000\n"
+"POT-Creation-Date: 2021-12-26 20:42+0000\n"
+"PO-Revision-Date: 2021-11-07 20:44+0000\n"
 "Last-Translator: edx_transifex_bot <i18n-working-group+edx-transifex-bot@edx.org>\n"
 "Language-Team: Swahili (Kenya) (http://www.transifex.com/open-edx/edx-platform/language/sw_KE/)\n"
 "Language: sw_KE\n"
@@ -81,6 +81,14 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: Babel 2.8.0\n"
+
+#: cms/static/cms/js/main.js cms/static/js/views/active_video_upload_list.js
+#: cms/static/js/views/video_transcripts.js
+#: common/lib/xmodule/xmodule/assets/library_source_block/public/js/library_source_block.js
+msgid ""
+"This may be happening because of an error with our server or your internet "
+"connection. Try refreshing the page or making sure you are online."
+msgstr ""
 
 #: cms/static/cms/js/xblock/cms.runtime.v1.js
 #: cms/static/js/certificates/views/signatory_details.js
@@ -91,8 +99,9 @@ msgstr ""
 #: cms/static/js/views/edit_textbook.js
 #: cms/static/js/views/list_item_editor.js
 #: cms/static/js/views/modals/edit_xblock.js cms/static/js/views/tabs.js
-#: cms/static/js/views/utils/xblock_utils.js lms/static/js/ccx/schedule.js
-#: lms/static/js/views/fields.js
+#: cms/static/js/views/utils/xblock_utils.js
+#: common/lib/xmodule/xmodule/assets/library_source_block/public/js/library_source_block.js
+#: lms/static/js/ccx/schedule.js lms/static/js/views/fields.js
 msgid "Saving"
 msgstr "Kuhifadhi"
 
@@ -150,6 +159,7 @@ msgstr "Pakia ujumbe"
 #: cms/static/js/views/modals/edit_xblock.js
 #: cms/static/js/views/video_transcripts.js
 #: common/lib/xmodule/xmodule/js/src/html/edit.js
+#: lms/static/js/demographics_collection/Wizard.jsx
 #: lms/static/js/student_account/tos_modal.js
 #: cms/templates/js/course-video-settings.underscore
 #: common/static/common/templates/discussion/templates.underscore
@@ -162,7 +172,7 @@ msgstr "Funga"
 #: cms/templates/js/course-instructor-details.underscore
 #: cms/templates/js/previous-video-upload-list.underscore
 #: cms/templates/js/signatory-details.underscore
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
 msgid "Name"
 msgstr "Jina"
 
@@ -267,8 +277,8 @@ msgstr ""
 #: common/static/common/js/discussion/views/discussion_thread_list_view.js
 #: common/static/common/js/discussion/views/discussion_thread_view.js
 #: common/static/common/js/discussion/views/response_comment_view.js
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/components/ReportStatus/ReportStatus.jsx
 #: lms/static/js/student_account/views/FinishAuthView.js
-#: lms/static/js/verify_student/views/payment_confirmation_step_view.js
 #: lms/static/js/verify_student/views/step_view.js
 #: lms/static/js/views/fields.js
 msgid "Error"
@@ -278,6 +288,18 @@ msgstr "Kosa"
 #: common/lib/xmodule/xmodule/js/public/js/library_content_edit.js
 msgid "Updating with latest library content"
 msgstr "Sasisha kwa kutumia taarifa mpya za maktaba"
+
+#: common/lib/xmodule/xmodule/assets/library_source_block/LibrarySourcedBlockPicker.jsx
+msgid "Loading..."
+msgstr ""
+
+#: common/lib/xmodule/xmodule/assets/library_source_block/LibrarySourcedBlockPicker.jsx
+msgid "Selected blocks"
+msgstr ""
+
+#: common/lib/xmodule/xmodule/assets/library_source_block/public/js/library_source_block.js
+msgid "Unable to update settings"
+msgstr ""
 
 #: common/lib/xmodule/xmodule/assets/split_test/public/js/split_test_author_view.js
 #: common/lib/xmodule/xmodule/js/public/js/split_test_author_view.js
@@ -737,11 +759,14 @@ msgstr ""
 msgid "Delete table"
 msgstr ""
 
+#. #-#-#-#-#  djangojs-partial.po (edx-platform)  #-#-#-#-#
+#. Translators: this is a message from the raw HTML editor displayed in the
+#. browser when a user needs to edit HTML
+#: common/lib/xmodule/xmodule/js/src/html/edit.js
 #: cms/templates/js/certificate-editor.underscore
 #: cms/templates/js/group-configuration-editor.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
 msgid "Description"
-msgstr "Maelezo"
+msgstr ""
 
 #. Translators: this is a message from the raw HTML editor displayed in the
 #. browser when a user needs to edit HTML
@@ -1573,7 +1598,6 @@ msgid "Vertical space"
 msgstr ""
 
 #: openedx/features/course_bookmarks/static/course_bookmarks/templates/bookmarks-list.underscore
-#: openedx/features/course_search/static/course_search/templates/course_search_item.underscore
 #: openedx/features/course_search/static/course_search/templates/dashboard_search_item.underscore
 msgid "View"
 msgstr "Angalia"
@@ -1664,6 +1688,11 @@ msgid ""
 "If you use the Advanced Editor, this problem will be converted to XML and you will not be able to return to the Simple Editor Interface.\n"
 "\n"
 "Proceed to the Advanced Editor and convert this problem to XML?"
+msgstr ""
+
+#: common/lib/xmodule/xmodule/js/src/problem/edit.js
+msgid ""
+"An answer option has been left blank. Please review and edit the component."
 msgstr ""
 
 #: common/lib/xmodule/xmodule/js/src/problem/edit.js
@@ -2293,6 +2322,38 @@ msgstr[1] ""
 msgid "Select a section or problem"
 msgstr ""
 
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/components/Main/Main.jsx
+msgid "Create a report of problem responses"
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/components/ReportStatus/ReportStatus.jsx
+msgid "Your report is being generated..."
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/components/ReportStatus/ReportStatus.jsx
+msgid "Your report has been successfully generated."
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/components/ReportStatus/ReportStatus.jsx
+msgid "View Report"
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/data/actions/problemResponses.js
+msgid "There was an error generating the report link."
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/data/actions/problemResponses.js
+msgid "There was an error generating your report."
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/data/actions/problemResponses.js
+msgid "Unable to get report generation status."
+msgstr ""
+
+#: lms/djangoapps/instructor/static/instructor/ProblemBrowser/data/actions/problemResponses.js
+msgid "Unable to submit request to generate report."
+msgstr ""
+
 #: lms/djangoapps/support/static/support/js/views/certificates.js
 msgid "An unexpected error occurred.  Please try again."
 msgstr "Hitilafu isiotarajiwa imetokea. Tafadhali jaribu tena."
@@ -2369,6 +2430,10 @@ msgstr ""
 msgid "Subject"
 msgstr ""
 
+#: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
+msgid "Select a category"
+msgstr ""
+
 #: lms/templates/student_account/account_settings.underscore
 msgid "Account Settings"
 msgstr "Mikakati ya Akaunti"
@@ -2398,27 +2463,11 @@ msgid "Financial Aid"
 msgstr ""
 
 #: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
-msgid "Masters"
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
-msgid "MicroMasters"
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
-msgid "MicroBachelors"
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
 msgid "Photo Verification"
 msgstr ""
 
 #: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
 msgid "Proctoring"
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/logged_in_user.jsx
-msgid "Security"
 msgstr ""
 
 #: cms/templates/js/asset-library.underscore
@@ -2476,28 +2525,12 @@ msgid "Enter some details for your support request."
 msgstr ""
 
 #: lms/djangoapps/support/static/support/jsx/single_support_form.jsx
-msgid ""
-"Due to the recent increase in interest in online education and edX, we are "
-"currently experiencing an unusually high volume of support requests. We "
-"appreciate your patience as we work to review each request. Please check the"
-" "
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/single_support_form.jsx
-msgid " as many questions may have already been answered."
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/single_support_form.jsx
 #: lms/djangoapps/support/static/support/jsx/success.jsx
 msgid "Contact Us"
 msgstr ""
 
 #: lms/djangoapps/support/static/support/jsx/single_support_form.jsx
 msgid "Find answers to the top questions asked by learners."
-msgstr ""
-
-#: lms/djangoapps/support/static/support/jsx/single_support_form.jsx
-msgid "Search the {platform} Help Center"
 msgstr ""
 
 #: lms/djangoapps/support/static/support/jsx/success.jsx
@@ -2748,7 +2781,7 @@ msgid "My Teams"
 msgstr ""
 
 #: lms/djangoapps/teams/static/teams/js/views/teams_tab.js
-#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-white-list.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-allowlist.underscore
 msgid "Browse"
 msgstr "Kuvinjari"
 
@@ -2769,10 +2802,6 @@ msgstr ""
 #: lms/djangoapps/teams/static/teams/js/views/teams_tab.js
 msgid "Team Search"
 msgstr "Tafuta Timu"
-
-#: lms/djangoapps/teams/static/teams/js/views/teams_tab.js
-msgid "Showing results for \"{searchString}\""
-msgstr "Inaonesha matokeo ya \"{searchString}\""
 
 #: lms/djangoapps/teams/static/teams/js/views/teams_tab.js
 msgid "Create a New Team"
@@ -2811,6 +2840,10 @@ msgid ""
 msgstr ""
 "Unaweza kumuondoa mjumbe kutoka kwenye hii timu, hasa pale ambapo "
 "hawajashiriki katika shughuli za kikosi."
+
+#: lms/djangoapps/teams/static/teams/js/views/teams_tab.js
+msgid "Showing results for \"{searchString}\""
+msgstr "Inaonesha matokeo ya \"{searchString}\""
 
 #: lms/djangoapps/teams/static/teams/js/views/teams_tab.js
 msgid "Search teams"
@@ -3045,13 +3078,9 @@ msgstr "Kichwa cha taarifa"
 
 #: lms/static/js/ajax-error.js
 msgid ""
-"You have been logged out of your edX account. Click Okay to log in again "
-"now. Click Cancel to stay on this page (you must log in again to save your "
-"work)."
+"You have been logged out of your account. Click Okay to log in again now. "
+"Click Cancel to stay on this page (you must log in again to save your work)."
 msgstr ""
-"Umetoka nje ya mtandao kwa akaunti yako ya edX. Bofya Okay kuingia tena "
-"mtandaoni. Bofya Cancel kubaki kwenye ukurasa huu (lazima uingie tena "
-"mtandaoni uhifadhi kazi yako)."
 
 #: lms/static/js/api_admin/views/catalog_preview.js
 msgid "Preview this query"
@@ -3118,57 +3147,107 @@ msgstr ""
 "Student username/email field is required and can not be empty. Kindly fill "
 "in username/email and then press \"Invalidate Certificate\" button."
 
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
+#: lms/static/js/certificates/views/certificate_allowlist.js
+msgid "Student Removed from certificate allowlist successfully."
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_allowlist.js
+msgid ""
+"Could not find Certificate Exception in the allowlist. Please refresh the "
+"page and try again"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_allowlist.js
+#: lms/static/js/certificates/views/certificate_allowlist_editor.js
+#: lms/static/js/certificates/views/certificate_invalidation_view.js
+msgid "Server Error, Please refresh the page and try again."
+msgstr "Hitilafu ya Seva, Tafadhali fungua upya ukurasa na ujaribu tena."
+
+#: lms/static/js/certificates/views/certificate_allowlist_editor.js
+msgid "<%- user %> already in exception list."
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_allowlist_editor.js
+msgid ""
+"<%- user %> has been successfully added to the exception list. Click "
+"Generate Exception Certificate below to send the certificate."
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid " learners were successfully added to exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid " learner was successfully added to the exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" records are not in the correct format and have not been added to the "
+"exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" record is not in the correct format and has not been added to the exception"
+" list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" learner accounts cannot be found and have not been added to the exception "
+"list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" learner account cannot be found and has not been added to the exception "
+"list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid " learners already appear on the exception list in this course"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid " learner already appears on the exception list in this course"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" learners are not enrolled in this course and have not added to the "
+"exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" learner is not enrolled in this course and has not been added to the "
+"exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" learners have an active certificate invalidation in this course and have "
+"not been added to the exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid ""
+" learner has an active certificate invalidation in this course and has not "
+"been added to the exception list"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid " learners encountered unknown errors"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
+msgid " learner encountered an unknown error"
+msgstr ""
+
+#: lms/static/js/certificates/views/certificate_bulk_allowlist.js
 msgid "Uploaded file issues. Click on \"+\" to view."
 msgstr "Mafaili yamepakiwa. Bofya \"+\" kutazama."
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learners are successfully added to exception list"
-msgstr "Wanagenzi wamefaulu kuongezwa kwa orodha baguzi"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learner is successfully added to the exception list"
-msgstr "mwanafunzi \"amefanikiwa\" kuongezwa kwenye orodha ya pekee"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " records are not in correct format and not added to the exception list"
-msgstr ""
-" rekodi hazipo kwenye fomati sahihi na hazijaongezwa kwenye orodha maalum"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " record is not in correct format and not added to the exception list"
-msgstr " rekodi haipo kwenye fomati sahihi na haijawekwa kwenye orodha maalum"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learners do not exist in LMS and not added to the exception list"
-msgstr " wanafunzi hawamo kwenye LMS na hawajawekwa kwenye orodha maalum"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learner does not exist in LMS and not added to the exception list"
-msgstr "\"mwanafunzi\" hayupo kwenye LMS na hakuongezewa kwenye orodha maalum."
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learners are already white listed and not added to the exception list"
-msgstr ""
-" wanafunzi tayari wapo kwenye orodha ya wanaokubalika na hawajawekwa kwenye "
-"orodha maalum"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learner is already white listed and not added to the exception list"
-msgstr ""
-" mwanafunzi tayari yupo kwenye orodha ya wanaokubalika na hajawekwa kwenye "
-"orodha maalum"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid ""
-" learners are not enrolled in course and not added to the exception list"
-msgstr ""
-" wanafunzi hawajaandikishwa kwenye kozi na hawajawekwa kwenye orodha maalum"
-
-#: lms/static/js/certificates/views/certificate_bulk_whitelist.js
-msgid " learner is not enrolled in course and not added to the exception list"
-msgstr ""
-" mwanafunzi hajaandikishwa kwenye kozi na hajawekwa kwenye orodha maalum"
 
 #: lms/static/js/certificates/views/certificate_invalidation_view.js
 msgid ""
@@ -3181,12 +3260,6 @@ msgstr ""
 #: lms/static/js/certificates/views/certificate_invalidation_view.js
 msgid "Certificate has been successfully invalidated for <%= user %>."
 msgstr "Cheti kimefanikiwa kubatilishwa kwa <%= user %>."
-
-#: lms/static/js/certificates/views/certificate_invalidation_view.js
-#: lms/static/js/certificates/views/certificate_whitelist.js
-#: lms/static/js/certificates/views/certificate_whitelist_editor.js
-msgid "Server Error, Please refresh the page and try again."
-msgstr "Hitilafu ya Seva, Tafadhali fungua upya ukurasa na ujaribu tena."
 
 #: lms/static/js/certificates/views/certificate_invalidation_view.js
 msgid ""
@@ -3203,30 +3276,6 @@ msgid ""
 msgstr ""
 "Haikuweza kupata Ubatilishaji wa Cheti \"kwenye\" orodha. Tafadhali "
 "changamsha ukurasa na jaribu tena. "
-
-#: lms/static/js/certificates/views/certificate_whitelist.js
-msgid "Student Removed from certificate white list successfully."
-msgstr ""
-"\"Mwanafunzi\" amefanikiwa Kuondolewa kwenye cheti cha orodha "
-"iliyothibitishwa.  "
-
-#: lms/static/js/certificates/views/certificate_whitelist.js
-msgid ""
-"Could not find Certificate Exception in white list. Please refresh the page "
-"and try again"
-msgstr ""
-"Haikuweza kupata Cheti maalum katika orodha maalum. Tafadhali changamsha "
-"ukurasa na jaribu tena."
-
-#: lms/static/js/certificates/views/certificate_whitelist_editor.js
-msgid "<%= user %> already in exception list."
-msgstr "<%= user %> tayari iko kwenye orodha maalum."
-
-#: lms/static/js/certificates/views/certificate_whitelist_editor.js
-msgid ""
-"<%= user %> has been successfully added to the exception list. Click "
-"Generate Exception Certificate below to send the certificate."
-msgstr ""
 
 #: lms/static/js/course_survey.js
 msgid "There has been an error processing your survey."
@@ -3294,7 +3343,7 @@ msgstr ""
 
 #: lms/static/js/dashboard/legacy.js
 msgid ""
-"The refund deadline for this course has passed,so you will not receive a "
+"The refund deadline for this course has passed, so you will not receive a "
 "refund."
 msgstr ""
 
@@ -3303,6 +3352,90 @@ msgstr ""
 msgid ""
 "Unable to determine whether we should give you a refund because of System "
 "Error. Please try again later."
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionBanner.jsx
+msgid "Want to make edX better for everyone?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionBanner.jsx
+msgid "Get started"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid "Help make edX better for everyone!"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid "Why does edX collect this information?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid ""
+"An error occurred while attempting to retrieve or save the information "
+"below. Please try again later."
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid ""
+"What was the total combined income, during the last 12 months, of all "
+"members of your family? "
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid ""
+"Have you ever served on active duty in the U.S. Armed Forces, Reserves, or "
+"National Guard?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid "What is the highest level of education that you have achieved so far?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid ""
+"What is the highest level of education that any of your parents or guardians"
+" have achieved?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid "Select employment status"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid "What industry do you currently work in?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/DemographicsCollectionModal.jsx
+msgid "What industry do you want to work in?"
+msgstr ""
+
+#: lms/static/js/demographics_collection/MultiselectDropdown.jsx
+msgid "Clear all"
+msgstr ""
+
+#: lms/static/js/demographics_collection/Wizard.jsx
+msgid "demographics questionnaire"
+msgstr ""
+
+#: lms/static/js/demographics_collection/Wizard.jsx
+msgid "close questionnaire"
+msgstr ""
+
+#: lms/static/js/demographics_collection/Wizard.jsx
+msgid "finish later"
+msgstr ""
+
+#: lms/static/js/demographics_collection/Wizard.jsx
+msgid "Return to my dashboard"
+msgstr ""
+
+#: lms/static/js/demographics_collection/Wizard.jsx
+msgid "Finish later"
+msgstr ""
+
+#: lms/static/js/demographics_collection/Wizard.jsx
+msgid "next page"
 msgstr ""
 
 #: lms/static/js/discovery/views/search_form.js
@@ -3425,13 +3558,10 @@ msgid "Recent Activity"
 msgstr "Tukio la hivi Punde"
 
 #: lms/static/js/edxnotes/views/tabs/search_results.js
-msgid "No results found for \"%(query_string)s\". Please try searching again."
+msgid "No results found for \"{query_string}\". Please try searching again."
 msgstr ""
-"Hakuna majibu yaliyopatikana kwenye \"%(query_string)s\". Tafadhali jaribu "
-"kutafuta tena."
 
 #: lms/static/js/edxnotes/views/tabs/search_results.js
-#: openedx/features/course_search/static/course_search/templates/course_search_results.underscore
 #: openedx/features/course_search/static/course_search/templates/dashboard_search_results.underscore
 msgid "Search Results"
 msgstr "Tafuta Matokeo"
@@ -3644,22 +3774,31 @@ msgid "Error while regenerating certificates. Please try again."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Loading data..."
 msgstr "Kupakia ujumbe..."
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error getting issued certificates list."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+msgid "Error generating anonymous IDs. Please try again."
+msgstr ""
+
+#: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating proctored exam results. Please try again."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating survey results. Please try again."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating student profile information. Please try again."
 msgstr ""
 
@@ -3673,6 +3812,7 @@ msgid "Error getting student list."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating list of students who may enroll. Please try again."
 msgstr ""
 
@@ -3681,14 +3821,17 @@ msgid "Error retrieving grading configuration."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating grades. Please try again."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating problem grade report. Please try again."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/data_download.js
+#: lms/static/js/instructor_dashboard/data_download_2.js
 msgid "Error generating ORA data report. Please try again."
 msgstr ""
 
@@ -3842,10 +3985,6 @@ msgstr ""
 
 #: lms/static/js/instructor_dashboard/membership.js
 msgid "Reason field should not be left blank."
-msgstr ""
-
-#: lms/static/js/instructor_dashboard/membership.js
-msgid "Role field should not be left unselected."
 msgstr ""
 
 #: lms/static/js/instructor_dashboard/membership.js
@@ -4024,13 +4163,10 @@ msgstr ""
 
 #: lms/static/js/instructor_dashboard/student_admin.js
 msgid ""
-"Error resetting problem attempts for problem '<%= problem_id %>' and student"
+"Error resetting problem attempts for problem '<%- problem_id %>' and student"
 " '<%- student_id %>'. Make sure that the problem and student identifiers are"
 " complete and correct."
 msgstr ""
-"Kosa limetokea kwenye majaribio ya kutatua kosa '<%= problem_id %>' and "
-"student '<%- student_id %>'. Hakikisha tatizo na vibainishi vya mwanafunzi "
-"vimekamilika na viko sahihi."
 
 #: lms/static/js/instructor_dashboard/student_admin.js
 msgid ""
@@ -4323,6 +4459,16 @@ msgid ""
 "sensitive nature of student information."
 msgstr ""
 
+#: lms/static/js/learner_dashboard/EnterpriseLearnerPortalModal.jsx
+msgid ""
+"To access the courses available to you through {enterpriseName}, visit the "
+"{enterpriseName} dashboard."
+msgstr ""
+
+#: lms/static/js/learner_dashboard/EnterpriseLearnerPortalModal.jsx
+msgid "Go to dashboard"
+msgstr ""
+
 #: lms/static/js/learner_dashboard/models/course_card_model.js
 msgid "(Self-paced) Starts {start}"
 msgstr ""
@@ -4497,7 +4643,7 @@ msgid ""
 msgstr ""
 
 #: lms/static/js/student_account/components/StudentAccountDeletion.jsx
-msgid "Before proceeding, please {htmlStart}activate your account{htmlEnd}."
+msgid "Before proceeding, please {htmlStart}{emailMsg}{htmlEnd}."
 msgstr ""
 
 #: lms/static/js/student_account/components/StudentAccountDeletion.jsx
@@ -4659,6 +4805,15 @@ msgstr ""
 msgid ""
 "An error has occurred. Try refreshing the page, or check your Internet "
 "connection."
+msgstr ""
+
+#: lms/static/js/student_account/views/LoginView.js
+msgid ""
+"In order to sign in, you need to activate your "
+"account.{line_break}{line_break}We just sent an activation link to "
+"{strong_start} {email} {strong_end}. If  you do not receive an email, check "
+"your spam folders or  {anchorStart}contact {platform_name} "
+"Support{anchorEnd}."
 msgstr ""
 
 #: lms/static/js/student_account/views/LoginView.js
@@ -4838,11 +4993,13 @@ msgid ""
 msgstr ""
 
 #: lms/static/js/student_account/views/account_settings_factory.js
-msgid " Link"
+msgid "{platform_display_name} Link"
 msgstr ""
 
 #: lms/static/js/student_account/views/account_settings_factory.js
-msgid "Enter your "
+msgid ""
+"Enter your {platform_display_name} username or the URL to your "
+"{platform_display_name} page. Delete the URL to remove the link."
 msgstr ""
 
 #: lms/static/js/student_account/views/account_settings_factory.js
@@ -5013,10 +5170,6 @@ msgstr "\"Hitilafu imetokea. Tafadhali jaribu tena."
 
 #: lms/static/js/verify_student/views/make_payment_step_view.js
 msgid "Could not submit order"
-msgstr ""
-
-#: lms/static/js/verify_student/views/payment_confirmation_step_view.js
-msgid "Could not retrieve payment information"
 msgstr ""
 
 #: lms/static/js/verify_student/views/reverify_view.js
@@ -5199,8 +5352,8 @@ msgid "Show Less"
 msgstr ""
 
 #: openedx/features/course_search/static/course_search/js/views/search_results_view.js
-msgid "{total_results} result"
-msgid_plural "{total_results} results"
+msgid "{total_results} result found for \"{search_term}\""
+msgid_plural "{total_results} results found for \"{search_term}\""
 msgstr[0] ""
 msgstr[1] ""
 
@@ -5286,13 +5439,6 @@ msgstr ""
 
 #: openedx/features/learner_profile/static/learner_profile/js/views/learner_profile_view.js
 msgid "Profile"
-msgstr ""
-
-#: cms/static/cms/js/main.js cms/static/js/views/active_video_upload_list.js
-#: cms/static/js/views/video_transcripts.js
-msgid ""
-"This may be happening because of an error with our server or your internet "
-"connection. Try refreshing the page or making sure you are online."
 msgstr ""
 
 #: cms/static/cms/js/main.js
@@ -5610,6 +5756,16 @@ msgid "The certificate available date must be later than the course end date."
 msgstr ""
 
 #: cms/static/js/models/settings/course_details.js
+msgid "The certificate display behavior must be one of: {behavior_options}"
+msgstr ""
+
+#: cms/static/js/models/settings/course_details.js
+msgid ""
+"The certificates display behavior must be {valid_option} if certificate "
+"available date is set."
+msgstr ""
+
+#: cms/static/js/models/settings/course_details.js
 msgid "Key should only contain letters, numbers, _, or -"
 msgstr "Neno linatakiwa liwe na herufi, namba, _, au -"
 
@@ -5638,8 +5794,8 @@ msgid "Please enter non-negative integer."
 msgstr "Tafadhali ingiza namba kamili isiyo hasi."
 
 #: cms/static/js/models/settings/course_grader.js
-msgid "Cannot drop more <%= types %> assignments than are assigned."
-msgstr "Haiwezi kutoa majaribio mengi zaidi <%= types %> ya yaliyotolewa."
+msgid "Cannot drop more <%- types %> assignments than are assigned."
+msgstr ""
 
 #: cms/static/js/models/settings/course_grading_policy.js
 msgid "Grace period must be specified in HH:MM format."
@@ -5784,6 +5940,10 @@ msgstr ""
 #: cms/static/js/views/components/add_xblock.js
 #: cms/static/js/views/utils/xblock_utils.js
 msgid "Adding"
+msgstr ""
+
+#: cms/static/js/views/container.js
+msgid "{startTag}{requestToken}{endTag}{selector}"
 msgstr ""
 
 #: cms/static/js/views/course_info_update.js
@@ -6091,7 +6251,7 @@ msgid "Highlights for {display_name}"
 msgstr ""
 
 #: cms/static/js/views/modals/course_outline_modals.js
-msgid "Enable Weekly Highlight Emails"
+msgid "Enable Course Highlight Emails"
 msgstr ""
 
 #: cms/static/js/views/modals/course_outline_modals.js
@@ -6129,6 +6289,10 @@ msgstr "\"Kipengele\""
 
 #: cms/static/js/views/modals/edit_xblock.js
 msgid "Component"
+msgstr ""
+
+#: cms/static/js/views/modals/edit_xblock.js
+msgid "Studio's having trouble parsing the problem component's content"
 msgstr ""
 
 #: cms/static/js/views/modals/move_xblock_modal.js
@@ -6749,11 +6913,6 @@ msgstr "Matendo"
 msgid "Unscheduled"
 msgstr "Haijapangiwa"
 
-#: cms/templates/js/course_info_update.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Date"
-msgstr "Tarehe"
-
 #: cms/templates/js/paging-header.underscore
 #: common/static/common/templates/components/paging-footer.underscore
 #: common/static/common/templates/discussion/templates.underscore
@@ -6762,8 +6921,8 @@ msgstr "Iliopita"
 
 #: cms/templates/js/previous-video-upload-list.underscore
 #: lms/djangoapps/support/static/support/templates/manage_user.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
 #: lms/templates/instructor/instructor_dashboard_2/certificate-invalidation.underscore
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
 msgid "Action"
 msgstr "Kitendo"
 
@@ -7175,8 +7334,8 @@ msgid "course id"
 msgstr "Kitambulisho cha kozi"
 
 #: lms/djangoapps/support/static/support/templates/certificates_results.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
 #: lms/templates/instructor/instructor_dashboard_2/certificate-invalidation.underscore
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
 msgid "No results"
 msgstr "Hakuna matokeo"
 
@@ -7492,6 +7651,18 @@ msgid "Mark Exam As Completed"
 msgstr "Usahihishaji wa Mtihani 'umekamilika'"
 
 #: lms/templates/courseware/proctored-exam-status.underscore
+msgid "Exam timer and end exam button"
+msgstr ""
+
+#: lms/templates/courseware/proctored-exam-status.underscore
+msgid "End My Exam"
+msgstr "Maliza Mtihani Wangu"
+
+#: lms/templates/courseware/proctored-exam-status.underscore
+msgid "Hide Timer"
+msgstr ""
+
+#: lms/templates/courseware/proctored-exam-status.underscore
 msgid "You are taking \"{exam_link}\" as {exam_type}. "
 msgstr ""
 
@@ -7507,18 +7678,6 @@ msgstr ""
 msgid ""
 "To receive credit for problems, you must select \"Submit\" for each problem "
 "before you select \"End My Exam\"."
-msgstr ""
-
-#: lms/templates/courseware/proctored-exam-status.underscore
-msgid "Exam timer and end exam button"
-msgstr ""
-
-#: lms/templates/courseware/proctored-exam-status.underscore
-msgid "End My Exam"
-msgstr "Maliza Mtihani Wangu"
-
-#: lms/templates/courseware/proctored-exam-status.underscore
-msgid "Hide Timer"
 msgstr ""
 
 #: lms/templates/discovery/course_card.underscore
@@ -7647,11 +7806,67 @@ msgstr ""
 msgid "Go to Dashboard"
 msgstr "Nenda kwenye 'Dashibodi'"
 
-#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-white-list.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist-editor.underscore
+msgid "Individual Exceptions"
+msgstr "Tofauti maalum za Kibinafsi"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist-editor.underscore
+msgid ""
+"Enter the username or email address of each learner that you want to add as "
+"an exception."
+msgstr ""
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist-editor.underscore
+msgid "Student email or username"
+msgstr "Barua  pepe ya Mwanafunzi au jina la mtumiaji "
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist-editor.underscore
+msgid "Free text notes"
+msgstr "Nukuu huru za 'maandishi'"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist-editor.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-allowlist.underscore
+msgid "Add to Exception List"
+msgstr "Ongeza kwenye Orodha Maalum"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "Generate Exception Certificates"
+msgstr "Tengeneza Vyeti Maalum"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "All users on the Exception list who do not yet have a certificate"
+msgstr "Watumiaji wote walioko kwenye Orodha maalum ambao hawana vyeti"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "All users on the Exception list"
+msgstr "Watumiaji wote walio kwenye Orodha maalum"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "User Email"
+msgstr "Barua pepe ya Mtumiaji"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "Exception Granted"
+msgstr ""
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "Certificate Generated"
+msgstr "Cheti Kimetengenezwa"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-invalidation.underscore
+msgid "Notes"
+msgstr "Nukuu"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore
+msgid "Remove from List"
+msgstr "Ondoa kwenye Orodha"
+
+#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-allowlist.underscore
 msgid "Bulk Exceptions"
 msgstr ""
 
-#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-white-list.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-allowlist.underscore
 msgid ""
 "Upload a comma separated values (.csv) file that contains the usernames or "
 "email addresses of learners who have been given exceptions. Include the "
@@ -7660,14 +7875,9 @@ msgid ""
 "second comma separated field."
 msgstr ""
 
-#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-white-list.underscore
+#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-allowlist.underscore
 msgid "Upload a CSV file"
 msgstr "Pakia faili la CSV "
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-bulk-white-list.underscore
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list-editor.underscore
-msgid "Add to Exception List"
-msgstr "Ongeza kwenye Orodha Maalum"
 
 #: lms/templates/instructor/instructor_dashboard_2/certificate-invalidation.underscore
 msgid ""
@@ -7698,59 +7908,8 @@ msgid "Invalidated"
 msgstr "Imebatilishwa"
 
 #: lms/templates/instructor/instructor_dashboard_2/certificate-invalidation.underscore
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "Notes"
-msgstr "Nukuu"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-invalidation.underscore
 msgid "Remove from Invalidation Table"
 msgstr ""
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list-editor.underscore
-msgid "Individual Exceptions"
-msgstr "Tofauti maalum za Kibinafsi"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list-editor.underscore
-msgid ""
-"Enter the username or email address of each learner that you want to add as "
-"an exception."
-msgstr ""
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list-editor.underscore
-msgid "Student email or username"
-msgstr "Barua  pepe ya Mwanafunzi au jina la mtumiaji "
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list-editor.underscore
-msgid "Free text notes"
-msgstr "Nukuu huru za 'maandishi'"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "Generate Exception Certificates"
-msgstr "Tengeneza Vyeti Maalum"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "All users on the Exception list who do not yet have a certificate"
-msgstr "Watumiaji wote walioko kwenye Orodha maalum ambao hawana vyeti"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "All users on the Exception list"
-msgstr "Watumiaji wote walio kwenye Orodha maalum"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "User Email"
-msgstr "Barua pepe ya Mtumiaji"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "Exception Granted"
-msgstr ""
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "Certificate Generated"
-msgstr "Cheti Kimetengenezwa"
-
-#: lms/templates/instructor/instructor_dashboard_2/certificate-white-list.underscore
-msgid "Remove from List"
-msgstr "Ondoa kwenye Orodha"
 
 #: lms/templates/instructor/instructor_dashboard_2/cohort-discussions-subcategory.underscore
 msgid "Divided"
@@ -8121,25 +8280,31 @@ msgid "View Program Record"
 msgstr ""
 
 #: lms/templates/learner_dashboard/program_details_sidebar.underscore
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 msgid "Additional Credit Opportunities"
 msgstr ""
 
 #: lms/templates/learner_dashboard/program_details_sidebar.underscore
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 msgid "Learn More"
 msgstr ""
 
 #: lms/templates/learner_dashboard/program_details_sidebar.underscore
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 msgid "Additional Professional Opportunities"
 msgstr ""
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "Congratulations!"
 msgstr "Hongera!"
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "Your Program Journey"
 msgstr "Mwenendo wa Programu Yako"
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid ""
 "To complete the program, you must earn a verified certificate for each "
@@ -8147,34 +8312,42 @@ msgid ""
 msgstr ""
 "Kukamilisha programu yako, lazima upate cheti cha uthibitisho wa kila kozi"
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "Upgrade All Remaining Courses ("
 msgstr ""
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "${listPrice}"
 msgstr ""
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid " ${price} {currency} )"
 msgstr ""
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "COURSES IN PROGRESS"
 msgstr "KOZI ZINAZOTOLEWA SASA"
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "REMAINING COURSES"
 msgstr "KOZI ZILIZOBAKIA"
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "COMPLETED COURSES"
 msgstr "KOZI ZILIZOKAMILIKA"
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid "As you complete courses, you will see them listed here."
 msgstr "Kama ukikamilisha kozi hii, utaziona zimeorodheshwa hapa."
 
+#: lms/templates/learner_dashboard/program_details_tab_view.underscore
 #: lms/templates/learner_dashboard/program_details_view.underscore
 msgid ""
 "Complete courses on your schedule to ensure you stand out in your field!"
@@ -8568,7 +8741,6 @@ msgstr ""
 #: lms/templates/verify_student/face_photo_step.underscore
 #: lms/templates/verify_student/id_photo_step.underscore
 #: lms/templates/verify_student/intro_step.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
 #, python-format
 msgid "Next: %(nextStepTitle)s"
 msgstr "Ifuatayo: %(nextStepTitle)s"
@@ -8705,13 +8877,11 @@ msgstr ""
 " kukamilisha uwezeshaji unaweza kurudi na ufungue upya ukurasa. "
 
 #: lms/templates/verify_student/intro_step.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
 msgid "Activate Your Account"
 msgstr "Wezesha Akaunti Yako"
 
 #: lms/templates/verify_student/intro_step.underscore
 #: lms/templates/verify_student/make_payment_step_ab_testing.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
 msgid "Photo ID"
 msgstr "Picha ya Kitambulisho"
 
@@ -8726,7 +8896,6 @@ msgstr ""
 #: lms/templates/verify_student/intro_step.underscore
 #: lms/templates/verify_student/make_payment_step.underscore
 #: lms/templates/verify_student/make_payment_step_ab_testing.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
 msgid "Webcam"
 msgstr "Kamera ya wavuti"
 
@@ -8833,7 +9002,6 @@ msgid "Check your email for an activation message."
 msgstr "Angalia barua pepe yako kwa ajili ya ujumbe uliowezeshwa."
 
 #: lms/templates/verify_student/make_payment_step_ab_testing.underscore
-#: lms/templates/verify_student/payment_confirmation_step.underscore
 msgid "Total"
 msgstr "Jumla"
 
@@ -8875,81 +9043,6 @@ msgid ""
 msgstr ""
 "Utatumia kamera yako ya tovuti kupiga picha ya sura yako na pamoja na ya "
 "Kitambulisho cha picha kilichoidhinishwa na serikali."
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Thank you! We have received your payment for {courseName}."
-msgstr "Asante! Tume pokea malipo yako ya {courseName}."
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid ""
-"Please print this page for your records; it serves as your receipt. You will"
-" also receive an email with the same information."
-msgstr ""
-"Tafadhali chapisha huu ukurasa wa kumbukumbu yako; inajihifadhi kama risiti."
-" Pia utapokea barua pepe yenye taarifa sawa."
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Order No."
-msgstr "'Idadi' ya Mahitaji."
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Amount"
-msgstr "Kiasi"
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Please Note"
-msgstr "Tafadhali Zingatia"
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Crossed out items have been refunded."
-msgstr ""
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Billed to"
-msgstr "Bili kwa"
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "No receipt available"
-msgstr "Hakuna risiti inayopatikana"
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Next Step: Confirm your identity"
-msgstr "Hatua Inayofuata: Thibitisha kitambulisho chako"
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Check your email"
-msgstr "Angalia barua pepe yako"
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid ""
-"You need to activate your account before you can enroll in courses. Check "
-"your inbox for an activation email."
-msgstr ""
-"Unahitaji kuwezesha akaunti yako kabla ya kujiandikisha kwenye kozi zako. "
-"Angalia sehemu yako ya kupokelea ujumbe ili kuiwezesha barua pepe "
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid ""
-"A driver's license, passport, or government-issued ID with your name and "
-"photo."
-msgstr ""
-"Leseni ya kuendesha gari, pasipoti, au kitambulisho ulichopewa na serikali "
-"kikiwa na jina lako na picha yako."
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-#, python-format
-msgid ""
-"If you don't verify your identity now, you can still explore your course "
-"from your dashboard. You will receive periodic reminders from "
-"%(platformName)s to verify your identity."
-msgstr ""
-"Kama hutoweza kuhakiki kitambulisho chako sasa, bado unaweza kuingia  kwenye"
-" kozi yako kupitia Dashboard yako. Utapokea ujumbe wa kukumbusha mara kwa "
-"mara kutoka %(platformName)s kuhakiki kitambulisho chako."
-
-#: lms/templates/verify_student/payment_confirmation_step.underscore
-msgid "Want to confirm your identity later?"
-msgstr "Unataka kuhakiki kitambulisho chako baadae?"
 
 #: lms/templates/verify_student/reverify_success_step.underscore
 msgid "Identity Verification In Progress"
@@ -9498,7 +9591,7 @@ msgid "Copy Component Location"
 msgstr ""
 
 #: cms/templates/js/course-highlights-enable.underscore
-msgid "Weekly Highlight Emails"
+msgid "Course Highlight Emails"
 msgstr ""
 
 #: cms/templates/js/course-highlights-enable.underscore
@@ -9844,6 +9937,10 @@ msgid ""
 msgstr ""
 
 #: cms/templates/js/course_info_update.underscore
+msgid "Date"
+msgstr ""
+
+#: cms/templates/js/course_info_update.underscore
 msgid "Post"
 msgstr "Chapisha"
 
@@ -9999,12 +10096,6 @@ msgstr ""
 #: cms/templates/js/group-edit.underscore
 msgid "delete group"
 msgstr "\"futa\" kundi"
-
-#: cms/templates/js/highlights-editor.underscore
-msgid ""
-"This feature is currently in testing. Course teams can enter highlights, but"
-" learners will not receive email messages."
-msgstr ""
 
 #: cms/templates/js/highlights-editor.underscore
 msgid ""
@@ -10264,6 +10355,32 @@ msgstr ""
 msgid "Clear Release Date/Time"
 msgstr ""
 
+#: cms/templates/js/self-paced-due-date-editor.underscore
+msgid "Due in:"
+msgstr ""
+
+#: cms/templates/js/self-paced-due-date-editor.underscore
+msgid "weeks from learner enrollment date"
+msgstr ""
+
+#: cms/templates/js/self-paced-due-date-editor.underscore
+msgid ""
+"If a learner starts on {startDate}, this subsection will be due on "
+"{projectedDueIn}."
+msgstr ""
+
+#: cms/templates/js/self-paced-due-date-editor.underscore
+msgid ""
+"The maximum number of weeks this subsection can be due in is 18 weeks from "
+"the learner enrollment date."
+msgstr ""
+
+#: cms/templates/js/self-paced-due-date-editor.underscore
+msgid ""
+"The minimum number of weeks this subsection can be due in is 1 week from the"
+" learner enrollment date."
+msgstr ""
+
 #: cms/templates/js/show-correctness-editor.underscore
 msgid "Assessment Results Visibility"
 msgstr "Kuonekana Matokeo ya Tathmini"
@@ -10503,7 +10620,8 @@ msgstr ""
 msgid ""
 "Proctored exams are timed and they record video of each learner taking the "
 "exam. The videos are then reviewed to ensure that learners follow all "
-"examination rules."
+"examination rules. Please note that setting this exam as proctored will "
+"change the visibility settings to \"Hide content after due date.\""
 msgstr ""
 
 #: cms/templates/js/timed-examination-preference-editor.underscore

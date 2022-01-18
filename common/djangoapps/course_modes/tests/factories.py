@@ -4,20 +4,19 @@ Factories for course mode models.
 
 
 import random
-import six
 
 from factory import lazy_attribute
 from factory.django import DjangoModelFactory
 from opaque_keys.edx.keys import CourseKey
 
-from course_modes.models import CourseMode
+from common.djangoapps.course_modes.models import CourseMode
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 
 
 # Factories are self documenting
-class CourseModeFactory(DjangoModelFactory):
-    class Meta(object):
+class CourseModeFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = CourseMode
 
     mode_slug = CourseMode.DEFAULT_MODE_SLUG
@@ -38,7 +37,7 @@ class CourseModeFactory(DjangoModelFactory):
             course_overview = None
             course_kwargs.setdefault('id', course_id)
             if course_id is not None:
-                if isinstance(course_id, six.string_types):
+                if isinstance(course_id, str):
                     course_id = CourseKey.from_string(course_id)
                     course_kwargs['id'] = course_id
                 try:
@@ -63,4 +62,4 @@ class CourseModeFactory(DjangoModelFactory):
 
     @lazy_attribute
     def mode_display_name(self):
-        return '{0} course'.format(self.mode_slug)
+        return f'{self.mode_slug} course'

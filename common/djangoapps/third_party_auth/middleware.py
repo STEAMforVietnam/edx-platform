@@ -6,11 +6,11 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from requests import HTTPError
 from social_django.middleware import SocialAuthExceptionMiddleware
 
-from student.helpers import get_next_url_for_login_page
+from common.djangoapps.student.helpers import get_next_url_for_login_page
 
 from . import pipeline
 
@@ -20,7 +20,7 @@ class ExceptionMiddleware(SocialAuthExceptionMiddleware, MiddlewareMixin):
 
     def get_redirect_uri(self, request, exception):
         # Fall back to django settings's SOCIAL_AUTH_LOGIN_ERROR_URL.
-        redirect_uri = super(ExceptionMiddleware, self).get_redirect_uri(request, exception)
+        redirect_uri = super().get_redirect_uri(request, exception)
 
         # Safe because it's already been validated by
         # pipeline.parse_query_params. If that pipeline step ever moves later
@@ -48,4 +48,4 @@ class ExceptionMiddleware(SocialAuthExceptionMiddleware, MiddlewareMixin):
                 redirect_url = get_next_url_for_login_page(request)
                 return redirect('/login?next=' + redirect_url)
 
-        return super(ExceptionMiddleware, self).process_exception(request, exception)
+        return super().process_exception(request, exception)

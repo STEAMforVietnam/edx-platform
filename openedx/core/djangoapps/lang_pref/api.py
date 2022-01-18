@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """ Python API for language and translation management. """
 
 
 from collections import namedtuple
 
 from django.conf import settings
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from openedx.core.djangoapps.dark_lang.models import DarkLangConfig
 from openedx.core.djangoapps.site_configuration.helpers import get_value
 
@@ -79,7 +78,7 @@ def all_languages():
         alphabetically.
 
     """
-    languages = [(lang[0], _(lang[1])) for lang in settings.ALL_LANGUAGES]
+    languages = [(lang[0], _(lang[1])) for lang in settings.ALL_LANGUAGES]  # lint-amnesty, pylint: disable=translation-of-non-string
     return sorted(languages, key=lambda lang: lang[1])
 
 

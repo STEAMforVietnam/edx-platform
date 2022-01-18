@@ -9,7 +9,6 @@ from time import sleep
 from paver.easy import call_task, cmdopts, dry, might_call, needs, sh, task
 
 from common.test.acceptance.fixtures.course import CourseFixture, FixtureError
-from pavelib.database import update_local_bokchoy_db_from_s3
 from pavelib.utils.envs import Env
 from pavelib.utils.test import utils as test_utils
 from pavelib.utils.test.bokchoy_options import (
@@ -68,7 +67,7 @@ def load_courses(options):
     `test_root/courses/`.
     """
     if 'imports_dir' in options:
-        msg = colorize('green', "Importing courses from {}...".format(options.imports_dir))
+        msg = colorize('green', f"Importing courses from {options.imports_dir}...")
         print(msg)
 
         sh(
@@ -102,18 +101,7 @@ def update_fixtures():
 
 
 @task
-@timed
-def reset_test_database():
-    """
-    Reset the database used by the bokchoy tests.
-
-    Use the database cache automation defined in pavelib/database.py
-    """
-    update_local_bokchoy_db_from_s3()  # pylint: disable=no-value-for-parameter
-
-
-@task
-@needs(['reset_test_database', 'clear_mongo', 'load_bok_choy_data', 'load_courses', 'update_fixtures'])
+@needs(['clear_mongo', 'load_bok_choy_data', 'load_courses', 'update_fixtures'])
 @might_call('start_servers')
 @cmdopts([BOKCHOY_FASTTEST], share_with=['start_servers'])
 @timed
@@ -239,7 +227,7 @@ class BokChoyTestSuite(TestSuite):
             # Clean up data we created in the databases
             msg = colorize('green', "Cleaning up databases...")
             print(msg)
-            sh("./manage.py lms --settings {settings} flush --traceback --noinput".format(settings=Env.SETTINGS))
+            sh(f"./manage.py lms --settings {Env.SETTINGS} flush --traceback --noinput")
             clear_mongo()
 
     @property
@@ -247,12 +235,12 @@ class BokChoyTestSuite(TestSuite):
         """
         Construct the proper combination of multiprocessing, XUnit XML file, color, and verbosity for use with pytest.
         """
-        command = ["--junitxml={}".format(self.xunit_report)]
+        command = [f"--junitxml={self.xunit_report}"]
 
         if self.num_processes != 1:
             # Construct "multiprocess" pytest command
             command += [
-                "-n {}".format(self.num_processes),
+                f"-n {self.num_processes}",
                 "--color=no",
             ]
         if self.verbosity < 1:
@@ -260,7 +248,7 @@ class BokChoyTestSuite(TestSuite):
         elif self.verbosity > 1:
             command.append("--verbose")
         if self.eval_attr:
-            command.append("-a '{}'".format(self.eval_attr))
+            command.append(f"-a '{self.eval_attr}'")
 
         return command
 
@@ -298,13 +286,13 @@ class BokChoyTestSuite(TestSuite):
         # Construct the pytest command, specifying where to save
         # screenshots and XUnit XML reports
         cmd = [
-            "DEFAULT_STORE={}".format(self.default_store),
-            "SAVED_SOURCE_DIR='{}'".format(self.log_dir),
-            "SCREENSHOT_DIR='{}'".format(self.log_dir),
-            "BOK_CHOY_HAR_DIR='{}'".format(self.har_dir),
-            "BOKCHOY_A11Y_CUSTOM_RULES_FILE='{}'".format(self.a11y_file),
-            "SELENIUM_DRIVER_LOG_DIR='{}'".format(self.log_dir),
-            "VERIFY_XSS='{}'".format(self.verify_xss),
+            f"DEFAULT_STORE={self.default_store}",
+            f"SAVED_SOURCE_DIR='{self.log_dir}'",
+            f"SCREENSHOT_DIR='{self.log_dir}'",
+            f"BOK_CHOY_HAR_DIR='{self.har_dir}'",
+            f"BOKCHOY_A11Y_CUSTOM_RULES_FILE='{self.a11y_file}'",
+            f"SELENIUM_DRIVER_LOG_DIR='{self.log_dir}'",
+            f"VERIFY_XSS='{self.verify_xss}'",
         ]
         if self.save_screenshots:
             cmd.append("NEEDLE_SAVE_BASELINE=True")
@@ -313,7 +301,7 @@ class BokChoyTestSuite(TestSuite):
                 "coverage",
                 "run",
             ]
-            cmd.append("--rcfile={}".format(self.coveragerc))
+            cmd.append(f"--rcfile={self.coveragerc}")
         else:
             cmd += [
                 "python",

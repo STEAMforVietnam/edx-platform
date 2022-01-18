@@ -9,7 +9,8 @@ Python APIs exposed by the bulk_email app to other in-process apps.
 from django.conf import settings
 from django.urls import reverse
 
-from bulk_email.models_api import (
+from lms.djangoapps.bulk_email.models_api import (
+    is_bulk_email_disabled_for_course,
     is_bulk_email_enabled_for_course,
     is_bulk_email_feature_enabled,
     is_user_opted_out_for_course
@@ -30,7 +31,7 @@ def get_emails_enabled(user, course_id):
         (bool): True if emails are enabled for the course associated with course_id for the user;
         False otherwise
     """
-    if is_bulk_email_feature_enabled(course_id=course_id):
+    if is_bulk_email_feature_enabled(course_id=course_id) and not is_bulk_email_disabled_for_course(course_id):
         return not is_user_opted_out_for_course(user=user, course_id=course_id)
     return None
 
@@ -45,5 +46,5 @@ def get_unsubscribed_link(username, course_id):
     lms_root_url = configuration_helpers.get_value('LMS_ROOT_URL', settings.LMS_ROOT_URL)
     token = UsernameCipher.encrypt(username)
     optout_url = reverse('bulk_email_opt_out', kwargs={'token': token, 'course_id': course_id})
-    url = '{base_url}{optout_url}'.format(base_url=lms_root_url, optout_url=optout_url)
+    url = f'{lms_root_url}{optout_url}'
     return url

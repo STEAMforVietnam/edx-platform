@@ -66,7 +66,7 @@ class TestGenerate(TestCase):
         """
         filename = os.path.join(self.configuration.source_messages_dir, random_name())
         generate.merge(self.configuration, self.configuration.source_locale, target=filename)
-        self.assertTrue(os.path.exists(filename))
+        assert os.path.exists(filename)
         os.remove(filename)
 
     def test_main(self):
@@ -77,21 +77,27 @@ class TestGenerate(TestCase):
         .mo files should exist, and be recently created (modified
         after start of test suite)
         """
-        # Change dummy_locales to not have Esperanto present.
-        self.configuration.dummy_locales = ['fake2']
+        # Change dummy_locales to only contain Esperanto.
+        self.configuration.dummy_locales = ['eo']
 
+        # Clear previous files.
+        for locale in self.configuration.dummy_locales:
+            for filename in ('django', 'djangojs'):
+                mofile = filename + '.mo'
+                path = os.path.join(self.configuration.get_messages_dir(locale), mofile)
+                if os.path.exists(path):
+                    os.remove(path)
+
+        # Regenerate files.
         generate.main(verbosity=0, strict=False)
-        for locale in self.configuration.translated_locales:
+        for locale in self.configuration.dummy_locales:
             for filename in ('django', 'djangojs'):
                 mofile = filename + '.mo'
                 path = os.path.join(self.configuration.get_messages_dir(locale), mofile)
                 exists = os.path.exists(path)
-                self.assertTrue(exists, msg='Missing file in locale %s: %s' % (locale, mofile))
-                self.assertGreaterEqual(
-                    datetime.fromtimestamp(os.path.getmtime(path), UTC),
-                    self.start_time,
-                    msg='File not recently modified: %s' % path
-                )
+                assert exists, (f'Missing file in locale {locale}: {mofile}')
+                assert datetime.fromtimestamp(os.path.getmtime(path), UTC) >= \
+                       self.start_time, ('File not recently modified: %s' % path)
             # Segmenting means that the merge headers don't work they way they
             # used to, so don't make this check for now. I'm not sure if we'll
             # get the merge header back eventually, or delete this code eventually.
@@ -112,11 +118,7 @@ class TestGenerate(TestCase):
         pof = pofile(path)
         pattern = re.compile('^#-#-#-#-#', re.M)
         match = pattern.findall(pof.header)
-        self.assertEqual(
-            len(match),
-            3,
-            msg="Found %s (should be 3) merge comments in the header for %s" % (len(match), path)
-        )
+        assert len(match) == 3, (f'Found {len(match)} (should be 3) merge comments in the header for {path}')
 
 
 def random_name(size=6):

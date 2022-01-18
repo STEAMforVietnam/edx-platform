@@ -6,20 +6,22 @@ Django models related to course groups functionality.
 import json
 import logging
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
-from django.utils.encoding import python_2_unicode_compatible
+
 from opaque_keys.edx.django.models import CourseKeyField
 
 from openedx.core.djangolib.model_mixins import DeletableByUserValue
 
+from openedx_events.learning.data import CohortData, CourseData, UserData, UserPersonalData  # lint-amnesty, pylint: disable=wrong-import-order
+from openedx_events.learning.signals import COHORT_MEMBERSHIP_CHANGED  # lint-amnesty, pylint: disable=wrong-import-order
+
 log = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class CourseUserGroup(models.Model):
     """
     This model represents groups of users in a course.  Groups may have different types,
@@ -28,7 +30,7 @@ class CourseUserGroup(models.Model):
 
     .. no_pii:
     """
-    class Meta(object):
+    class Meta:
         unique_together = (('name', 'course_id'), )
 
     name = models.CharField(max_length=255,
@@ -81,13 +83,13 @@ class CohortMembership(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course_id = CourseKeyField(max_length=255)
 
-    class Meta(object):
+    class Meta:
         unique_together = (('user', 'course_id'), )
 
-    def clean_fields(self, *args, **kwargs):
+    def clean_fields(self, *args, **kwargs):  # lint-amnesty, pylint: disable=signature-differs
         if self.course_id is None:
             self.course_id = self.course_user_group.course_id
-        super(CohortMembership, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
     def clean(self):
         if self.course_user_group.group_type != CourseUserGroup.COHORT:
@@ -115,7 +117,7 @@ class CohortMembership(models.Model):
                 membership.course_user_group.users.add(user)
                 previous_cohort = None
             elif membership.course_user_group == cohort:
-                raise ValueError(u"User {user_name} already present in cohort {cohort_name}".format(
+                raise ValueError("User {user_name} already present in cohort {cohort_name}".format(
                     user_name=user.username,
                     cohort_name=cohort.name))
             else:
@@ -130,11 +132,32 @@ class CohortMembership(models.Model):
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         self.full_clean(validate_unique=False)
 
-        log.info(u"Saving CohortMembership for user '%s' in '%s'", self.user.id, self.course_id)
-        return super(CohortMembership, self).save(force_insert=force_insert,
-                                                  force_update=force_update,
-                                                  using=using,
-                                                  update_fields=update_fields)
+        # .. event_implemented_name: COHORT_MEMBERSHIP_CHANGED
+        COHORT_MEMBERSHIP_CHANGED.send_event(
+            cohort=CohortData(
+                user=UserData(
+                    pii=UserPersonalData(
+                        username=self.user.username,
+                        email=self.user.email,
+                        name=self.user.profile.name,
+                    ),
+                    id=self.user.id,
+                    is_active=self.user.is_active,
+                ),
+                course=CourseData(
+                    course_key=self.course_id,
+                ),
+                name=self.course_user_group.name,
+            )
+        )
+
+        log.info("Saving CohortMembership for user '%s' in '%s'", self.user.id, self.course_id)
+        return super().save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields
+        )
 
 
 # Needs to exist outside class definition in order to use 'sender=CohortMembership'
@@ -187,21 +210,21 @@ class CourseCohortsSettings(models.Model):
     # in reality the default value at the time that cohorting is enabled for a course comes from
     # course_module.always_cohort_inline_discussions (via `migrate_cohort_settings`).
     # DEPRECATED-- DO NOT USE: Instead use `CourseDiscussionSettings.always_divide_inline_discussions`
-    # via `get_course_discussion_settings` or `set_course_discussion_settings`.
+    # via `CourseDiscussionSettings.get` or `CourseDiscussionSettings.update`.
     always_cohort_inline_discussions = models.BooleanField(default=False)
 
     @property
     def cohorted_discussions(self):
         """
         DEPRECATED-- DO NOT USE. Instead use `CourseDiscussionSettings.divided_discussions`
-        via `get_course_discussion_settings`.
+        via `CourseDiscussionSettings.get`.
         """
         return json.loads(self._cohorted_discussions)
 
     @cohorted_discussions.setter
     def cohorted_discussions(self, value):
         """
-        DEPRECATED-- DO NOT USE. Instead use `CourseDiscussionSettings` via `set_course_discussion_settings`.
+        DEPRECATED-- DO NOT USE. Instead use `CourseDiscussionSettings.update`
         """
         self._cohorted_discussions = json.dumps(value)
 
@@ -251,7 +274,7 @@ class UnregisteredLearnerCohortAssignments(DeletableByUserValue, models.Model):
     .. pii_retirement: local_api
     """
     # pylint: disable=model-missing-unicode
-    class Meta(object):
+    class Meta:
         unique_together = (('course_id', 'email'), )
 
     course_user_group = models.ForeignKey(CourseUserGroup, on_delete=models.CASCADE)

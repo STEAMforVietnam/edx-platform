@@ -3,6 +3,7 @@
 
 import unittest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import ddt
 import six
@@ -10,13 +11,11 @@ from django.conf import settings
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
-
-from mock import patch
+from edx_toggles.toggles.testutils import override_waffle_flag
 from pytz import UTC
 
-from course_modes.tests.factories import CourseModeFactory
-from lms.djangoapps.verify_student.models import SoftwareSecurePhotoVerification, VerificationDeadline
-from student.helpers import (
+from common.djangoapps.course_modes.tests.factories import CourseModeFactory
+from common.djangoapps.student.helpers import (
     VERIFY_STATUS_APPROVED,
     VERIFY_STATUS_MISSED_DEADLINE,
     VERIFY_STATUS_NEED_TO_REVERIFY,
@@ -24,13 +23,16 @@ from student.helpers import (
     VERIFY_STATUS_RESUBMITTED,
     VERIFY_STATUS_SUBMITTED
 )
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from util.testing import UrlResetMixin
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+from common.djangoapps.util.testing import UrlResetMixin
+from lms.djangoapps.verify_student.models import SoftwareSecurePhotoVerification, VerificationDeadline
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from openedx.core.djangoapps.agreements.toggles import ENABLE_INTEGRITY_SIGNATURE
 
 
 @patch.dict(settings.FEATURES, {'AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING': True})
+@override_settings(PLATFORM_NAME='edX')
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
 @ddt.ddt
 class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
@@ -44,16 +46,16 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         None: None,
     }
 
-    URLCONF_MODULES = ['verify_student.urls']
+    URLCONF_MODULES = ['lms.djangoapps.verify_student.urls']
 
     def setUp(self):
         # Invoke UrlResetMixin
-        super(TestCourseVerificationStatus, self).setUp()
+        super().setUp()
 
         self.user = UserFactory(password="edx")
         self.course = CourseFactory.create()
         success = self.client.login(username=self.user.username, password="edx")
-        self.assertTrue(success, msg="Did not log in successfully")
+        assert success, 'Did not log in successfully'
         self.dashboard_url = reverse('dashboard')
 
     def test_enrolled_as_non_verified(self):
@@ -136,7 +138,11 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
     @patch("lms.djangoapps.verify_student.services.is_verification_expiring_soon")
     def test_verify_resubmit_button_on_dashboard(self, mock_expiry):
         mock_expiry.return_value = True
-        SoftwareSecurePhotoVerification.objects.create(user=self.user, status='approved', expiry_date=now())
+        SoftwareSecurePhotoVerification.objects.create(
+            user=self.user,
+            status='approved',
+            expiration_date=now() + timedelta(days=1)
+        )
         response = self.client.get(self.dashboard_url)
         self.assertContains(response, "Resubmit Verification")
 
@@ -162,7 +168,7 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         attempt.mark_ready()
         attempt.submit()
         attempt.approve()
-        attempt.created_at = self.DATES[self.PAST] - timedelta(days=900)
+        attempt.expiration_date = self.DATES[self.PAST] - timedelta(days=900)
         attempt.save()
 
         # The student didn't have an approved verification at the deadline,
@@ -178,7 +184,7 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         attempt.mark_ready()
         attempt.submit()
         attempt.approve()
-        attempt.created_at = self.DATES[self.PAST] - timedelta(days=900)
+        attempt.expiration_date = self.DATES[self.PAST] - timedelta(days=900)
         attempt.save()
 
         # The student didn't have an approved verification at the deadline,
@@ -249,7 +255,7 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         attempt.mark_ready()
         attempt.submit()
 
-        # Expect that learner has submitted photos for reverfication and his/her
+        # Expect that learner has submitted photos for reverfication and their
         # previous verification is set to expired soon.
         self._assert_course_verification_status(VERIFY_STATUS_RESUBMITTED)
 
@@ -314,6 +320,55 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         self.assertContains(response2, attempt2.expiration_datetime.strftime("%m/%d/%Y"))
         self.assertContains(response2, attempt2.expiration_datetime.strftime("%m/%d/%Y"), count=2)
 
+    @override_waffle_flag(ENABLE_INTEGRITY_SIGNATURE, active=True)
+    @ddt.data(
+        None,
+        'past',
+        'future'
+    )
+    def test_verify_message_idv_disabled(self, deadline_key):
+        if deadline_key:
+            self._setup_mode_and_enrollment(self.DATES[deadline_key], "verified")
+        else:
+            self._setup_mode_and_enrollment(None, "verified")
+
+        self._assert_course_verification_status(None)
+
+        attempt = SoftwareSecurePhotoVerification.objects.create(user=self.user)
+        self._assert_course_verification_status(None)
+        attempt.mark_ready()
+        self._assert_course_verification_status(None)
+        attempt.submit()
+        self._assert_course_verification_status(None)
+        attempt.approve()
+        self._assert_course_verification_status(None)
+        attempt.expiration_date = self.DATES[self.PAST] - timedelta(days=900)
+        attempt.save()
+        self._assert_course_verification_status(None)
+
+    @ddt.data(True, False)
+    def test_integrity_disables_sidebar(self, integrity_flag):
+        self._setup_mode_and_enrollment(None, "verified")
+
+        #no sidebar when no IDV yet
+        response = self.client.get(self.dashboard_url)
+        self.assertNotContains(response, "profile-sidebar")
+
+        # The student has an approved verification
+        attempt = SoftwareSecurePhotoVerification.objects.create(user=self.user)
+        attempt.mark_ready()
+        attempt.submit()
+        attempt.approve()
+
+        # sidebar only appears after IDV if integrity is not on
+        with patch('common.djangoapps.student.views.dashboard.is_integrity_signature_enabled',
+                   return_value=integrity_flag):
+            response = self.client.get(self.dashboard_url)
+            if integrity_flag:
+                self.assertNotContains(response, "profile-sidebar")
+            else:
+                self.assertContains(response, "profile-sidebar")
+
     def _setup_mode_and_enrollment(self, deadline, enrollment_mode):
         """Create a course mode and enrollment.
 
@@ -375,7 +430,7 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         response = self.client.get(self.dashboard_url)
 
         # Sanity check: verify that the course is on the page
-        self.assertContains(response, six.text_type(self.course.id))
+        self.assertContains(response, str(self.course.id))
 
         # Verify that the correct banner is rendered on the dashboard
         alt_text = self.BANNER_ALT_MESSAGES.get(status)
@@ -385,7 +440,7 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
         # Verify that the correct banner color is rendered
         self.assertContains(
             response,
-            "<article class=\"course {}\"".format(self.MODE_CLASSES[status])
+            f"<article class=\"course {self.MODE_CLASSES[status]}\""
         )
 
         # Verify that the correct copy is rendered on the dashboard
@@ -403,7 +458,7 @@ class TestCourseVerificationStatus(UrlResetMixin, ModuleStoreTestCase):
                 fail_msg = "Could not find any of these messages: {expected}".format(
                     expected=self.NOTIFICATION_MESSAGES[status]
                 )
-                self.assertTrue(found_msg, msg=fail_msg)
+                assert found_msg, fail_msg
         else:
             # Combine all possible messages into a single list
             all_messages = []

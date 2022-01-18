@@ -5,13 +5,13 @@ Python tests for the Survey models
 
 from collections import OrderedDict
 
-from django.contrib.auth.models import User
 from django.test.client import Client
 
-from survey.models import SurveyForm
-from survey.utils import check_survey_required_and_unanswered, is_survey_required_for_course
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from common.djangoapps.student.tests.factories import UserFactory
+from lms.djangoapps.survey.models import SurveyForm
+from lms.djangoapps.survey.utils import check_survey_required_and_unanswered, is_survey_required_for_course
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class SurveyModelsTests(ModuleStoreTestCase):
@@ -23,16 +23,22 @@ class SurveyModelsTests(ModuleStoreTestCase):
         """
         Set up the test data used in the specific tests
         """
-        super(SurveyModelsTests, self).setUp()
+        super().setUp()
 
         self.client = Client()
 
         # Create two accounts
         self.password = 'abc'
-        self.student = User.objects.create_user('student', 'student@test.com', self.password)
-        self.student2 = User.objects.create_user('student2', 'student2@test.com', self.password)
+        self.student = UserFactory.create(
+            username='student', email='student@test.com', password=self.password,
+        )
+        self.student2 = UserFactory.create(
+            username='student2', email='student2@test.com', password=self.password,
+        )
 
-        self.staff = User.objects.create_user('staff', 'staff@test.com', self.password)
+        self.staff = UserFactory.create(
+            username='staff', email='staff@test.com', password=self.password,
+        )
         self.staff.is_staff = True
         self.staff.save()
 
@@ -60,7 +66,7 @@ class SurveyModelsTests(ModuleStoreTestCase):
         Assert the a requried course survey is when both the flags is set and a survey name
         is set on the course descriptor
         """
-        self.assertTrue(is_survey_required_for_course(self.course))
+        assert is_survey_required_for_course(self.course)
 
     def test_is_survey_not_required_for_course(self):
         """
@@ -68,51 +74,51 @@ class SurveyModelsTests(ModuleStoreTestCase):
         then the survey is not considered required
         """
         course = CourseFactory.create()
-        self.assertFalse(is_survey_required_for_course(course))
+        assert not is_survey_required_for_course(course)
 
         course = CourseFactory.create(
             course_survey_required=False
         )
-        self.assertFalse(is_survey_required_for_course(course))
+        assert not is_survey_required_for_course(course)
 
         course = CourseFactory.create(
             course_survey_required=True,
             course_survey_name="NonExisting"
         )
-        self.assertFalse(is_survey_required_for_course(course))
+        assert not is_survey_required_for_course(course)
 
         course = CourseFactory.create(
             course_survey_required=False,
             course_survey_name=self.test_survey_name
         )
-        self.assertFalse(is_survey_required_for_course(course))
+        assert not is_survey_required_for_course(course)
 
     def test_user_not_yet_answered_required_survey(self):
         """
         Assert that a new course which has a required survey but user has not answered it yet
         """
-        self.assertFalse(check_survey_required_and_unanswered(self.student, self.course))
+        assert not check_survey_required_and_unanswered(self.student, self.course)
 
         temp_course = CourseFactory.create(
             course_survey_required=False
         )
-        self.assertTrue(check_survey_required_and_unanswered(self.student, temp_course))
+        assert check_survey_required_and_unanswered(self.student, temp_course)
 
         temp_course = CourseFactory.create(
             course_survey_required=True,
             course_survey_name="NonExisting"
         )
-        self.assertTrue(check_survey_required_and_unanswered(self.student, temp_course))
+        assert check_survey_required_and_unanswered(self.student, temp_course)
 
     def test_user_has_answered_required_survey(self):
         """
         Assert that a new course which has a required survey and user has answers for it
         """
         self.survey.save_user_answers(self.student, self.student_answers, None)
-        self.assertTrue(check_survey_required_and_unanswered(self.student, self.course))
+        assert check_survey_required_and_unanswered(self.student, self.course)
 
     def test_staff_must_answer_survey(self):
         """
         Assert that someone with staff level permissions does not have to answer the survey
         """
-        self.assertTrue(check_survey_required_and_unanswered(self.staff, self.course))
+        assert check_survey_required_and_unanswered(self.staff, self.course)

@@ -10,14 +10,15 @@ from openedx.core.djangoapps.schedules.config import DEBUG_MESSAGE_WAFFLE_FLAG
 
 class ScheduleMessageType(BaseMessageType):
     def __init__(self, *args, **kwargs):
-        super(ScheduleMessageType, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.log_level = logging.DEBUG if DEBUG_MESSAGE_WAFFLE_FLAG.is_enabled() else None
+        self.options['override_frequency_capping'] = True
 
 
 class RecurringNudge(ScheduleMessageType):
     def __init__(self, day, *args, **kwargs):
-        super(RecurringNudge, self).__init__(*args, **kwargs)
-        self.name = "recurringnudge_day{}".format(day)
+        super().__init__(*args, **kwargs)
+        self.name = f"recurringnudge_day{day}"
 
 
 class UpgradeReminder(ScheduleMessageType):

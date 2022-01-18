@@ -6,12 +6,12 @@ Base file for Grades tests
 from crum import set_current_request
 
 from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
+from common.djangoapps.student.models import CourseEnrollment
+from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.course_blocks.api import get_course_blocks
 from openedx.core.djangolib.testing.utils import get_mock_request
-from student.models import CourseEnrollment
-from student.tests.factories import UserFactory
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 from ..course_data import CourseData
 from ..subsection_grade_factory import SubsectionGradeFactory
@@ -23,7 +23,7 @@ class GradeTestBase(SharedModuleStoreTestCase):
     """
     @classmethod
     def setUpClass(cls):
-        super(GradeTestBase, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
         with cls.store.bulk_operations(cls.course.id):
             cls.chapter = ItemFactory.create(
@@ -34,7 +34,7 @@ class GradeTestBase(SharedModuleStoreTestCase):
             cls.sequence = ItemFactory.create(
                 parent=cls.chapter,
                 category='sequential',
-                display_name="Test Sequential X",
+                display_name="Test Sequential X with an & Ampersand",
                 graded=True,
                 format="Homework"
             )
@@ -78,7 +78,7 @@ class GradeTestBase(SharedModuleStoreTestCase):
             cls.store.update_item(cls.chapter_2, UserFactory().id)
 
     def setUp(self):
-        super(GradeTestBase, self).setUp()
+        super().setUp()
         self.addCleanup(set_current_request, None)
         self.request = get_mock_request(UserFactory())
         self.client.login(username=self.request.user.username, password="test")

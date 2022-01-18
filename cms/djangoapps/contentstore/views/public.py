@@ -5,11 +5,12 @@ Public views
 
 from django.conf import settings
 from django.shortcuts import redirect
-from django.utils.http import urlquote_plus
+from urllib.parse import quote_plus  # lint-amnesty, pylint: disable=wrong-import-order
 from waffle.decorators import waffle_switch
 
-from contentstore.config import waffle
-from edxmako.shortcuts import render_to_response
+from common.djangoapps.edxmako.shortcuts import render_to_response
+
+from ..config import waffle
 
 __all__ = ['register_redirect_to_lms', 'login_redirect_to_lms', 'howitworks', 'accessibility']
 
@@ -46,7 +47,7 @@ def _build_next_param(request):
         # Warning: do not use `build_absolute_uri` when `next_url` is empty because `build_absolute_uri` would
         # build use the login url for the next url, which would cause a login redirect loop.
         absolute_next_url = request.build_absolute_uri(next_url)
-        return '?next=' + urlquote_plus(absolute_next_url)
+        return '?next=' + quote_plus(absolute_next_url)
     return ''
 
 
@@ -58,7 +59,7 @@ def howitworks(request):
         return render_to_response('howitworks.html', {})
 
 
-@waffle_switch('{}.{}'.format(waffle.WAFFLE_NAMESPACE, waffle.ENABLE_ACCESSIBILITY_POLICY_PAGE))
+@waffle_switch(f'{waffle.WAFFLE_NAMESPACE}.{waffle.ENABLE_ACCESSIBILITY_POLICY_PAGE}')
 def accessibility(request):
     """
     Display the accessibility accommodation form.

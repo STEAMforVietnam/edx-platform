@@ -1,13 +1,14 @@
 
 
-(function(globals) {
-
-  var django = globals.django || (globals.django = {});
+'use strict';
+{
+  const globals = this;
+  const django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    var v=0;
-    if (typeof(v) == 'boolean') {
+    const v = 0;
+    if (typeof v === 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -19,23 +20,12 @@
 
   django.catalog = django.catalog || {};
   
-  var newcatalog = {
+  const newcatalog = {
     "\n        No, I want to continue working.\n      ": "\nTidak, saya ingin lanjut bekerja.",
     "\n      After you submit your exam, your exam will be graded.\n    ": "\nSetelah Anda mengirimkan jawaban ujian,  jawaban Anda akan dinilai.",
     " ${price} {currency} )": " ${price} {currency} )",
-    " Link": "Tautan",
     " and ": "dan",
     " and {num_of_minutes} minutes": "dan {num_of_minutes} menit",
-    " learner does not exist in LMS and not added to the exception list": "pembelajar tidak dapat ditemukan di LMS dan tidak ditambahkan ke daftar eksepsi",
-    " learner is already white listed and not added to the exception list": "pembelajar telah dimasukkan dalam daftar putih dan tidak ditambahkan ke daftar eksepsi",
-    " learner is not enrolled in course and not added to the exception list": "pembelajar tidak mengikuti kursus dan tidak ditambahkan ke daftar eksepsi",
-    " learner is successfully added to the exception list": "pembelajar telah berhasil ditambahkan ke daftar exception",
-    " learners are already white listed and not added to the exception list": "pembelajar telah dimasukkan dalam daftar putih dan tidak ditambahkan ke daftar eksepsi",
-    " learners are not enrolled in course and not added to the exception list": "pembelajar tidak mengikuti kursus dan tidak ditambahkan ke daftar eksepsi",
-    " learners are successfully added to exception list": "pembelajar telah berhasil ditambahkan ke daftar exception",
-    " learners do not exist in LMS and not added to the exception list": "pembelajar tidak dapat ditemukan di LMS dan tidak ditambahkan ke daftar eksepsi",
-    " record is not in correct format and not added to the exception list": "rekaman tidak dalam format yang tepat dan tidak ditambahkan ke daftar eksepsi",
-    " records are not in correct format and not added to the exception list": "rekaman tidak dalam format yang tepat dan tidak ditambahkan ke daftar eksepsi",
     "${listPrice}": "${listPrice}",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
     "%(errorCount)s error found in form.": [
@@ -86,10 +76,7 @@
     "- Sortable": "bisa diurutkan",
     "6 a.m.": "6 pagi",
     "6 p.m.": "18.00",
-    "<%= user %> already in exception list.": "<%= user %> telah berada dalam daftar eksepsi.",
-    "<%= user %> has been successfully added to the exception list. Click Generate Exception Certificate below to send the certificate.": "<%= user %> telah berhasil ditambahkan dalam daftar eksepsi. Klik Buat Sertifikat Eksepsi di bawah untuk mengirim sertifikat.",
     "A Password is required": "Masukkan kata kunci",
-    "A driver's license, passport, or government-issued ID with your name and photo.": "SIM, phasphor, ID terbitan pemerintah/ktp dengan nama dan photo anda",
     "A driver's license, passport, or other government-issued ID with your name and photo": "SIM, phasphor, atau ID yg diterbitkan oleh pemerintah dengan nama dan photo anda",
     "A highlight to look forward to this week.": "Sorotan untuk disimak minggu ini.",
     "A list of courses you have just enrolled in as a verified student": "Daftar kursus di mana Anda menjadi peserta terverifikasi",
@@ -167,7 +154,6 @@
     "Already have an {platformName} account?": "Sudah memiliki akun {platformName}?",
     "Alternative source": "Sumber Alternatif",
     "Always show assessment results": "Selalu tampilkan hasil penilaian",
-    "Amount": "Jumlah",
     "An email has been sent to {userEmail} with a link for you to activate your account.": "Kami sudah mengirimkan email ke {userEmail} dengan tautan untuk mengaktivasi akun Anda.",
     "An error has occurred. Check your Internet connection and try again.": "Terjadi error. Cek koneksi Internet Anda dan coba ulangi kembali.",
     "An error has occurred. Make sure that you are connected to the Internet, and then try refreshing the page.": "Terjadi error. Pastikan Anda terhubung dengan Internet, kemudian refresh kembali halaman ini.",
@@ -229,9 +215,7 @@
     "Basic Account Information": "Informasi Akun Dasar",
     "Be sure your entire face is inside the frame": "Pastikan seluruh wajah anda berada didalam frame",
     "Before proceeding, please confirm that your details match": "Sebelum proses, silakan konfirmasi bahwa detailnya sesuai",
-    "Before proceeding, please {htmlStart}activate your account{htmlEnd}.": "Sebelum melanjutkan, mohon {htmlStart}aktivasi akun Anda{htmlEnd}.",
     "Before proceeding, please {htmlStart}unlink all social media accounts{htmlEnd}.": "Sebelum melanjutkan, mohon {htmlStart}putuskan kaitan semua akun media sosial{htmlEnd}.",
-    "Billed to": "Ditagihkan kepada:",
     "Billing/Payment Options": "Pilihan Pembayaran",
     "Biography": "Riwayat hidup",
     "Block view is unavailable": "Tampilan blok tidak tersedia",
@@ -293,7 +277,6 @@
     "Check Your Email": "Periksa email anda",
     "Check the highlighted fields below and try again.": "Cek field di bawah yang dihighlight dan coba kembali.",
     "Check this box to receive an email digest once a day notifying you about new, unread activity from posts you are following.": "Centang kotak ini untuk menerima email sehari sekali mengenai aktivitas baru yang belum dibaca dari post yang Anda ikuti.",
-    "Check your email": "Periksa email anda",
     "Check your email account for instructions to reset your password.": "Cek akun email Anda untuk instruksi penyetelan ulang kata kunci.",
     "Check your email for an activation message.": "Periksa email Anda untuk pesan aktivasi.",
     "Checkout": "Checkout",
@@ -366,7 +349,6 @@
     "Copy Email To Editor": "Salin Email Kepada Editor",
     "Copy row": "Salin baris",
     "Cost": "Biaya",
-    "Could not find Certificate Exception in white list. Please refresh the page and try again": "Tidak dapat menemukan Eksepsi Sertifikat dalam daftar putih. Silakan refresh halaman ini dan coba kembali.",
     "Could not find Certificate Invalidation in the list. Please refresh the page and try again": "Tidak dapat menemukan Pembatalan Keberlakuan Sertifikat dalam daftar. Silakan refresh halaman ini dan coba kembali.",
     "Could not find a user with username or email address '<%- identifier %>'.": "Tidak dapat menemukan pengguna dengan nama pengguna atau alamat email '<%- identifier %>'.",
     "Could not find the specified string.": "Tidak dapat menemukan string yang dimaksud.",
@@ -374,11 +356,9 @@
     "Could not grade your answer. The submission was aborted.": "Jawaban tidak dapat dinilai. Penyerahan jawaban dibatalkan.",
     "Could not override problem score for {user}.": "Tidak dapat menimpa nilai permasalahan untuk {user}",
     "Could not retrieve download url.": "Gagal mencapai url unduhan.",
-    "Could not retrieve payment information": "Tidak dapat memuat informasi pembayaran",
     "Could not retrieve upload url.": "Gagal mencapai url unggahan.",
     "Could not submit order": "Tidak dapat mengajukan pesanan",
     "Could not submit photos": "Tidak bisa mengajukan foto-foto",
-    "Couldn't Save This Assignment": "Gagal Menyimpan Tugas Ini",
     "Country": "Negara",
     "Country of residence": "Negara tempat tinggal",
     "Country or Region of Residence": "Negara atau Wilayah Tempat Tinggal",
@@ -415,7 +395,6 @@
     "Creative Commons licensed content, with terms as follow:": "Konten kreatif  lisensi umum, dengan istilah sebagai berikut:",
     "Criterion Added": "Kriteria telah ditambahkan",
     "Criterion Deleted": "Kriteria telah dihapus",
-    "Crossed out items have been refunded.": "Item yang dicoret telah direfund.",
     "Current Role:": "Peran saat ini",
     "Current conversation": "Percakapan saat ini",
     "Current tab": "Tab ini",
@@ -423,7 +402,6 @@
     "Custom...": "Kustom",
     "Cut": "Potong",
     "Cut row": "Potong baris",
-    "Date": "Tanggal",
     "Date Added": "Tanggal Ditambahkan",
     "Date Placed": "Tanggal",
     "Deactivate": "Menonaktivkan",
@@ -462,7 +440,6 @@
     "Do not show again": "Berhenti perlihatkan",
     "Do you want to allow this student ('{student_id}') to skip the entrance exam?": "Apakah Anda ingin memperbolehkan siswa ini ('{student_id}') untuk melewatkan ujian masuk?",
     "Do you want to replace the edX transcript with the YouTube transcript?": "Apakah anda ingin mengganti transkrip edX dengan Transkrip You Tube?",
-    "Do you want to upload your file before submitting?": "Apakah Anda ingin mengunggah berkas Anda sebelum mengirimkan?",
     "Document properties": "Properti dokumen",
     "Does the name on your ID match your account name: %(fullName)s?": "Apakah nama pada ID anda sesuai dengan nama account anda: %(fullName)s?",
     "Does the photo of you show your whole face?": "Apakah photo anda menunjukkan seluruh wajah?",
@@ -507,7 +484,6 @@
     "Emoticons": "Emoticons",
     "Enable": "Aktifkan",
     "Enable Cohorts": "Aktifkan Cohorts",
-    "Enable Weekly Highlight Emails": "Aktifkan Email Sorotan Mingguan",
     "Enabled": "Aktif",
     "Encoding": "Encoding",
     "End My Exam": "Akhiri Ujian Saya",
@@ -535,7 +511,6 @@
     "Enter the page number you'd like to quickly navigate to.": "Masukkan nomer halaman yang ingin Anda tuju.",
     "Enter the username or email address of each learner that you want to add as an exception.": "Masukkan nama pengguna atau alamat email setiap peserta yang dikecualikan",
     "Enter username or email": "Masukan username atau alamat surel",
-    "Enter your ": "Masukkan",
     "Entrance exam attempts is being reset for student '{student_id}'.": "Percobaan ujian masuk telah disetel ulang untuk siswa '{student_id}'.",
     "Entrance exam state is being deleted for student '{student_id}'.": "Status ujian masuk siswa '{student_id}' telah dihapus.",
     "Error": "Kesalahan",
@@ -561,7 +536,6 @@
     "Error getting the number of ungraded responses": "Tidak dapat menampilkan jumlah tanggapan yang belum dinilai.",
     "Error listing task history for this student and problem.": "Terjadi kesalahan dalam mendaftar riwayat tugas untuk siswa dan permasalahan ini.",
     "Error resetting entrance exam attempts for student '{student_id}'. Make sure student identifier is correct.": "Error menyetel ulang percobaan ujian masuk untuk siswa '{student_id}'. Pastikan kode identifikasi siswa benar.",
-    "Error resetting problem attempts for problem '<%= problem_id %>' and student '<%- student_id %>'. Make sure that the problem and student identifiers are complete and correct.": "Error menyetel ulang percobaan untuk masalah '<%= problem_id %>' dan siswa '<%- student_id %>'. Pastikan kode identifikasi masalah dan siswa lengkap dan benar.",
     "Error retrieving grading configuration.": "Kesalahan saat menerima susunan penilaian",
     "Error sending email.": "Terjadi kesalahan saat kirim surel.",
     "Error starting a task to override score for problem '<%- problem_id %>' for student '<%- student_id %>'. Make sure that the the score and the problem and student identifiers are complete and correct.": "Terjadi kesalahan dalam memulai tugas untuk menimpa nilai untuk permasalahan '<%- problem_id %>' untuk siswa '<%- student_id %>'. Pastikan ID nilai dan permasalahan dan siswa lengkap dan benar.",
@@ -597,7 +571,6 @@
     "Feedback available for selection.": "Umpan balik tersedia untuk pilihan Anda.",
     "File": "Berkas",
     "File Name": "Nama Berkas",
-    "File type is not allowed.": "Jenis berkas ini tidak diperkenankan",
     "File types can not be empty.": "Jenis berkas tidak dapat dikosongkan.",
     "File upload succeeded": "Unggah File telah sukses",
     "Files must be in JPEG or PNG format.": "Berkas harus dalam format JPEG atau PNG.",
@@ -699,7 +672,6 @@
     "ID": "ID",
     "ID-Verification is not required for this Professional Education course.": "Verifikasi ID tidak dibutuhkan untuk kursus pendidikan profesional",
     "If you do not yet have an account, use the button below to register.": "Jika Anda belum memiliki akun, gunakan tombol di bawah untuk registrasi.",
-    "If you don't verify your identity now, you can still explore your course from your dashboard. You will receive periodic reminders from %(platformName)s to verify your identity.": "Jika Anda tidak memverifikasi identitas Anda sekarang, Anda masih dapat melihat kursus Anda dari dashboard Anda. Anda akan menerima pengingat dari %(platformName)s secara periodik untuk memverifikasi identitas Anda.",
     "If you leave this page without saving or submitting your response, you will lose any work you have done on the response.": "Jika Anda meninggalkan halaman ini tanpa menyimpan atau mengirim tanggapan Anda, Anda akan kehilangan semua pekerjaan yang Anda buat pada tanggapan Anda.",
     "If you leave this page without submitting your peer assessment, you will lose any work you have done.": "Jika Anda meninggalkan halaman ini tanpa mengirimkan penilaian sebaya Anda, Anda akan kehilangan pekerjaan yang Anda lakukan.",
     "If you leave this page without submitting your self assessment, you will lose any work you have done.": "Jika Anda meninggalkan halaman tanpa mengirimkan hasil penilaian mandiri, Anda akan kehilangan pekerjaan Anda barusan.",
@@ -828,7 +800,6 @@
     "Mark Exam As Completed": "Tandai Ujian Sebagai Selesai",
     "Mark enrollment code as unused": "Tandai kode kepesertaan sebagai tidak digunakan",
     "Markdown Editing Help": "Bantuan Merubah Markdown",
-    "Masters": "Master",
     "Match case": "Match case",
     "Maximum": "Maksimum",
     "May": "Mei",
@@ -865,7 +836,6 @@
     "New document": "Dokumen baru",
     "New window": "Window baru",
     "Next": "Selanjutnya",
-    "Next Step: Confirm your identity": "Langkah Selanjutnya: konfirmasi identitas anda",
     "Next: %(nextStepTitle)s": "Selanjutnya: %(nextStepTitle)s",
     "No Derivatives": "Tidak Ada Derivatif",
     "No EdX Timed Transcript": "Tidak ada transkrip waktu  EdX ",
@@ -876,9 +846,7 @@
     "No description available": "Tidak tersedia deskripsi",
     "No posts matched your query.": "Tidak terdapat post yang sesuai dengan pencarian Anda.",
     "No prerequisite": "Tidak ada prasyarat",
-    "No receipt available": "Tidak ada tanda terima yang tersedia",
     "No results": "Tidak ada hasil",
-    "No results found for \"%(query_string)s\". Please try searching again.": "Tidak ditemukan hasil pencarian untuk \"%(query_string)s\". Silakan coba cari kembali.",
     "No results found for {original_query}. Showing results for {suggested_query}.": "Tidak ada hasil ditemukan untuk {original_query}. Menunjukkan hasil untuk {suggested_query}.",
     "No tasks currently running.": "Tidak ada tugas yang sedang berjalan.",
     "No transcript uploaded.": "Tidak ada transkrip tersedia.",
@@ -933,7 +901,6 @@
     "Options for {license_name}": "Pilihan untuk {license_name}",
     "Order Details": "Rincian Pesanan",
     "Order History": "Runtutan Pesanan",
-    "Order No.": "Nomer order",
     "Order Number": "Nomor Pesanan",
     "Organization": "Lembaga",
     "Organization ": "Organisasi",
@@ -974,7 +941,6 @@
     "Placeholder": "Placeholder",
     "Play": "Putar",
     "Play video": "Putar video",
-    "Please Note": "Silakan catat",
     "Please add a photo of the instructor (Note: only JPEG or PNG format supported)": "Mohon tambahkan foto instruktur (Catatan: hanya format JPG atau PNG yang didukung)",
     "Please add the institute where the instructor is associated": "Mohon tambahkan lembaga yang berhubungan dengan instruktur",
     "Please add the instructor's biography": "Mohon tambahkan riwayat hidup instruktur",
@@ -982,7 +948,6 @@
     "Please add the instructor's title": "Mohon tambahkan gelar instruktur",
     "Please address the errors on this page first, and then save your progress.": "Harap atasi masalah pada halaman ini dahulu, lalu simpan kemajuan Anda.",
     "Please check the following validation feedbacks and reflect them in your course settings:": "Silakan periksa feedback validasi  berikut dan mencerminkan mereka di dalam pengaturan  kursus anda",
-    "Please correct the outlined fields.": "Silakan perbaiki bidang-bidang bergaris tepi.",
     "Please describe this image or agree that it has no contextual value by checking the checkbox.": "Mohon deskripsikan gambar ini atau setujui bahwa gambar ini tidak memiliki nilai kontekstual dengan memberi tanda centang",
     "Please do not use any spaces in this field.": "Mohon jangan gunakan spasi di field ini.",
     "Please do not use any spaces or special characters in this field.": "Harap tidak menggunakan spasi atau karakter khusus pada isian ini.",
@@ -1038,9 +1003,7 @@
     "Proctored Exam": "Ujian Supervisi",
     "Proctored Option Available": "Pilihan proktor tersedia",
     "Proctored Option No Longer Available": "Pilihan proktor tidak tersedia lagi",
-    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "Ujian Tersupervisi dijadwalkan dan mereka merekam video dari setiap peserta didik yang menjalani ujian. Video kemudian ditinjau untuk memastikan bahwa peserta didik mengikuti semua aturan ujian.",
     "Proctoring": "Proctoring",
-    "Proctoring Session Results Update for {course_name} {exam_name}": "Hasil Sesi Proctor untuk {course_name} {exam_name}",
     "Product Name": "Nama Produk",
     "Professional Certificate for {courseName}": "Sertifikat Profesional untuk {courseName}",
     "Professional Education": "Pendidikan Profesional",
@@ -1120,7 +1083,6 @@
     "Right": "Kanan",
     "Right to left": "Kanan ke kiri",
     "Robots": "Robot",
-    "Role field should not be left unselected.": "Kolom peran harus dipilih.",
     "Row": "Row",
     "Row group": "Row group",
     "Row properties": "Row properties",
@@ -1139,7 +1101,6 @@
     "Search Results": "Hasil pencarian",
     "Search all posts": "Cari semua post",
     "Search teams": "Cari tim",
-    "Search the {platform} Help Center": "Cari dalam Help Center {platform}",
     "Second Review Required": "Diperlukan ulasan kedua",
     "Section": "Bagian",
     "Section Highlights": "Sorotan Bagian",
@@ -1248,7 +1209,6 @@
     "Status of Your Response": "Status respon Anda",
     "Strikethrough": "Coret",
     "Student": "Siswa",
-    "Student Removed from certificate white list successfully.": "Siswa telah berhasil dihapus dari daftar putih sertifikat.",
     "Student email or username": "Email atau nama pengguna peserta",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Add to Exception List\" button.": "Username/email siswa harus diisi. Silakan isi username/email lalu klik tombol \"Tambahkan ke Daftar Eksepsi\".",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Invalidate Certificate\" button.": "Username/email pembelajar tidak boleh kosong. Isi username/email dan klik tombol \"Invalidate Certificate\".",
@@ -1349,7 +1309,6 @@
     "The organization that this signatory belongs to, as it should appear on certificates.": "Organisasi penandatangan yang harus tercetak di sertifikat",
     "The page \"{route}\" could not be found.": "Halaman \"{route}\" tidak dapat ditemukan.",
     "The post you selected has been deleted.": "Post yang Anda pilih telah dihapus.",
-    "The refund deadline for this course has passed,so you will not receive a refund.": "Batas waktu refund untuk kursus ini telah berakhir, sehingga Anda tidak dapat menerima refund.",
     "The selected content group does not exist": "Grup isi yang dipilih tidak ada",
     "The server could not be contacted.": "Server tidak dapat dihubungi.",
     "The staff assessment form could not be loaded.": "Form penilaian staf tidak dapat dimuat.",
@@ -1409,7 +1368,6 @@
     "This learner is currently sharing a limited profile.": "Peserta ini membagikan profil yang terbatas.",
     "This link will open in a modal window": "Tautan ini akan terbuka di jendela modal",
     "This link will open in a new browser window/tab": "Tautan ini akan dibuka di jendela/tab peramban baru",
-    "This may be happening because of an error with our server or your internet connection. Try refreshing the page or making sure you are online.": "Ini mungkin terjadi karena ada kesalahan di server kami atau koneksi Internet Anda. Coba refresh halaman untuk memastikan Anda online.",
     "This page contains information about orders that you have placed with {platform_name}.": "Halaman ini mengandung informasi mengenai pesanan yang telah Anda buat dengan {platform_name}",
     "This post could not be closed. Refresh the page and try again.": "Post ini tidak dapat ditutup. Refresh halaman ini dan coba lagi.",
     "This post could not be flagged for abuse. Refresh the page and try again.": "Post ini tidak dapat ditandai sebagai penyalahgunaan. Refresh halaman ini dan coba lagi.",
@@ -1418,7 +1376,6 @@
     "This post could not be unflagged for abuse. Refresh the page and try again.": "Tanda penyalahgunaan pada post ini tidak dapat dibatalkan. Refresh halaman ini dan coba lagi.",
     "This post could not be unpinned. Refresh the page and try again.": "Pin pada post ini tidak dapat dibatalkan. Refresh halaman ini dan coba lagi.",
     "This problem could not be saved.": "Masalah ini tidak dapat disimpan.",
-    "This problem has already been released. Any changes will apply only to future assessments.": "Masalah ini telah dilepas. Perubahan yang terjadi hanya akan diterapkan pada penilaian mendatang.",
     "This problem has been reset.": "Permasalahan ini telah direset",
     "This response could not be marked as an answer. Refresh the page and try again.": "Respon ini tidak dapat dikategorikan menjadi jawaban. Refresh halaman ini dan coba lagi.",
     "This response could not be marked as endorsed. Refresh the page and try again.": "Respon ini tidak dapat ditandai sebagai endorsed. Refresh halaman ini dan coba lagi.",
@@ -1590,7 +1547,6 @@
     "Volume": "Volume",
     "Vote for good posts and responses": "Vote post dan respon yang baik",
     "Waiting": "Menunggu",
-    "Want to confirm your identity later?": "Ingin konfirmasi identitas anda nanti?",
     "Warning": "Peringatan",
     "Warnings": "Peringatan",
     "We ask you to activate your account to ensure it is really you creating the account and to prevent fraud.": "Kami meminta Anda untuk mengaktivasi akun Anda untuk memastikan bahwa memang Anda yang membuat akun ini dan untuk mencegah penyalahgunaan.",
@@ -1640,7 +1596,6 @@
     "You can no longer change sessions.": "Anda tidak bisa lagi mengubah sesi.",
     "You can now enter your payment information and complete your enrollment.": "Anda sekarang dapat masuk ke informasi pembayaran dan melengkapi pendaftaran anda",
     "You can remove members from this team, especially if they have not participated in the team's activity.": "Anda dapat mengeluarkan anggota dari tim ini, terutama jika mereka tidak berpartisipasi dalam aktivitas tim.",
-    "You can upload files with these file types: ": "Anda dapat mengunggah berkas dengan jenis sebagai berikut:",
     "You can use your {accountName} account to sign in to your {platformName} account.": "Anda dapat menggunakan akun {accountName} Anda untuk masuk ke akun {platformName} Anda.",
     "You can view your information or unlink from {enterprise_name} anytime in your Account Settings.": "Anda dapat melihat informasi Anda dan membatalkan tautan dari {enterprise_name} setiap saat melalui Pengaturan Akun Anda.",
     "You cannot view the course as a student or beta tester before the course release date.": "Anda tidak dapat melihat kursus sebagai siswa atau penguji beta sebelum tanggal rilis kursus.",
@@ -1654,16 +1609,14 @@
     "You did not submit the required files: {requiredFiles}.": "Anda tidak mengumpulkan berkas yang diperlukan: {requiredFiles}.",
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "Anda tidak memiliki Flash yang sudah diinstal. Instal Flash untuk melanjutkan verifikasi Anda.",
     "You don't seem to have a webcam connected.": "Tidak dapat menemukan webcam Anda.",
-    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "Anda telah menambahkan kriteria. Anda perlu memiliki satu opsi untuk pilihan dalam langkah Pelatihan Pembelajar. Untuk melakukannya, klik tab Setelan.",
     "You have already verified your ID!": "Anda telah memverifikasi ID anda",
-    "You have been logged out of your edX account. Click Okay to log in again now. Click Cancel to stay on this page (you must log in again to save your work).": "Anda telah keluar dari akun edX anda. Klik Okay untuk masuk kembali sekarang. Klik Batalkan untuk tetap di halaman ini (Anda harus masuk lagi untuk menyimpan pekerjaan Anda).",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "Anda telah menghapus satu kriteria. Kriteria telah dihapus dari contoh tanggapan pada langkah Pelatihan Pembelajar.",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "Anda telah menghapus semua opsi untuk kriteria ini. Kriteria telah dihapus dari contoh tanggapan pada langkah Pelatihan Pembelajar.",
     "You have deleted an option. That option has been removed from its criterion in the sample responses in the Learner Training step. You might have to select a new option for the criterion.": "Anda telah menghapus sebuah opsi. Opsi tersebut telah dihapus dari kriteria pada contoh tanggapan pada langkah Pelatihan Pembelajar. Anda mungkin perlu memilih opsi baru untuk kriteria tersebut.",
     "You have no handouts defined": "Anda tidak memiliki handout yang terdefinisi",
     "You have not bookmarked any courseware pages yet": "Anda belum menandai halaman kursus.",
-    "You have selected an action, and you haven't made any changes on individual fields. You're probably looking for the Go button rather than the Save button.": "Anda telah memilih sebuah aksi, tetapi belum mengubah bidang apapun. Kemungkinan Anda mencari tombol Buka dan bukan tombol Simpan.",
-    "You have selected an action, but you haven't saved your changes to individual fields yet. Please click OK to save. You'll need to re-run the action.": "Anda telah memilih sebuah aksi, tetapi belum menyimpan perubahan ke bidang yang ada. Klik OK untuk menyimpan perubahan ini. Anda akan perlu mengulangi aksi tersebut kembali.",
+    "You have selected an action, and you haven\u2019t made any changes on individual fields. You\u2019re probably looking for the Go button rather than the Save button.": "Anda telah memilih tindakan, dan Anda belum membuat perubahan apa pun di setiap bidang. Anda mungkin mencari tombol Buka daripada tombol Simpan.",
+    "You have selected an action, but you haven\u2019t saved your changes to individual fields yet. Please click OK to save. You\u2019ll need to re-run the action.": "Anda telah memilih tindakan, tetapi Anda belum menyimpan perubahan ke masing-masing bidang. Silakan klik OK untuk menyimpan. Anda harus menjalankan kembali tindakan tersebut.",
     "You have set your language to {beta_language}, which is currently not fully translated. You can help us translate this language fully by joining the Transifex community and adding translations from English for learners that speak {beta_language}.": "Anda telah menyetel bahasa menjadi {beta_language}, yang belum seluruhnya diterjemahkan. Anda dapat membantu kami menerjemahkan ke bahasa ini seluruhnya dengan bergabung dengan komunitas Transifex dan menambahkan terjemahan dari Bahasa Inggris untuk peserta yang berbicara {beta_language}.",
     "You have successfully signed into %(currentProvider)s, but your %(currentProvider)s account does not have a linked %(platformName)s account. To link your accounts, sign in now using your %(platformName)s password.": "Anda telah berhasil masuk ke %(currentProvider)s, namun akun %(currentProvider)s Anda tidak memiliki akun %(platformName)s yang terhubung. Untuk menghubungkan akun Anda, masuk sekarang dengan menggunakan kata sandi %(platformName)s Anda.",
     "You have successfully updated your goal.": "Anda telah berhasil memperbarui tujuan Anda",
@@ -1682,7 +1635,6 @@
     "You must specify a name": "Anda harus berikan nama",
     "You must specify a name for the cohort": "Anda harus menentukan nama untuk kohort ini",
     "You must specify your birth year before you can share your full profile. To specify your birth year, go to the {account_settings_page_link}": "Anda harus menentukan tahun lahir sebelum Anda dapat membagikan profil lengkap Anda. Untuk memilih tahun lahir, klik {account_settings_page_link}",
-    "You need to activate your account before you can enroll in courses. Check your inbox for an activation email.": "Anda memerlukan untuk aktifasi account anda sebelum anda dapat mendaftar kursus. Periksa inbok anda pada aktifasi email",
     "You need to activate your account before you can enroll in courses. Check your inbox for an activation email. After you complete activation you can return and refresh this page.": "Anda harus mengaktifkan akun sebelum Anda dapat mendaftar kursus. Periksa kotak masuk email Anda untuk email aktivasi. Setelah Anda menyelesaikan aktivasi Anda dapat memuat kembali halaman ini.",
     "You receive messages from {platform_name} and course teams at this address.": "Anda menerima pesan dari {platform_name} dan tim kursus di alamat ini.",
     "You submitted {filename}; only {allowedFiles} are allowed.": "Anda menyerahkan {filename}; Anda hanya boleh menyerahkan {allowedFiles}.",
@@ -1781,14 +1733,10 @@
     "or": "atau",
     "or create a new one here": "Buatlah satu yang baru disini",
     "or sign in with": "Atau masuk dengan",
-    "pending": "ditunda",
-    "practice": "Latihan",
     "price": "Harga",
-    "proctored": "Proktor",
     "provide the title/name of the chapter that will be used in navigating": "Menyediakan judul/nama dari bab yang akan digunakan dalam navigasi",
     "provide the title/name of the text book as you would like your students to see it": "Menyediakan judul/nama dari textbook selagi anda  ingin pelajar anda melihatnya",
     "remove": "hapus",
-    "satisfactory": "Memuaskan",
     "send an email message to {email}": "Mengirim surel ke {email}",
     "strong text": "Teks tebal",
     "team count": "jumlah tim",
@@ -1798,7 +1746,6 @@
       "saat ini terdapat {numVotes} vote"
     ],
     "title_word_{uniqueId}": "title_word_{uniqueId}",
-    "unsatisfactory": "Tidak memuaskan",
     "unsubmitted": "submisi dibatalkan",
     "upload a PDF file or provide the path to a Studio asset file": "Unggah file PDF atau menyediakan path/jalur pada file aset studio",
     "username or email": "nama pengguna atau email",
@@ -1846,31 +1793,28 @@
     "{sessionDates} (Open until {enrollmentEnd})": "{sessionDates} (Dibuka sampai {enrollmentEnd})",
     "{sessionDates} - Currently Selected": "{sessionDates} - Sedang Dipilih",
     "{start_strong}{total}{end_strong} words submitted in total.": "{start_strong}{total}{end_strong} total kata dikumpulkan",
-    "{total_results} result": [
-      "{total_results} hasil"
-    ],
     "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}": "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}",
     "{type} Progress": "Kemajuan {type} ",
     "\u2026": "\u2026"
   };
-  for (var key in newcatalog) {
+  for (const key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      var value = django.catalog[msgid];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[msgid];
+      if (typeof value === 'undefined') {
         return msgid;
       } else {
-        return (typeof(value) == 'string') ? value : value[0];
+        return (typeof value === 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      var value = django.catalog[singular];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[singular];
+      if (typeof value === 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1880,16 +1824,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      var value = django.gettext(context + '\x04' + msgid);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.gettext(context + '\x04' + msgid);
+      if (value.includes('\x04')) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.includes('\x04')) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1912,19 +1856,15 @@
       "%d-%m-%Y %H.%M.%S",
       "%d-%m-%Y %H.%M.%S.%f",
       "%d-%m-%Y %H.%M",
-      "%d-%m-%Y",
       "%d-%m-%y %H.%M.%S",
       "%d-%m-%y %H.%M.%S.%f",
       "%d-%m-%y %H.%M",
-      "%d-%m-%y",
       "%m/%d/%y %H.%M.%S",
       "%m/%d/%y %H.%M.%S.%f",
       "%m/%d/%y %H.%M",
-      "%m/%d/%y",
       "%m/%d/%Y %H.%M.%S",
       "%m/%d/%Y %H.%M.%S.%f",
       "%m/%d/%Y %H.%M",
-      "%m/%d/%Y",
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
@@ -1932,12 +1872,14 @@
     ],
     "DATE_FORMAT": "j N Y",
     "DATE_INPUT_FORMATS": [
-      "%d-%m-%y",
-      "%d/%m/%y",
       "%d-%m-%Y",
       "%d/%m/%Y",
+      "%d-%m-%y",
+      "%d/%m/%y",
       "%d %b %Y",
       "%d %B %Y",
+      "%m/%d/%y",
+      "%m/%d/%Y",
       "%Y-%m-%d"
     ],
     "DECIMAL_SEPARATOR": ",",
@@ -1959,8 +1901,8 @@
   };
 
     django.get_format = function(format_type) {
-      var value = django.formats[format_type];
-      if (typeof(value) == 'undefined') {
+      const value = django.formats[format_type];
+      if (typeof value === 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1979,6 +1921,5 @@
 
     django.jsi18n_initialized = true;
   }
-
-}(this));
+};
 

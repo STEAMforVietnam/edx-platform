@@ -1,28 +1,24 @@
 (function(define) {
     'use strict';
     define(['jquery'], function($) {
-        var userFromEdxUserCookie = function() {
-            var hostname = window.location.hostname;
-            var isLocalhost = hostname.indexOf('localhost') >= 0;
-            var isStage = hostname.indexOf('stage') >= 0;
-            var edxUserCookie, prefix, user;
+        var edxUserCookieUtils = {
+            userFromEdxUserCookie: function(edxUserInfoCookieName) {
+                var cookie, user, userCookie;
 
-            if (isLocalhost) {
-                // localhost doesn't have prefixes
-                edxUserCookie = 'edx-user-info';
-            } else {
-                // does not take sandboxes into account
-                prefix = isStage ? 'stage' : 'prod';
-                edxUserCookie = prefix + '-edx-user-info';
+                cookie = document.cookie.match('(^|;)\\s*' + edxUserInfoCookieName + '\\s*=\\s*([^;]+)');
+                userCookie = cookie ? cookie.pop() : $.cookie(edxUserInfoCookieName);
+
+                if (!userCookie) {
+                    return {};
+                }
+
+                // returns the user object from cookie. Replaces '054' with ',' and removes '\'
+                user = userCookie.replace(/\\/g, '').replace(/054/g, ',');
+                user = user.substring(1, user.length - 1);
+                return JSON.parse(user);
             }
-            // returns the user object from cookie. Replaces '054' with ',' and removes '\'
-            user = $.cookie(edxUserCookie).replace(/\\/g, '').replace(/054/g, ',');
-            user = user.substring(1, user.length - 1);
-            return JSON.parse(user);
         };
 
-        return {
-            userFromEdxUserCookie: userFromEdxUserCookie
-        };
+        return edxUserCookieUtils;
     });
 }).call(this, define || RequireJS.define);

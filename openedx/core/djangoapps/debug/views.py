@@ -8,9 +8,9 @@ in a 404 error.
 import bleach
 from django.http import HttpResponseNotFound
 from django.template import TemplateDoesNotExist
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
-from edxmako.shortcuts import render_to_response
+from common.djangoapps.edxmako.shortcuts import render_to_response
 from openedx.core.djangoapps.util.user_messages import PageLevelMessages
 
 
@@ -27,12 +27,10 @@ def show_reference_template(request, template):
     e.g. /template/ux/reference/index.html?name=Foo
     """
     try:
-        uses_pattern_library = u'/pattern-library/' in request.path
-        is_v1 = u'/v1/' in request.path
-        uses_bootstrap = not uses_pattern_library and not is_v1
+        is_v1 = '/v1/' in request.path
+        uses_bootstrap = not is_v1
         context = {
             'request': request,
-            'uses_pattern_library': uses_pattern_library,
             'uses_bootstrap': uses_bootstrap,
         }
         context.update(request.GET.dict())
@@ -48,7 +46,7 @@ def show_reference_template(request, template):
             PageLevelMessages.register_error_message(request, request.GET.get('error'))
 
         # Add some messages to the course skeleton pages
-        if u'course-skeleton.html' in request.path:
+        if 'course-skeleton.html' in request.path:
             PageLevelMessages.register_info_message(request, _('This is a test message'))
             PageLevelMessages.register_success_message(request, _('This is a success message'))
             PageLevelMessages.register_warning_message(request, _('This is a test warning'))
@@ -56,4 +54,4 @@ def show_reference_template(request, template):
 
         return render_to_response(template, context)
     except TemplateDoesNotExist:
-        return HttpResponseNotFound(u'Missing template {template}'.format(template=bleach.clean(template, strip=True)))
+        return HttpResponseNotFound(f'Missing template {bleach.clean(template, strip=True)}')

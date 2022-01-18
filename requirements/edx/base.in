@@ -10,7 +10,6 @@
 
 -c ../constraints.txt
 
--r ../edx-sandbox/shared.txt  # Dependencies which are also used by code sandboxes
 -r github.in              # Forks and other dependencies not yet on PyPI
 -r local.in               # Packages in edx-platform which have their own setup.py
 -r paver.txt              # Requirements for running paver commands
@@ -26,6 +25,7 @@
 # 4. If the package is not needed in production, add it to another file such
 #    as development.in or testing.in instead.
 
+acid-xblock
 analytics-python                    # Used for Segment analytics
 attrs                               # Reduces boilerplate code involving class attributes
 Babel                               # Internationalization utilities, used for date formatting in a few places
@@ -38,12 +38,12 @@ celery                              # Asynchronous task execution library
 chem                                # A helper library for chemistry calculations
 contextlib2                         # We need contextlib2.ExitStack so we can stop using contextlib.nested which doesn't exist in python 3
 crowdsourcehinter-xblock
+cryptography                        # Implementations of assorted cryptography algorithms
 defusedxml
 Django                              # Web application framework
 django-appconf
-django-celery                       # Only used for the CacheBackend for celery results
-django-cookies-samesite             # Middleware which allows SameSite=None flag for session and csrf cookies in Django<3.0.5
-django-config-models>=1.0.0         # Configuration models for Django allowing config management with auditing
+django-celery-results               # Only used for the CacheBackend for celery results
+django-config-models                # Configuration models for Django allowing config management with auditing
 django-cors-headers                 # Used to allow to configure CORS headers for cross-domain requests
 django-countries                    # Country data for Django forms and model fields
 django-crum                         # Middleware that stores the current request and user in thread local storage
@@ -58,7 +58,6 @@ django-oauth-toolkit                # Provides oAuth2 capabilities for Django
 django-pipeline
 django-pyfs
 django-ratelimit
-django-require
 django-sekizai
 django-ses
 django-simple-history
@@ -68,20 +67,23 @@ django-storages
 django-user-tasks
 django-waffle
 django-webpack-loader               # Used to wire webpack bundles into the django asset pipeline
-djangorestframework==3.9.4
+djangorestframework
+done-xblock
 edx-ace
-edx-analytics-data-api-client
 edx-api-doc-tools
+edx-auth-backends                   # Allow Studio to use LMS SSO
+edx-braze-client
 edx-bulk-grades                     # LMS REST API for managing bulk grading operations
 edx-ccx-keys
 edx-celeryutils
 edx-completion
 edx-django-release-util             # Release utils for the edx release pipeline
 edx-django-sites-extensions
-edx-django-utils
+edx-django-utils>=4.0.0            # Utilities for cache, monitoring, and plugins
 edx-drf-extensions
 edx-enterprise
 edx-milestones
+edx-name-affirmation
 edx-organizations
 edx-proctoring>=2.0.1
 edx-proctoring-proctortrack==1.0.5  # Intentionally and permanently pinned to ensure code changes are reviewed
@@ -89,6 +91,7 @@ edx-rest-api-client
 edx-search
 edx-sga
 edx-submissions
+edx-toggles                         # Feature toggles management
 edx-user-state-client
 edx-when
 edxval
@@ -102,8 +105,9 @@ help-tokens
 html5lib                            # HTML parser, used for capa problems
 icalendar                           # .ics generator, used by calendar_sync
 ipaddress                           # Ip network support for Embargo feature
-jsonfield2                          # Django model field for validated JSON; used in several apps
+jsonfield                           # Django model field for validated JSON; used in several apps
 laboratory                          # Library for testing that code refactors/infrastructure changes produce identical results
+lxml                                # XML parser
 lti-consumer-xblock
 mailsnake                           # Needed for mailchimp (mailing djangoapp)
 mako                                # Primary template language used for server-side page rendering
@@ -111,15 +115,15 @@ Markdown                            # Convert text markup to HTML; used in capa 
 mongoengine                         # Object-document mapper for MongoDB, used in the LMS dashboard
 mysqlclient                         # Driver for the default production relational database
 newrelic                            # New Relic agent for performance monitoring
+nltk                                # Natural language processing; used by the chem package
 nodeenv                             # Utility for managing Node.js environments; we use this for deployments and testing
 oauthlib                            # OAuth specification support for authenticating via LTI or other Open edX services
 openedx-calc                        # Library supporting mathematical calculations for Open edX
+openedx-events                      # Open edX Events from Hooks Extension Framework (OEP-50)
 ora2
-pdfminer.six                        # Used in shoppingcart for extracting/parsing pdf text
 piexif                              # Exif image metadata manipulation, used in the profile_images app
 Pillow                              # Image manipulation library; used for course assets, profile images, invoice PDFs, etc.
-py2neo<4.0.0                        # Used to communicate with Neo4j, which is used internally for modulestore inspection
-PyContracts
+py2neo                              # Driver for converting Python modulestore structures to Neo4j's schema (for Coursegraph).
 pycountry
 pycryptodomex
 pygments                            # Used to support colors in paver command output
@@ -127,7 +131,9 @@ pyjwkest
 # TODO Replace PyJWT usage with pyjwkest
 # PyJWT 1.6.3 contains PyJWTError, which is required by Apple auth in social-auth-core
 PyJWT>=1.6.3
+pylti1p3                            # Required by content_libraries core library to suport LTI 1.3 launches
 pymongo                             # MongoDB driver
+PyNaCl                              # User-friendly cryptography (wrapper and bindings for libsodium)
 pynliner                            # Inlines CSS styles into HTML for email notifications
 python-dateutil
 python-Levenshtein
@@ -135,18 +141,15 @@ python3-openid ; python_version>='3'
 python3-saml
 pyuca                               # For more accurate sorting of translated country names in django-countries
 recommender-xblock                  # https://github.com/edx/RecommenderXBlock
-rest-condition                      # DRF's recommendation for supporting complex permissions
-rfc6266-parser                      # Used to generate Content-Disposition headers.
 social-auth-core
 pysrt                               # Support for SubRip subtitle files, used in the video XModule
 pytz                                # Time zone information database
 PyYAML                              # Used to parse XModule resource templates
-redis==2.10.6                       # celery task broker
+redis                               # celery task broker
 requests-oauthlib                   # Simplifies use of OAuth via the requests library, used for CCX and LTI
 random2
 rules                               # Django extension for rules-based authorization checks
 simplejson
-sailthru-client                     # For Sailthru integration
 Shapely                             # Geometry library, used for image click regions in capa
 six                                 # Utilities for supporting Python 2 & 3 in the same codebase
 social-auth-app-django
@@ -163,4 +166,3 @@ XBlock                              # Courseware component architecture
 xblock-utils                        # Provides utilities used by the Discussion XBlock
 xss-utils                           # https://github.com/edx/edx-platform/pull/20633 Fix XSS via Translations
 enmerkar-underscore                 # Implements a underscore extractor for django-babel.
-

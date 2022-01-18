@@ -1,23 +1,20 @@
-
+# lint-amnesty, pylint: disable=missing-module-docstring
 
 import logging
 import os
 import sys
 import time
+import warnings
 from collections import namedtuple
 from functools import partial
 
-import six
 import yaml
-from contracts import contract, new_contract
-from django.utils.encoding import python_2_unicode_compatible
+
 from lazy import lazy
 from lxml import etree
 from opaque_keys.edx.asides import AsideDefinitionKeyV2, AsideUsageKeyV2
 from opaque_keys.edx.keys import UsageKey
 from pkg_resources import resource_exists, resource_isdir, resource_listdir, resource_string
-from six import text_type
-from six.moves import map
 from web_fragments.fragment import Fragment
 from webob import Response
 from webob.multidict import MultiDict
@@ -44,6 +41,15 @@ from xmodule.exceptions import UndefinedContext
 from xmodule.fields import RelativeTime
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from xmodule.util.xmodule_django import add_webpack_to_fragment
+
+from common.djangoapps.xblock_django.constants import (
+    ATTR_KEY_ANONYMOUS_USER_ID,
+    ATTR_KEY_REQUEST_COUNTRY_CODE,
+    ATTR_KEY_USER_ID,
+    ATTR_KEY_USER_IS_STAFF,
+    ATTR_KEY_USER_ROLE,
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -78,8 +84,8 @@ STUDIO_VIEW = 'studio_view'
 PREVIEW_VIEWS = [STUDENT_VIEW, PUBLIC_VIEW, AUTHOR_VIEW]
 
 DEFAULT_PUBLIC_VIEW_MESSAGE = (
-    u'This content is only accessible to enrolled learners. '
-    u'Sign in or register, and enroll in this course to view it.'
+    'This content is only accessible to enrolled learners. '
+    'Sign in or register, and enroll in this course to view it.'
 )
 
 # Make '_' a no-op so we can scrape strings. Using lambda instead of
@@ -203,7 +209,7 @@ def dummy_track(_event_type, _event):
     pass
 
 
-class HTMLSnippet(object):
+class HTMLSnippet:
     """
     A base class defining an interface for an object that is able to present an
     html snippet, along with associated javascript and css
@@ -235,8 +241,8 @@ class HTMLSnippet(object):
         # cdodge: We've moved the xmodule.coffee script from an outside directory into the xmodule area of common
         # this means we need to make sure that all xmodules include this dependency which had been previously implicitly
         # fulfilled in a different area of code
-        coffee = cls.js.setdefault('coffee', [])
-        js = cls.js.setdefault('js', [])
+        coffee = cls.js.setdefault('coffee', [])  # lint-amnesty, pylint: disable=unused-variable
+        js = cls.js.setdefault('js', [])  # lint-amnesty, pylint: disable=unused-variable
 
         # Added xmodule.js separately to enforce 000 prefix for this only.
         cls.js.setdefault('xmodule_js', resource_string(__name__, 'js/src/xmodule.js'))
@@ -300,7 +306,7 @@ class HTMLSnippet(object):
         Return the html used to display this snippet
         """
         raise NotImplementedError(
-            "get_html() must be provided by specific modules - not present in {0}"
+            "get_html() must be provided by specific modules - not present in {}"
             .format(self.__class__))
 
 
@@ -310,7 +316,7 @@ def shim_xmodule_js(fragment, js_module_name):
     """
     # Delay this import so that it is only used (and django settings are parsed) when
     # they are required (rather than at startup)
-    import webpack_loader.utils
+    import webpack_loader.utils  # lint-amnesty, pylint: disable=unused-import
 
     if not fragment.js_init_fn:
         fragment.initialize_js('XBlockToXModuleShim')
@@ -319,7 +325,7 @@ def shim_xmodule_js(fragment, js_module_name):
         add_webpack_to_fragment(fragment, 'XModuleShim')
 
 
-class XModuleFields(object):
+class XModuleFields:
     """
     Common fields for XModules.
     """
@@ -369,7 +375,7 @@ class XModuleMixin(XModuleFields, XBlock):
         self.xmodule_runtime = None
         self._asides = []
 
-        super(XModuleMixin, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @property
     def runtime(self):
@@ -478,17 +484,17 @@ class XModuleMixin(XModuleFields, XBlock):
         any set to None.)
         """
         result = {}
-        for field in self.fields.values():
+        for field in self.fields.values():  # lint-amnesty, pylint: disable=no-member
             if field.scope == scope and field.is_set_on(self):
                 try:
                     result[field.name] = field.read_json(self)
                 except TypeError as exception:
                     exception_message = "{message}, Block-location:{location}, Field-name:{field_name}".format(
-                        message=text_type(exception),
-                        location=text_type(self.location),
+                        message=str(exception),
+                        location=str(self.location),
                         field_name=field.name
                     )
-                    raise TypeError(exception_message)
+                    raise TypeError(exception_message)  # lint-amnesty, pylint: disable=raise-missing-from
         return result
 
     def has_children_at_depth(self, depth):
@@ -507,7 +513,7 @@ class XModuleMixin(XModuleFields, XBlock):
         So the example above would return True for `has_children_at_depth(2)`, and False
         for depth > 2
         """
-        if depth < 0:
+        if depth < 0:  # lint-amnesty, pylint: disable=no-else-raise
             raise ValueError("negative depth argument is invalid")
         elif depth == 0:
             return bool(self.get_children())
@@ -551,7 +557,7 @@ class XModuleMixin(XModuleFields, XBlock):
         return [
             child
             for child
-            in super(XModuleMixin, self).get_children(usage_id_filter)
+            in super().get_children(usage_id_filter)
             if child is not None
         ]
 
@@ -561,9 +567,9 @@ class XModuleMixin(XModuleFields, XBlock):
         is an error while retrieving the block.
         """
         try:
-            child = super(XModuleMixin, self).get_child(usage_id)
+            child = super().get_child(usage_id)
         except ItemNotFoundError:
-            log.warning(u'Unable to load item %s, skipping', usage_id)
+            log.warning('Unable to load item %s, skipping', usage_id)
             return None
 
         if child is None:
@@ -689,7 +695,7 @@ class XModuleMixin(XModuleFields, XBlock):
         self.clear_child_cache()
 
         # Clear out any cached field data scoped to the old user.
-        for field in self.fields.values():
+        for field in self.fields.values():  # lint-amnesty, pylint: disable=no-member
             if field.scope in (Scope.parent, Scope.children):
                 continue
 
@@ -810,25 +816,25 @@ class XModuleMixin(XModuleFields, XBlock):
         Default message for blocks that don't implement public_view
         """
         alert_html = HTML(
-            u'<div class="page-banner"><div class="alert alert-warning">'
-            u'<span class="icon icon-alert fa fa fa-warning" aria-hidden="true"></span>'
-            u'<div class="message-content">{}</div></div></div>'
+            '<div class="page-banner"><div class="alert alert-warning">'
+            '<span class="icon icon-alert fa fa fa-warning" aria-hidden="true"></span>'
+            '<div class="message-content">{}</div></div></div>'
         )
 
         if self.display_name:
             display_text = _(
-                u'{display_name} is only accessible to enrolled learners. '
+                '{display_name} is only accessible to enrolled learners. '
                 'Sign in or register, and enroll in this course to view it.'
             ).format(
                 display_name=self.display_name
             )
         else:
-            display_text = _(DEFAULT_PUBLIC_VIEW_MESSAGE)
+            display_text = _(DEFAULT_PUBLIC_VIEW_MESSAGE)  # lint-amnesty, pylint: disable=translation-of-non-string
 
         return Fragment(alert_html.format(display_text))
 
 
-class ProxyAttribute(object):
+class ProxyAttribute:
     """
     A (python) descriptor that proxies attribute access.
 
@@ -876,7 +882,7 @@ descriptor_attr = partial(ProxyAttribute, 'descriptor')  # pylint: disable=inval
 module_runtime_attr = partial(ProxyAttribute, 'xmodule_runtime')  # pylint: disable=invalid-name
 
 
-class XModuleToXBlockMixin(object):
+class XModuleToXBlockMixin:
     """
     Common code needed by XModule and XBlocks converted from XModules.
     """
@@ -892,7 +898,7 @@ class XModuleToXBlockMixin(object):
         """
         XBlock handler that wraps `handle_ajax`
         """
-        class FileObjForWebobFiles(object):
+        class FileObjForWebobFiles:
             """
             Turn Webob cgi.FieldStorage uploaded files into pure file objects.
 
@@ -912,7 +918,7 @@ class XModuleToXBlockMixin(object):
         # WebOb requests have multiple entries for uploaded files.  handle_ajax
         # expects a single entry as a list.
         request_post = MultiDict(request.POST)
-        for key in set(six.iterkeys(request.POST)):
+        for key in set(request.POST.keys()):
             if hasattr(request.POST[key], "file"):
                 request_post[key] = list(map(FileObjForWebobFiles, request.POST.getall(key)))
 
@@ -921,8 +927,7 @@ class XModuleToXBlockMixin(object):
 
 
 @XBlock.needs("i18n")
-@python_2_unicode_compatible
-class XModule(XModuleToXBlockMixin, HTMLSnippet, XModuleMixin):
+class XModule(XModuleToXBlockMixin, HTMLSnippet, XModuleMixin):  # lint-amnesty, pylint: disable=abstract-method
     """ Implements a generic learning module.
 
         Subclasses must at a minimum provide a definition for get_html in order
@@ -955,7 +960,7 @@ class XModule(XModuleToXBlockMixin, HTMLSnippet, XModuleMixin):
         # Set the descriptor first so that we can proxy to it
         self.descriptor = descriptor
         self._runtime = None
-        super(XModule, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.runtime.xmodule_instance = self
 
     @property
@@ -968,12 +973,12 @@ class XModule(XModuleToXBlockMixin, HTMLSnippet, XModuleMixin):
 
     def __str__(self):
         # xss-lint: disable=python-wrap-html
-        return u'<x_module(id={0})>'.format(self.id)
+        return f'<x_module(id={self.id})>'  # lint-amnesty, pylint: disable=no-member
 
     def handle_ajax(self, _dispatch, _data):
         """ dispatch is last part of the URL.
             data is a dictionary-like object with the content of the request"""
-        return u""
+        return ""
 
     def get_child(self, usage_id):
         if usage_id in self._child_cache:
@@ -1011,7 +1016,7 @@ class XModule(XModuleToXBlockMixin, HTMLSnippet, XModuleMixin):
         return [self.descriptor]
 
     # ~~~~~~~~~~~~~~~ XBlock API Wrappers ~~~~~~~~~~~~~~~~
-    def student_view(self, context):
+    def student_view(self, context):  # lint-amnesty, pylint: disable=unused-argument
         """
         Return a fragment with the html from this XModule
 
@@ -1028,13 +1033,13 @@ def policy_key(location):
     Get the key for a location in a policy file.  (Since the policy file is
     specific to a course, it doesn't need the full location url).
     """
-    return u'{cat}/{name}'.format(cat=location.block_type, name=location.block_id)
+    return f'{location.block_type}/{location.block_id}'
 
 
 Template = namedtuple("Template", "metadata data children")
 
 
-class ResourceTemplates(object):
+class ResourceTemplates:
     """
     Gets the templates associated w/ a containing cls. The cls must have a 'template_dir_name' attribute.
     It finds the templates as directly in this directory under 'templates'.
@@ -1067,11 +1072,11 @@ class ResourceTemplates(object):
         return templates
 
     @classmethod
-    def get_template_dir(cls):
+    def get_template_dir(cls):  # lint-amnesty, pylint: disable=missing-function-docstring
         if getattr(cls, 'template_dir_name', None):
-            dirname = os.path.join('templates', cls.template_dir_name)
+            dirname = os.path.join('templates', cls.template_dir_name)  # lint-amnesty, pylint: disable=no-member
             if not resource_isdir(__name__, dirname):
-                log.warning(u"No resource directory {dir} found when loading {cls_name} templates".format(
+                log.warning("No resource directory {dir} found when loading {cls_name} templates".format(
                     dir=dirname,
                     cls_name=cls.__name__,
                 ))
@@ -1099,7 +1104,7 @@ class ResourceTemplates(object):
                     return template
 
 
-class XModuleDescriptorToXBlockMixin(object):
+class XModuleDescriptorToXBlockMixin:
     """
     Common code needed by XModuleDescriptor and XBlocks converted from XModules.
     """
@@ -1117,7 +1122,7 @@ class XModuleDescriptorToXBlockMixin(object):
 
     # ================================= XML PARSING ============================
     @classmethod
-    def parse_xml(cls, node, runtime, keys, id_generator):
+    def parse_xml(cls, node, runtime, keys, id_generator):  # lint-amnesty, pylint: disable=unused-argument
         """
         Interpret the parsed XML in `node`, creating an XModuleDescriptor.
         """
@@ -1133,9 +1138,9 @@ class XModuleDescriptorToXBlockMixin(object):
         legacy XModule code. Use the "normal" XBlock parsing code.
         """
         try:
-            return super(XModuleDescriptorToXBlockMixin, cls).parse_xml_new_runtime(node, runtime, keys)
+            return super().parse_xml_new_runtime(node, runtime, keys)
         except AttributeError:
-            return super(XModuleDescriptorToXBlockMixin, cls).parse_xml(node, runtime, keys, id_generator=None)
+            return super().parse_xml(node, runtime, keys, id_generator=None)
 
     @classmethod
     def from_xml(cls, xml_data, system, id_generator):
@@ -1191,7 +1196,7 @@ class XModuleDescriptorToXBlockMixin(object):
 
 
 @XBlock.needs("i18n")
-class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTemplates, XModuleMixin):
+class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTemplates, XModuleMixin):  # lint-amnesty, pylint: disable=abstract-method
     """
     An XModuleDescriptor is a specification for an element of a course. This
     could be a problem, an organizational element (a group of content), or a
@@ -1226,7 +1231,7 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
 
         XModuleDescriptor.__init__ takes the same arguments as xblock.core:XBlock.__init__
         """
-        super(XModuleDescriptor, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # update_version is the version which last updated this xblock v prev being the penultimate updater
         # leaving off original_version since it complicates creation w/o any obv value yet and is computable
         # by following previous until None
@@ -1249,7 +1254,7 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
             old_content (dict): the values of the fields with Scope.content before the save was performed.
                 This will include 'data'.
         """
-        pass
+        pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
     # =============================== BUILTIN METHODS ==========================
     def __eq__(self, other):
@@ -1258,9 +1263,9 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
         """
         return (hasattr(other, 'scope_ids') and
                 self.scope_ids == other.scope_ids and
-                set(self.fields.keys()) == set(other.fields.keys()) and
+                set(self.fields.keys()) == set(other.fields.keys()) and  # lint-amnesty, pylint: disable=no-member
                 all(getattr(self, field.name) == getattr(other, field.name)
-                    for field in self.fields.values()))
+                    for field in self.fields.values()))  # lint-amnesty, pylint: disable=no-member
 
     def __hash__(self):  # pylint: disable=useless-super-delegation
         """
@@ -1271,7 +1276,7 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
         performance if we have to rely on lists and equality rather than sets,
         dictionaries, and identity-based hash functions.
         """
-        return super(XModuleDescriptor, self).__hash__()
+        return super().__hash__()
 
     def __repr__(self):
         return (
@@ -1304,11 +1309,11 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
                 self.xmodule_runtime.xmodule_instance.save()
             except Exception:  # pylint: disable=broad-except
                 # xmodule_instance is set by the XModule.__init__. If we had an error after that,
-                # we need to clean it out so that we can set up the ErrorModule instead
+                # we need to clean it out so that we can set up the ErrorBlock instead
                 self.xmodule_runtime.xmodule_instance = None
 
                 if isinstance(self, self.xmodule_runtime.error_descriptor_class):
-                    log.exception('Error creating an ErrorModule from an ErrorDescriptor')
+                    log.exception('Error creating an ErrorBlock from an ErrorBlock')
                     raise
 
                 log.exception('Error creating xmodule')
@@ -1317,7 +1322,7 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
                     error_msg=exc_info_to_str(sys.exc_info())
                 )
                 descriptor.xmodule_runtime = self.xmodule_runtime
-                self.xmodule_runtime.xmodule_instance = descriptor._xmodule  # pylint: disable=protected-access
+                self.xmodule_runtime.xmodule_instance = descriptor
         return self.xmodule_runtime.xmodule_instance
 
     course_id = module_attr('course_id')
@@ -1345,7 +1350,7 @@ class XModuleDescriptor(XModuleDescriptorToXBlockMixin, HTMLSnippet, ResourceTem
         return Fragment(self.get_html())
 
 
-class ConfigurableFragmentWrapper(object):
+class ConfigurableFragmentWrapper:
     """
     Runtime mixin that allows for composition of many `wrap_xblock` wrappers
     """
@@ -1357,7 +1362,7 @@ class ConfigurableFragmentWrapper(object):
                 ...
                 return wrapped_frag
         """
-        super(ConfigurableFragmentWrapper, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if wrappers is not None:
             self.wrappers = wrappers
         else:
@@ -1408,19 +1413,19 @@ def descriptor_global_local_resource_url(block, uri):
     """
     See :meth:`xblock.runtime.Runtime.local_resource_url`.
     """
-    raise NotImplementedError("Applications must monkey-patch this function before using local_resource_url for studio_view")
+    raise NotImplementedError("Applications must monkey-patch this function before using local_resource_url for studio_view")  # lint-amnesty, pylint: disable=line-too-long
 
 
-class MetricsMixin(object):
+class MetricsMixin:
     """
     Mixin for adding metric logging for render and handle methods in the DescriptorSystem and ModuleSystem.
     """
 
-    def render(self, block, view_name, context=None):
+    def render(self, block, view_name, context=None):  # lint-amnesty, pylint: disable=missing-function-docstring
         start_time = time.time()
         try:
             status = "success"
-            return super(MetricsMixin, self).render(block, view_name, context=context)
+            return super().render(block, view_name, context=context)
 
         except:
             status = "failure"
@@ -1430,13 +1435,13 @@ class MetricsMixin(object):
             end_time = time.time()
             duration = end_time - start_time
             course_id = getattr(self, 'course_id', '')
-            tags = [
-                u'view_name:{}'.format(view_name),
-                u'action:render',
-                u'action_status:{}'.format(status),
-                u'course_id:{}'.format(course_id),
-                u'block_type:{}'.format(block.scope_ids.block_type),
-                u'block_family:{}'.format(block.entry_point),
+            tags = [  # lint-amnesty, pylint: disable=unused-variable
+                f'view_name:{view_name}',
+                'action:render',
+                f'action_status:{status}',
+                f'course_id:{course_id}',
+                f'block_type:{block.scope_ids.block_type}',
+                f'block_family:{block.entry_point}',
             ]
             log.debug(
                 "%.3fs - render %s.%s (%s)",
@@ -1446,11 +1451,11 @@ class MetricsMixin(object):
                 getattr(block, 'location', ''),
             )
 
-    def handle(self, block, handler_name, request, suffix=''):
+    def handle(self, block, handler_name, request, suffix=''):  # lint-amnesty, pylint: disable=missing-function-docstring
         start_time = time.time()
         try:
             status = "success"
-            return super(MetricsMixin, self).handle(block, handler_name, request, suffix=suffix)
+            return super().handle(block, handler_name, request, suffix=suffix)
 
         except:
             status = "failure"
@@ -1460,13 +1465,13 @@ class MetricsMixin(object):
             end_time = time.time()
             duration = end_time - start_time
             course_id = getattr(self, 'course_id', '')
-            tags = [
-                u'handler_name:{}'.format(handler_name),
-                u'action:handle',
-                u'action_status:{}'.format(status),
-                u'course_id:{}'.format(course_id),
-                u'block_type:{}'.format(block.scope_ids.block_type),
-                u'block_family:{}'.format(block.entry_point),
+            tags = [  # lint-amnesty, pylint: disable=unused-variable
+                f'handler_name:{handler_name}',
+                'action:handle',
+                f'action_status:{status}',
+                f'course_id:{course_id}',
+                f'block_type:{block.scope_ids.block_type}',
+                f'block_family:{block.entry_point}',
             ]
             log.debug(
                 "%.3fs - handle %s.%s (%s)",
@@ -1481,7 +1486,6 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
     """
     Base class for :class:`Runtime`s to be used with :class:`XModuleDescriptor`s
     """
-    # pylint: disable=bad-continuation
     def __init__(
         self, load_item, resources_fs, error_tracker, get_policy=None, disabled_xblock_types=lambda: [], **kwargs
     ):
@@ -1505,7 +1509,7 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         """
         kwargs.setdefault('id_reader', OpaqueKeyReader())
         kwargs.setdefault('id_generator', AsideKeyGenerator())
-        super(DescriptorSystem, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # This is used by XModules to write out separate files during xml export
         self.export_fs = None
@@ -1530,7 +1534,7 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         """
         if block_type in self.disabled_xblock_types():
             return self.default_class
-        return super(DescriptorSystem, self).load_block_type(block_type)
+        return super().load_block_type(block_type)
 
     def get_field_provenance(self, xblock, field):
         """
@@ -1577,7 +1581,7 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         """
         See :meth:`xblock.runtime.Runtime:applicable_aside_types` for documentation.
         """
-        potential_set = set(super(DescriptorSystem, self).applicable_aside_types(block))
+        potential_set = set(super().applicable_aside_types(block))
         if getattr(block, 'xmodule_runtime', None) is not None:
             if hasattr(block.xmodule_runtime, 'applicable_aside_types'):
                 application_set = set(block.xmodule_runtime.applicable_aside_types(block))
@@ -1595,7 +1599,7 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         child.set('url_name', block.url_name)
         block.add_xml_to_node(child)
 
-    def publish(self, block, event_type, event):
+    def publish(self, block, event_type, event):  # lint-amnesty, pylint: disable=arguments-differ
         # A stub publish method that doesn't emit any events from XModuleDescriptors.
         pass
 
@@ -1614,7 +1618,7 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
             An object implementing the requested service, or None.
         """
         # getting the service from parent module. making sure of block service declarations.
-        service = super(DescriptorSystem, self).service(block=block, service_name=service_name)
+        service = super().service(block=block, service_name=service_name)
         # Passing the block to service if it is callable e.g. ModuleI18nService. It is the responsibility of calling
         # service to handle the passing argument.
         if callable(service):
@@ -1622,17 +1626,14 @@ class DescriptorSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         return service
 
 
-new_contract('DescriptorSystem', DescriptorSystem)
-
-
-class XMLParsingSystem(DescriptorSystem):
+class XMLParsingSystem(DescriptorSystem):  # lint-amnesty, pylint: disable=abstract-method, missing-class-docstring
     def __init__(self, process_xml, **kwargs):
         """
         process_xml: Takes an xml string, and returns a XModuleDescriptor
             created from that xml
         """
 
-        super(XMLParsingSystem, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.process_xml = process_xml
 
     def _usage_id_from_node(self, node, parent_id, id_generator=None):
@@ -1725,7 +1726,7 @@ class XMLParsingSystem(DescriptorSystem):
         """
         course_key = xblock.scope_ids.usage_id.course_key
 
-        for field in six.itervalues(xblock.fields):
+        for field in xblock.fields.values():
             if field.is_set_on(xblock):
                 field_value = getattr(xblock, field.name)
                 if field_value is None:
@@ -1735,13 +1736,178 @@ class XMLParsingSystem(DescriptorSystem):
                 elif isinstance(field, ReferenceList):
                     setattr(xblock, field.name, [self._make_usage_key(course_key, ele) for ele in field_value])
                 elif isinstance(field, ReferenceValueDict):
-                    for key, subvalue in six.iteritems(field_value):
-                        assert isinstance(subvalue, six.string_types)
+                    for key, subvalue in field_value.items():
+                        assert isinstance(subvalue, str)
                         field_value[key] = self._make_usage_key(course_key, subvalue)
                     setattr(xblock, field.name, field_value)
 
 
-class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
+class ModuleSystemShim:
+    """
+    This shim provides the properties formerly available from ModuleSystem which are now being provided by services.
+
+    This shim will be removed, so all properties raise a deprecation warning.
+    """
+
+    @property
+    def anonymous_student_id(self):
+        """
+        Returns the anonymous user ID for the current user and course.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.anonymous_student_id is deprecated. Please use the user service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        user_service = self._services.get('user')
+        if user_service:
+            return user_service.get_current_user().opt_attrs.get(ATTR_KEY_ANONYMOUS_USER_ID)
+        return None
+
+    @property
+    def seed(self):
+        """
+        Returns the numeric current user id, for use as a random seed.
+        Returns 0 if there is no current user.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.seed is deprecated. Please use the user service `user_id` instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        return self.user_id or 0
+
+    @property
+    def user_id(self):
+        """
+        Returns the current user id, or None if there is no current user.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.user_id is deprecated. Please use the user service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        user_service = self._services.get('user')
+        if user_service:
+            return user_service.get_current_user().opt_attrs.get(ATTR_KEY_USER_ID)
+        return None
+
+    @property
+    def user_is_staff(self):
+        """
+        Returns whether the current user has staff access to the course.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.user_is_staff is deprecated. Please use the user service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        user_service = self._services.get('user')
+        if user_service:
+            return self._services['user'].get_current_user().opt_attrs.get(ATTR_KEY_USER_IS_STAFF)
+        return None
+
+    @property
+    def user_location(self):
+        """
+        Returns the "country code" associated with the current user's request IP address.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.user_location is deprecated. Please use the user service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        user_service = self._services.get('user')
+        if user_service:
+            return self._services['user'].get_current_user().opt_attrs.get(ATTR_KEY_REQUEST_COUNTRY_CODE)
+        return None
+
+    @property
+    def get_real_user(self):
+        """
+        Returns a function that takes `anonymous_student_id` and returns the Django User object
+        associated with `anonymous_student_id`.
+
+        If no `anonymous_student_id` is provided as an argument to this function, then the user service's anonymous user
+        ID is used instead.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.get_real_user is deprecated. Please use the user service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        user_service = self._services.get('user')
+        if user_service:
+            return self._services['user'].get_user_by_anonymous_id
+        return None
+
+    @property
+    def get_user_role(self):
+        """
+        Returns a function that returns the user's role in the course.
+
+        Implementation is different for LMS and Studio.
+
+        Deprecated in favor of the user service.
+        """
+        warnings.warn(
+            'runtime.get_user_role is deprecated. Please use the user service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        user_service = self._services.get('user')
+        if user_service:
+            return partial(self._services['user'].get_current_user().opt_attrs.get, ATTR_KEY_USER_ROLE)
+
+    @property
+    def render_template(self):
+        """
+        Returns a function that takes (template_file, context), and returns rendered html.
+
+        Deprecated in favor of the mako service.
+        """
+        warnings.warn(
+            'Use of runtime.render_template is deprecated. '
+            'Use MakoService.render_template or a JavaScript-based template instead.',
+            DeprecationWarning, stacklevel=2,
+        )
+        render_service = self._services.get('mako')
+        if render_service:
+            return render_service.render_template
+        return None
+
+    @property
+    def xqueue(self):
+        """
+        Returns a dict containing the XQueueInterface object, as well as parameters for the specific StudentModule:
+        * interface: XQueueInterface object
+        * construct_callback: function to construct the fully-qualified LMS callback URL.
+        * default_queuename: default queue name for the course in XQueue
+        * waittime: number of seconds to wait in between calls to XQueue
+
+        Deprecated in favor of the xqueue service.
+        """
+        warnings.warn(
+            'runtime.xqueue is deprecated. Please use the xqueue service instead.',
+            DeprecationWarning, stacklevel=3,
+        )
+        xqueue_service = self._services.get('xqueue')
+        if xqueue_service:
+            return {
+                'interface': xqueue_service.interface,
+                'construct_callback': xqueue_service.construct_callback,
+                'default_queuename': xqueue_service.default_queuename,
+                'waittime': xqueue_service.waittime,
+            }
+        return None
+
+
+class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, ModuleSystemShim, Runtime):
     """
     This is an abstraction such that x_modules can function independent
     of the courseware (e.g. import into other types of courseware, LMS,
@@ -1754,16 +1920,15 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
     and user, or other environment-specific info.
     """
 
-    @contract(descriptor_runtime='DescriptorSystem')
     def __init__(
-            self, static_url, track_function, get_module, render_template,
-            replace_urls, descriptor_runtime, user=None, filestore=None,
-            debug=False, hostname="", xqueue=None, publish=None, node_path="",
-            anonymous_student_id='', course_id=None,
+            self, static_url, track_function, get_module,
+            replace_urls, descriptor_runtime, filestore=None,
+            debug=False, hostname="", publish=None, node_path="",
+            course_id=None,
             cache=None, can_execute_unsafe_code=None, replace_course_urls=None,
-            replace_jump_to_id_urls=None, error_descriptor_class=None, get_real_user=None,
-            field_data=None, get_user_role=None, rebind_noauth_module_to_user=None,
-            user_location=None, get_python_lib_zip=None, **kwargs):
+            replace_jump_to_id_urls=None, error_descriptor_class=None,
+            field_data=None, rebind_noauth_module_to_user=None,
+            get_python_lib_zip=None, **kwargs):
         """
         Create a closure around the system environment.
 
@@ -1778,28 +1943,14 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
                          module instance object.  If the current user does not have
                          access to that location, returns None.
 
-        render_template - a function that takes (template_file, context), and
-                         returns rendered html.
-
-        user - The user to base the random number generator seed off of for this
-                         request
-
         filestore - A filestore ojbect.  Defaults to an instance of OSFS based
                          at settings.DATA_DIR.
-
-        xqueue - Dict containing XqueueInterface object, as well as parameters
-                    for the specific StudentModule:
-                    xqueue = {'interface': XQueueInterface object,
-                              'callback_url': Callback into the LMS,
-                              'queue_name': Target queuename in Xqueue}
 
         replace_urls - TEMPORARY - A function like static_replace.replace_urls
                          that capa_module can use to fix up the static urls in
                          ajax results.
 
         descriptor_runtime - A `DescriptorSystem` to use for loading xblocks by id
-
-        anonymous_student_id - Used for tracking modules with student id
 
         course_id - the course_id containing this module
 
@@ -1818,12 +1969,6 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
 
         error_descriptor_class - The class to use to render XModules with errors
 
-        get_real_user - function that takes `anonymous_student_id` and returns real user_id,
-        associated with `anonymous_student_id`.
-
-        get_user_role - A function that returns user role. Implementation is different
-            for LMS and Studio.
-
         field_data - the `FieldData` to use for backing XBlock storage.
 
         rebind_noauth_module_to_user - rebinds module bound to AnonymousUser to a real user...used in LTI
@@ -1834,22 +1979,17 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         # explicit field_data during construct_xblock.
         kwargs.setdefault('id_reader', getattr(descriptor_runtime, 'id_reader', OpaqueKeyReader()))
         kwargs.setdefault('id_generator', getattr(descriptor_runtime, 'id_generator', AsideKeyGenerator()))
-        super(ModuleSystem, self).__init__(field_data=field_data, **kwargs)
+        super().__init__(field_data=field_data, **kwargs)
 
         self.STATIC_URL = static_url
-        self.xqueue = xqueue
         self.track_function = track_function
         self.filestore = filestore
         self.get_module = get_module
-        self.render_template = render_template
         self.DEBUG = self.debug = debug
         self.HOSTNAME = self.hostname = hostname
-        self.seed = user.id if user is not None else 0
         self.replace_urls = replace_urls
         self.node_path = node_path
-        self.anonymous_student_id = anonymous_student_id
         self.course_id = course_id
-        self.user_is_staff = user is not None and user.is_staff
 
         if publish:
             self.publish = publish
@@ -1862,15 +2002,8 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         self.error_descriptor_class = error_descriptor_class
         self.xmodule_instance = None
 
-        self.get_real_user = get_real_user
-        self.user_location = user_location
-
-        self.get_user_role = get_user_role
         self.descriptor_runtime = descriptor_runtime
         self.rebind_noauth_module_to_user = rebind_noauth_module_to_user
-
-        if user:
-            self.user_id = user.id
 
     def get(self, attr):
         """	provide uniform access to attributes (like etree)."""
@@ -1886,7 +2019,7 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         # Remove value set transiently by XBlock
         kwargs.pop('_view_name')
 
-        return "{}{}".format(self.__class__.__name__, kwargs)
+        return f"{self.__class__.__name__}{kwargs}"
 
     @property
     def ajax_url(self):
@@ -1896,13 +2029,13 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         assert self.xmodule_instance is not None
         return self.handler_url(self.xmodule_instance, 'xmodule_handler', '', '').rstrip('/?')
 
-    def get_block(self, block_id, for_parent=None):
+    def get_block(self, block_id, for_parent=None):  # lint-amnesty, pylint: disable=arguments-differ
         return self.get_module(self.descriptor_runtime.get_block(block_id, for_parent=for_parent))
 
     def resource_url(self, resource):
         raise NotImplementedError("edX Platform doesn't currently implement XBlock resource urls")
 
-    def publish(self, block, event_type, event):
+    def publish(self, block, event_type, event):  # lint-amnesty, pylint: disable=arguments-differ
         pass
 
     def service(self, block, service_name):
@@ -1920,7 +2053,7 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
             An object implementing the requested service, or None.
         """
         # getting the service from parent module. making sure of block service declarations.
-        service = super(ModuleSystem, self).service(block=block, service_name=service_name)
+        service = super().service(block=block, service_name=service_name)
         # Passing the block to service if it is callable e.g. ModuleI18nService. It is the responsibility of calling
         # service to handle the passing argument.
         if callable(service):
@@ -1928,7 +2061,7 @@ class ModuleSystem(MetricsMixin, ConfigurableFragmentWrapper, Runtime):
         return service
 
 
-class CombinedSystem(object):
+class CombinedSystem:
     """
     This class is a shim to allow both pure XBlocks and XModuleDescriptors
     that have been bound as XModules to access both the attributes of ModuleSystem
@@ -2030,7 +2163,7 @@ class CombinedSystem(object):
         Always set the attr on the DescriptorSystem.
         """
         if name in self.__slots__:
-            return super(CombinedSystem, self).__setattr__(name, value)
+            return super().__setattr__(name, value)
 
         if self._module_system:
             setattr(self._module_system, name, value)
@@ -2046,10 +2179,10 @@ class CombinedSystem(object):
         delattr(self._descriptor_system, name)
 
     def __repr__(self):
-        return "CombinedSystem({!r}, {!r})".format(self._module_system, self._descriptor_system)
+        return f"CombinedSystem({self._module_system!r}, {self._descriptor_system!r})"
 
 
-class DoNothingCache(object):
+class DoNothingCache:
     """A duck-compatible object to use in ModuleSystem when there's no cache."""
     def get(self, _key):
         return None

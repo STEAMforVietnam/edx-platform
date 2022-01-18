@@ -5,23 +5,29 @@ Common test utilities for courseware functionality
 
 from abc import ABCMeta, abstractmethod
 from datetime import datetime, timedelta
+from unittest.mock import patch
+from urllib.parse import urlencode
 
 import ddt
-import six
-from mock import patch
-from six.moves.urllib.parse import urlencode
 
-from lms.djangoapps.courseware.field_overrides import OverrideModulestoreFieldData
-from lms.djangoapps.courseware.url_helpers import get_redirect_url
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from student.tests.factories import AdminFactory, CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls
+from lms.djangoapps.courseware.utils import is_mode_upsellable
+from openedx.features.course_experience.url_helpers import get_courseware_url, ExperienceOption
+from common.djangoapps.student.tests.factories import AdminFactory, CourseEnrollmentFactory, UserFactory
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.course_modes.tests.factories import CourseModeFactory
+
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
+
+from .field_overrides import OverrideModulestoreFieldData
+from .tests.helpers import MasqueradeMixin
 
 
 @ddt.ddt
-class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
+class RenderXBlockTestMixin(MasqueradeMixin, metaclass=ABCMeta):
     """
     Mixin for testing the courseware.render_xblock function.
     It can be used for testing any higher-level endpoint that calls this method.
@@ -56,7 +62,7 @@ class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
         """
         Clear out the block to be requested/tested before each test.
         """
-        super(RenderXBlockTestMixin, self).setUp()
+        super().setUp()
         # to adjust the block to be tested, update block_name_to_be_tested before calling setup_course.
         self.block_name_to_be_tested = 'html_block'
 
@@ -69,7 +75,7 @@ class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
             usage_key: The course block usage key. This ensures that the positive and negative tests stay in sync.
             url_encoded_params: URL encoded parameters that should be appended to the requested URL.
         """
-        pass  # pragma: no cover
+        pass  # pragma: no cover  # lint-amnesty, pylint: disable=unnecessary-pass
 
     def login(self):
         """
@@ -156,9 +162,9 @@ class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
 
     @ddt.data(
         ('vertical_block', ModuleStoreEnum.Type.mongo, 13),
-        ('vertical_block', ModuleStoreEnum.Type.split, 6),
+        ('vertical_block', ModuleStoreEnum.Type.split, 5),
         ('html_block', ModuleStoreEnum.Type.mongo, 14),
-        ('html_block', ModuleStoreEnum.Type.split, 6),
+        ('html_block', ModuleStoreEnum.Type.split, 5),
     )
     @ddt.unpack
     def test_courseware_html(self, block_name, default_store, mongo_calls):
@@ -175,7 +181,10 @@ class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
             self.setup_user(admin=True, enroll=True, login=True)
 
             with check_mongo_calls(mongo_calls):
-                url = get_redirect_url(self.course.id, self.block_to_be_tested.location)
+                url = get_courseware_url(
+                    self.block_to_be_tested.location,
+                    experience=ExperienceOption.LEGACY,
+                )
                 response = self.client.get(url)
                 expected_elements = self.block_specific_chrome_html_elements + self.COURSEWARE_CHROME_HTML_ELEMENTS
                 for chrome_element in expected_elements:
@@ -219,6 +228,12 @@ class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
     def test_success_unenrolled_staff(self):
         self.setup_course()
         self.setup_user(admin=True, enroll=False, login=True)
+        self.verify_response()
+
+    def test_success_unenrolled_staff_masquerading_as_student(self):
+        self.setup_course()
+        self.setup_user(admin=True, enroll=False, login=True)
+        self.update_masquerade(role='student')
         self.verify_response()
 
     def test_success_enrolled_student(self):
@@ -267,15 +282,52 @@ class RenderXBlockTestMixin(six.with_metaclass(ABCMeta, object)):
         self.verify_response(url_params={'view': 'author_view'}, expected_response_code=400)
 
 
-class FieldOverrideTestMixin(object):
+class FieldOverrideTestMixin:
     """
     A Mixin helper class for classes that test Field Overrides.
     """
 
     def setUp(self):
-        super(FieldOverrideTestMixin, self).setUp()
+        super().setUp()
         OverrideModulestoreFieldData.provider_classes = None
 
     def tearDown(self):
-        super(FieldOverrideTestMixin, self).tearDown()
+        super().tearDown()
         OverrideModulestoreFieldData.provider_classes = None
+
+
+@ddt.ddt
+class CoursewareUtilsTests(SharedModuleStoreTestCase):
+    """
+    Tests of the courseware utils file
+    """
+    def setUp(self):
+        super().setUp()
+        self.course = CourseFactory.create()
+        self.user = UserFactory.create()
+
+    @ddt.data(
+        (CourseMode.HONOR, True),
+        (CourseMode.PROFESSIONAL, False),
+        (CourseMode.VERIFIED, False),
+        (CourseMode.AUDIT, True),
+        (CourseMode.NO_ID_PROFESSIONAL_MODE, False),
+        (CourseMode.CREDIT_MODE, False),
+        (CourseMode.MASTERS, False),
+        (CourseMode.EXECUTIVE_EDUCATION, False),
+    )
+    @ddt.unpack
+    def test_is_mode_upsellable(self, mode, is_upsellable):
+        """
+        Test if this is a mode that is upsellable
+        """
+        CourseModeFactory.create(mode_slug=mode, course_id=self.course.id)
+        if mode == CourseMode.CREDIT_MODE:
+            CourseModeFactory.create(mode_slug=CourseMode.VERIFIED, course_id=self.course.id)
+        enrollment = CourseEnrollmentFactory(
+            is_active=True,
+            mode=mode,
+            course_id=self.course.id,
+            user=self.user
+        )
+        assert is_mode_upsellable(self.user, enrollment) is is_upsellable

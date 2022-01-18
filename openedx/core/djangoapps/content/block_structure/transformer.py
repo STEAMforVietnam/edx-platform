@@ -8,7 +8,7 @@ from abc import abstractmethod
 import functools
 
 
-class BlockStructureTransformer(object):
+class BlockStructureTransformer:
     """
     Abstract base class for all block structure transformers.
     """
@@ -106,7 +106,6 @@ class BlockStructureTransformer(object):
                 block structure that is to be modified with collected
                 data to be cached for the transformer.
         """
-        pass
 
     @abstractmethod
     def transform(self, usage_info, block_structure):

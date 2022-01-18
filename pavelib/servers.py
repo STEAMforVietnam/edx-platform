@@ -25,7 +25,7 @@ ASSET_SETTINGS_HELP = (
 
 
 def run_server(
-        system, fast=False, settings=None, asset_settings=None, port=None, contracts=False
+        system, fast=False, settings=None, asset_settings=None, port=None
 ):
     """Start the server for LMS or Studio.
 
@@ -35,17 +35,16 @@ def run_server(
         settings (str): The Django settings module to use; if not provided, use the default.
         asset_settings (str) The settings to use when generating assets. If not provided, assets are not generated.
         port (str): The port number to run the server on. If not provided, uses the default port for the system.
-        contracts (bool) If true then PyContracts is enabled (defaults to False).
     """
     if system not in ['lms', 'studio']:
         print("System must be either lms or studio", file=sys.stderr)
-        exit(1)
+        exit(1)  # lint-amnesty, pylint: disable=consider-using-sys-exit
 
     if not settings:
         settings = DEFAULT_SETTINGS
 
     if not fast and asset_settings:
-        args = [system, '--settings={}'.format(asset_settings), '--watch']
+        args = [system, f'--settings={asset_settings}', '--watch']
         # The default settings use DEBUG mode for running the server which means that
         # the optimized assets are ignored, so we skip collectstatic in that case
         # to save time.
@@ -56,10 +55,7 @@ def run_server(
     if port is None:
         port = DEFAULT_PORT[system]
 
-    args = [settings, 'runserver', '--traceback', '--pythonpath=.', '0.0.0.0:{}'.format(port)]
-
-    if contracts:
-        args.append("--contracts")
+    args = [settings, 'runserver', '--traceback', '--pythonpath=.', f'0.0.0.0:{port}']
 
     run_process(django_cmd(system, *args))
 
@@ -127,12 +123,6 @@ def devstack(args):
     parser.add_argument('--optimized', action='store_true', default=False, help="Run with optimized assets")
     parser.add_argument('--settings', type=str, default=DEFAULT_SETTINGS, help="Settings file")
     parser.add_argument('--asset-settings', type=str, default=None, help=ASSET_SETTINGS_HELP)
-    parser.add_argument(
-        '--no-contracts',
-        action='store_true',
-        default=False,
-        help="Disable contracts. By default, they're enabled in devstack."
-    )
     args = parser.parse_args(args)
     settings = args.settings
     asset_settings = args.asset_settings if args.asset_settings else settings
@@ -145,7 +135,6 @@ def devstack(args):
         fast=args.fast,
         settings=settings,
         asset_settings=asset_settings,
-        contracts=not args.no_contracts,
     )
 
 
@@ -159,7 +148,7 @@ def celery(options):
     Runs Celery workers.
     """
     settings = getattr(options, 'settings', 'devstack_with_worker')
-    run_process(cmd('DJANGO_SETTINGS_MODULE=lms.envs.{}'.format(settings),
+    run_process(cmd(f'DJANGO_SETTINGS_MODULE=lms.envs.{settings}',
                     'celery', 'worker', '--app=lms.celery:APP',
                     '--beat', '--loglevel=INFO', '--pythonpath=.'))
 
@@ -207,7 +196,7 @@ def run_all_servers(options):
         # First update assets for both LMS and Studio but don't collect static yet
         args = [
             'lms', 'studio',
-            '--settings={}'.format(asset_settings),
+            f'--settings={asset_settings}',
             '--skip-collect'
         ]
         call_task('pavelib.assets.update_assets', args=args)
@@ -226,8 +215,8 @@ def run_all_servers(options):
     # Start up LMS, CMS and Celery
     lms_port = DEFAULT_PORT['lms']
     cms_port = DEFAULT_PORT['studio']
-    lms_runserver_args = ["0.0.0.0:{}".format(lms_port)]
-    cms_runserver_args = ["0.0.0.0:{}".format(cms_port)]
+    lms_runserver_args = [f"0.0.0.0:{lms_port}"]
+    cms_runserver_args = [f"0.0.0.0:{cms_port}"]
 
     run_multi_processes([
         django_cmd(
@@ -237,7 +226,7 @@ def run_all_servers(options):
             'studio', settings_cms, 'runserver', '--traceback', '--pythonpath=.', *cms_runserver_args
         ),
         cmd(
-            'DJANGO_SETTINGS_MODULE=lms.envs.{}'.format(worker_settings),
+            f'DJANGO_SETTINGS_MODULE=lms.envs.{worker_settings}',
             'celery', 'worker', '--app=lms.celery:APP',
             '--beat', '--loglevel=INFO', '--pythonpath=.'
         )
@@ -282,9 +271,9 @@ def check_settings(args):
     settings = args.settings[0]
 
     try:
-        import_cmd = "echo 'import {system}.envs.{settings}'".format(system=system, settings=settings)
+        import_cmd = f"echo 'import {system}.envs.{settings}'"
         django_shell_cmd = django_cmd(system, settings, 'shell', '--plain', '--pythonpath=.')
-        sh("{import_cmd} | {shell_cmd}".format(import_cmd=import_cmd, shell_cmd=django_shell_cmd))
+        sh(f"{import_cmd} | {django_shell_cmd}")
 
     except:  # pylint: disable=bare-except
         print("Failed to import settings", file=sys.stderr)

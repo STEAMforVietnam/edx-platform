@@ -4,18 +4,19 @@ View logic for handling course messages.
 
 
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from babel.dates import format_date, format_timedelta
+from django.conf import settings
 from django.contrib import auth
 from django.template.loader import render_to_string
-from django.utils.http import urlquote_plus
 from django.utils.translation import get_language, to_locale
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from opaque_keys.edx.keys import CourseKey
 from pytz import UTC
 from web_fragments.fragment import Fragment
 
-from course_modes.models import CourseMode
+from common.djangoapps.course_modes.models import CourseMode
 from lms.djangoapps.courseware.courses import get_course_date_blocks, get_course_with_access
 from lms.djangoapps.course_goals.api import (
     get_course_goal,
@@ -29,8 +30,8 @@ from lms.djangoapps.courseware.access_utils import check_public_access
 from openedx.core.djangoapps.plugin_api.views import EdxFragmentView
 from openedx.core.djangolib.markup import HTML, Text
 from openedx.features.course_experience import CourseHomeMessages
-from student.models import CourseEnrollment
-from xmodule.course_module import COURSE_VISIBILITY_PUBLIC
+from common.djangoapps.student.models import CourseEnrollment
+from xmodule.course_module import COURSE_VISIBILITY_PUBLIC  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class CourseHomeMessageFragmentView(EdxFragmentView):
@@ -51,7 +52,7 @@ class CourseHomeMessageFragmentView(EdxFragmentView):
         'is_staff': True if the user is a staff member of the course, False otherwise
     }
     """
-    def render_to_fragment(self, request, course_id, user_access, **kwargs):
+    def render_to_fragment(self, request, course_id, user_access, **kwargs):  # lint-amnesty, pylint: disable=arguments-differ
         """
         Renders a course message fragment for the specified course.
         """
@@ -107,26 +108,26 @@ class CourseHomeMessageFragmentView(EdxFragmentView):
         return Fragment(html)
 
 
-def _register_course_home_messages(request, course, user_access, course_start_data):
+def _register_course_home_messages(request, course, user_access, course_start_data):  # lint-amnesty, pylint: disable=unused-argument
     """
     Register messages to be shown in the course home content page.
     """
     allow_anonymous = check_public_access(course, [COURSE_VISIBILITY_PUBLIC])
 
     if user_access['is_anonymous'] and not allow_anonymous:
-        sign_in_or_register_text = (_(u'{sign_in_link} or {register_link} and then enroll in this course.')
+        sign_in_or_register_text = (_('{sign_in_link} or {register_link} and then enroll in this course.')
                                     if not CourseMode.is_masters_only(course.id)
-                                    else _(u'{sign_in_link} or {register_link}.'))
+                                    else _('{sign_in_link} or {register_link}.'))
         CourseHomeMessages.register_info_message(
             request,
             Text(sign_in_or_register_text).format(
-                sign_in_link=HTML(u'<a href="/login?next={current_url}">{sign_in_label}</a>').format(
+                sign_in_link=HTML('<a href="/login?next={current_url}">{sign_in_label}</a>').format(
                     sign_in_label=_('Sign in'),
-                    current_url=urlquote_plus(request.path),
+                    current_url=quote_plus(request.path),
                 ),
-                register_link=HTML(u'<a href="/register?next={current_url}">{register_label}</a>').format(
+                register_link=HTML('<a href="/register?next={current_url}">{register_label}</a>').format(
                     register_label=_('register'),
-                    current_url=urlquote_plus(request.path),
+                    current_url=quote_plus(request.path),
                 )
             ),
             title=Text(_('You must be enrolled in the course to see course content.'))
@@ -134,7 +135,7 @@ def _register_course_home_messages(request, course, user_access, course_start_da
     if not user_access['is_anonymous'] and not user_access['is_staff'] and \
             not user_access['is_enrolled']:
 
-        title = Text(_(u'Welcome to {course_display_name}')).format(
+        title = Text(_('Welcome to {course_display_name}')).format(
             course_display_name=course.display_name
         )
 
@@ -142,15 +143,17 @@ def _register_course_home_messages(request, course, user_access, course_start_da
             # if a course is a Master's only course, we will not offer user ability to self-enroll
             CourseHomeMessages.register_info_message(
                 request,
-                Text(_('You must be enrolled in the course to see course content. '
-                       'Please contact your degree administrator or edX Support if you have questions.')),
+                Text(_(
+                    'You must be enrolled in the course to see course content. '
+                    'Please contact your degree administrator or {platform_name} Support if you have questions.'
+                )).format(platform_name=settings.PLATFORM_NAME),
                 title=title
             )
         elif not course.invitation_only:
             CourseHomeMessages.register_info_message(
                 request,
                 Text(_(
-                    u'{open_enroll_link}Enroll now{close_enroll_link} to access the full course.'
+                    '{open_enroll_link}Enroll now{close_enroll_link} to access the full course.'
                 )).format(
                     open_enroll_link=HTML('<button class="enroll-btn btn-link">'),
                     close_enroll_link=HTML('</button>')
@@ -171,7 +174,7 @@ def _register_course_goal_message(request, course):
     course_goal_options = get_course_goal_options()
     goal_choices_html = Text(_(
         'To start, set a course goal by selecting the option below that best describes '
-        u'your learning plan. {goal_options_container}'
+        'your learning plan. {goal_options_container}'
     )).format(
         goal_options_container=HTML('<div class="row goal-options-container">')
     )
@@ -181,11 +184,11 @@ def _register_course_goal_message(request, course):
         '{initial_tag}{choice}{closing_tag}'
     ).format(
         initial_tag=HTML(
-            u'<div tabindex="0" aria-label="{aria_label_choice}" class="goal-option dismissible" '
+            '<div tabindex="0" aria-label="{aria_label_choice}" class="goal-option dismissible" '
             'data-choice="{goal_key}">'
         ).format(
             goal_key=GOAL_KEY_CHOICES.unsure,
-            aria_label_choice=Text(_(u"Set goal to: {choice}")).format(
+            aria_label_choice=Text(_("Set goal to: {choice}")).format(
                 choice=course_goal_options[GOAL_KEY_CHOICES.unsure],
             ),
         ),
@@ -204,12 +207,12 @@ def _register_course_goal_message(request, course):
             '{initial_tag}{goal_text}{closing_tag}'
         ).format(
             initial_tag=HTML(
-                u'<button tabindex="0" aria-label="{aria_label_choice}" class="goal-option btn-outline-primary" '
+                '<button tabindex="0" aria-label="{aria_label_choice}" class="goal-option btn-outline-primary" '
                 'data-choice="{goal_key}">'
             ).format(
                 goal_key=goal_key,
-                aria_label_choice=Text(_(u"Set goal to: {goal_text}")).format(
-                    goal_text=Text(_(goal_text))
+                aria_label_choice=Text(_("Set goal to: {goal_text}")).format(
+                    goal_text=Text(_(goal_text))  # lint-amnesty, pylint: disable=translation-of-non-string
                 )
             ),
             goal_text=goal_text,
@@ -222,7 +225,7 @@ def _register_course_goal_message(request, course):
             goal_choices_html=goal_choices_html,
             closing_tag=HTML('</div>')
         ),
-        title=Text(_(u'Welcome to {course_display_name}')).format(
+        title=Text(_('Welcome to {course_display_name}')).format(
             course_display_name=course.display_name
         )
     )

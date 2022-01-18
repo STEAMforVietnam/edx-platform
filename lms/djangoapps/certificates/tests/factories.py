@@ -1,23 +1,29 @@
-# Factories are self documenting
+"""
+Certificates factories
+"""
 
 
+import datetime
 from uuid import uuid4
 
 from factory.django import DjangoModelFactory
 
+from common.djangoapps.student.models import LinkedInAddToProfileConfiguration
 from lms.djangoapps.certificates.models import (
+    CertificateAllowlist,
+    CertificateDateOverride,
     CertificateHtmlViewConfiguration,
     CertificateInvalidation,
     CertificateStatuses,
-    CertificateWhitelist,
     GeneratedCertificate
 )
-from student.models import LinkedInAddToProfileConfiguration
 
 
 class GeneratedCertificateFactory(DjangoModelFactory):
-
-    class Meta(object):
+    """
+    GeneratedCertificate factory
+    """
+    class Meta:
         model = GeneratedCertificate
 
     course_id = None
@@ -28,19 +34,25 @@ class GeneratedCertificateFactory(DjangoModelFactory):
     grade = ''
 
 
-class CertificateWhitelistFactory(DjangoModelFactory):
+class CertificateAllowlistFactory(DjangoModelFactory):
+    """
+    Certificate allowlist factory
+    """
 
-    class Meta(object):
-        model = CertificateWhitelist
+    class Meta:
+        model = CertificateAllowlist
 
     course_id = None
-    whitelist = True
+    allowlist = True
     notes = 'Test Notes'
 
 
 class CertificateInvalidationFactory(DjangoModelFactory):
+    """
+    CertificateInvalidation factory
+    """
 
-    class Meta(object):
+    class Meta:
         model = CertificateInvalidation
 
     notes = 'Test Notes'
@@ -48,8 +60,11 @@ class CertificateInvalidationFactory(DjangoModelFactory):
 
 
 class CertificateHtmlViewConfigurationFactory(DjangoModelFactory):
+    """
+    CertificateHtmlViewConfiguration factory
+    """
 
-    class Meta(object):
+    class Meta:
         model = CertificateHtmlViewConfiguration
 
     enabled = True
@@ -57,18 +72,18 @@ class CertificateHtmlViewConfigurationFactory(DjangoModelFactory):
             "default": {
                 "accomplishment_class_append": "accomplishment-certificate",
                 "platform_name": "edX",
-                "company_about_url": "http://www.edx.org/about-us",
-                "company_privacy_url": "http://www.edx.org/edx-privacy-policy",
-                "company_tos_url": "http://www.edx.org/edx-terms-service",
-                "company_verified_certificate_url": "http://www.edx.org/verified-certificate",
+                "company_about_url": "https://www.edx.org/about-us",
+                "company_privacy_url": "https://www.edx.org/edx-privacy-policy",
+                "company_tos_url": "https://www.edx.org/edx-terms-service",
+                "company_verified_certificate_url": "https://www.edx.org/verified-certificate",
                 "document_stylesheet_url_application": "/static/certificates/sass/main-ltr.css",
                 "logo_src": "/static/certificates/images/logo-edx.png",
-                "logo_url": "http://www.edx.org"
+                "logo_url": "https://www.edx.org"
             },
             "honor": {
                 "certificate_type": "Honor Code",
                 "certificate_title": "Certificate of Achievement",
-                "logo_url": "http://www.edx.org/honor_logo.png"
+                "logo_url": "https://www.edx.org/honor_logo.png"
             },
             "verified": {
                 "certificate_type": "Verified",
@@ -82,10 +97,23 @@ class CertificateHtmlViewConfigurationFactory(DjangoModelFactory):
 
 
 class LinkedInAddToProfileConfigurationFactory(DjangoModelFactory):
+    """
+    LinkedInAddToProfileConfiguration factory
+    """
 
-    class Meta(object):
+    class Meta:
         model = LinkedInAddToProfileConfiguration
 
     enabled = True
-    company_identifier = "0_0dPSPyS070e0HsE9HNz_13_d11_"
-    trk_partner_name = 'unittest'
+    company_identifier = "1337"
+
+
+class CertificateDateOverrideFactory(DjangoModelFactory):
+    """
+    CertificateDateOverride factory
+    """
+    class Meta:
+        model = CertificateDateOverride
+
+    date = datetime.datetime(2021, 5, 11, 0, 0, tzinfo=datetime.timezone.utc)
+    reason = "Learner really wanted this on their birthday"

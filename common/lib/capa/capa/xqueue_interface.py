@@ -1,7 +1,6 @@
-#
-#  LMS Interface to external queueing system (xqueue)
-#
-
+"""
+LMS Interface to external queueing system (xqueue)
+"""
 
 import hashlib
 import json
@@ -93,7 +92,7 @@ class XQueueInterface(object):
 
         # log the send to xqueue
         header_info = json.loads(header)
-        queue_name = header_info.get('queue_name', u'')
+        queue_name = header_info.get('queue_name', '')  # lint-amnesty, pylint: disable=unused-variable
 
         # Attempt to send to queue
         (error, msg) = self._send_to_queue(header, body, files_to_upload)
@@ -113,14 +112,14 @@ class XQueueInterface(object):
 
         return error, msg
 
-    def _login(self):
+    def _login(self):  # lint-amnesty, pylint: disable=missing-function-docstring
         payload = {
             'username': self.auth['username'],
             'password': self.auth['password']
         }
         return self._http_post(self.url + '/xqueue/login/', payload)
 
-    def _send_to_queue(self, header, body, files_to_upload):
+    def _send_to_queue(self, header, body, files_to_upload):  # lint-amnesty, pylint: disable=missing-function-docstring
         payload = {
             'xqueue_header': header,
             'xqueue_body': body
@@ -132,7 +131,7 @@ class XQueueInterface(object):
 
         return self._http_post(self.url + '/xqueue/submit/', payload, files=files)
 
-    def _http_post(self, url, data, files=None):
+    def _http_post(self, url, data, files=None):  # lint-amnesty, pylint: disable=missing-function-docstring
         try:
             response = self.session.post(
                 url, data=data, files=files, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT)
@@ -149,3 +148,53 @@ class XQueueInterface(object):
             return 1, 'unexpected HTTP status code [%d]' % response.status_code
 
         return parse_xreply(response.text)
+
+
+class XQueueService:
+    """
+    XBlock service providing an interface to the XQueue service.
+
+    Args:
+        construct_callback(callable): function which constructs a fully-qualified callback URL to make xqueue requests.
+        default_queuename(string): course-specific queue name.
+        waittime(int): number of seconds to wait between xqueue requests
+        url(string): base URL for the XQueue service.
+        django_auth(dict): username and password for the XQueue service.
+        basic_auth(array or None): basic authentication credentials, if needed.
+    """
+    def __init__(self, construct_callback, default_queuename, waittime, url, django_auth, basic_auth=None):
+
+        requests_auth = requests.auth.HTTPBasicAuth(*basic_auth) if basic_auth else None
+        self._interface = XQueueInterface(url, django_auth, requests_auth)
+
+        self._construct_callback = construct_callback
+        self._default_queuename = default_queuename.replace(' ', '_')
+        self._waittime = waittime
+
+    @property
+    def interface(self):
+        """
+        Returns the XQueueInterface instance.
+        """
+        return self._interface
+
+    @property
+    def construct_callback(self):
+        """
+        Returns the function to construct the XQueue callback.
+        """
+        return self._construct_callback
+
+    @property
+    def default_queuename(self):
+        """
+        Returns the default queue name for the current course.
+        """
+        return self._default_queuename
+
+    @property
+    def waittime(self):
+        """
+        Returns the number of seconds to wait in between calls to XQueue.
+        """
+        return self._waittime

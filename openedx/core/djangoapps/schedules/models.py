@@ -1,9 +1,9 @@
-
+# lint-amnesty, pylint: disable=missing-module-docstring
 
 from config_models.models import ConfigurationModel
 from django.contrib.sites.models import Site
 from django.db import models
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from model_utils import Choices
 from model_utils.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
@@ -15,6 +15,9 @@ class Schedule(TimeStampedModel):
     """
 
     enrollment = models.OneToOneField('student.CourseEnrollment', null=False, on_delete=models.CASCADE)
+    # The active field on the schedule is deprecated, please do not rely on it.
+    # You can use the is_active field on the CourseEnrollment model instead (i.e. schedule.enrollment.is_active).
+    # Removing this field from the database is a TODO for https://openedx.atlassian.net/browse/AA-574.
     active = models.BooleanField(
         default=True,
         help_text=_('Indicates if this schedule is actively used')
@@ -35,11 +38,11 @@ class Schedule(TimeStampedModel):
 
     def get_experience_type(self):
         try:
-            return self.experience.experience_type
+            return self.experience.experience_type  # lint-amnesty, pylint: disable=no-member
         except ScheduleExperience.DoesNotExist:
             return ScheduleExperience.EXPERIENCES.default
 
-    class Meta(object):
+    class Meta:
         verbose_name = _('Schedule')
         verbose_name_plural = _('Schedules')
 
@@ -51,14 +54,12 @@ class ScheduleConfig(ConfigurationModel):
     KEY_FIELDS = ('site',)
 
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
-    create_schedules = models.BooleanField(default=False)
     enqueue_recurring_nudge = models.BooleanField(default=False)
     deliver_recurring_nudge = models.BooleanField(default=False)
     enqueue_upgrade_reminder = models.BooleanField(default=False)
     deliver_upgrade_reminder = models.BooleanField(default=False)
     enqueue_course_update = models.BooleanField(default=False)
     deliver_course_update = models.BooleanField(default=False)
-    hold_back_ratio = models.FloatField(default=0)
 
 
 class ScheduleExperience(models.Model):
@@ -66,8 +67,8 @@ class ScheduleExperience(models.Model):
     .. no_pii:
     """
     EXPERIENCES = Choices(
-        (0, 'default', u'Recurring Nudge and Upgrade Reminder'),
-        (1, 'course_updates', u'Course Updates')
+        (0, 'default', 'Recurring Nudge and Upgrade Reminder'),
+        (1, 'course_updates', 'Course Updates')
     )
 
     schedule = models.OneToOneField(Schedule, related_name='experience', on_delete=models.CASCADE)

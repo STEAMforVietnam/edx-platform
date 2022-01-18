@@ -9,7 +9,6 @@ from tempfile import NamedTemporaryFile
 from django.core.files.uploadedfile import UploadedFile
 import piexif
 from PIL import Image
-from six.moves import range
 
 
 @contextmanager
@@ -29,7 +28,7 @@ def make_image_file(dimensions=(320, 240), prefix='tmp', extension='.jpeg', forc
 
     """
     image = Image.new('RGB', dimensions, "green")
-    image_file = NamedTemporaryFile(prefix=prefix, suffix=extension)
+    image_file = NamedTemporaryFile(prefix=prefix, suffix=extension)  # lint-amnesty, pylint: disable=consider-using-with
     try:
         if orientation and orientation in range(1, 9):
             exif_bytes = piexif.dump({'0th': {piexif.ImageIFD.Orientation: orientation}})

@@ -1,11 +1,13 @@
+# lint-amnesty, pylint: disable=missing-module-docstring
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.csrf import ensure_csrf_cookie
 from opaque_keys.edx.keys import CourseKey
 
-from edxmako.shortcuts import render_to_response
-from student.auth import has_course_author_access
-from xmodule.modulestore.django import modulestore
+from common.djangoapps.edxmako.shortcuts import render_to_response
+from common.djangoapps.student.auth import has_course_author_access
+from cms.djangoapps.contentstore.utils import get_proctored_exam_settings_url
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 __all__ = ['checklists_handler']
 
@@ -29,4 +31,5 @@ def checklists_handler(request, course_key_string=None):
     return render_to_response('checklists.html', {
         'language_code': request.LANGUAGE_CODE,
         'context_course': course_module,
+        'mfe_proctored_exam_settings_url': get_proctored_exam_settings_url(course_module.id),
     })

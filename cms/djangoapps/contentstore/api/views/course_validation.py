@@ -1,16 +1,16 @@
+# lint-amnesty, pylint: disable=missing-module-docstring
 import logging
 
 import dateutil
-import six
 from pytz import UTC
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 
-from contentstore.course_info_model import get_course_updates
-from contentstore.views.certificates import CertificateManager
+from cms.djangoapps.contentstore.course_info_model import get_course_updates
+from cms.djangoapps.contentstore.views.certificates import CertificateManager
 from openedx.core.lib.api.view_utils import DeveloperErrorViewMixin, view_auth_classes
-from xmodule.course_metadata_utils import DEFAULT_GRADING_POLICY
-from xmodule.modulestore.django import modulestore
+from xmodule.course_metadata_utils import DEFAULT_GRADING_POLICY  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .utils import course_author_access_required, get_bool_param
 
@@ -36,6 +36,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
         * grades
         * certificates
         * updates
+        * proctoring
         * graded_only (boolean) - whether to included graded subsections only in the assignments information.
         * validate_oras (boolean) - whether to check the dates in ORA problems in addition to assignment due dates.
 
@@ -59,6 +60,9 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
             * has_certificate - whether the course has a certificate.
         * updates
             * has_update - whether at least one course update exists.
+        * proctoring
+            * needs_proctoring_escalation_email - whether the course requires a proctoring escalation email
+            * has_proctoring_escalation_email - whether the course has a proctoring escalation email
 
     """
     @course_author_access_required
@@ -95,6 +99,10 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
                 response.update(
                     updates=self._updates_validation(course, request)
                 )
+            if get_bool_param(request, 'proctoring', all_requested):
+                response.update(
+                    proctoring=self._proctoring_validation(course)
+                )
 
         return Response(response)
 
@@ -110,14 +118,14 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
             has_end_date=course.end is not None,
         )
 
-    def _assignments_validation(self, course, request):
+    def _assignments_validation(self, course, request):  # lint-amnesty, pylint: disable=missing-function-docstring
         assignments, visible_assignments = self._get_assignments(course)
         assignments_with_dates = [
             a for a in visible_assignments if a.due
         ]
         assignments_with_dates_before_start = (
             [
-                {'id': six.text_type(a.location), 'display_name': a.display_name}
+                {'id': str(a.location), 'display_name': a.display_name}
                 for a in assignments_with_dates
                 if a.due < course.start
             ]
@@ -127,7 +135,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
 
         assignments_with_dates_after_end = (
             [
-                {'id': six.text_type(a.location), 'display_name': a.display_name}
+                {'id': str(a.location), 'display_name': a.display_name}
                 for a in assignments_with_dates
                 if a.due > course.end
             ]
@@ -143,7 +151,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
             ]
             assignments_with_dates_before_start = (
                 [
-                    {'id': six.text_type(a.location), 'display_name': a.display_name}
+                    {'id': str(a.location), 'display_name': a.display_name}
                     for a in assignments_with_dates
                     if a.due < course.start
                 ]
@@ -153,7 +161,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
 
             assignments_with_dates_after_end = (
                 [
-                    {'id': six.text_type(a.location), 'display_name': a.display_name}
+                    {'id': str(a.location), 'display_name': a.display_name}
                     for a in assignments_with_dates
                     if a.due > course.end
                 ]
@@ -174,14 +182,14 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
                     parent_unit = modulestore().get_item(ora.parent)
                     parent_assignment = modulestore().get_item(parent_unit.parent)
                     assignments_with_ora_dates_before_start.append({
-                        'id': six.text_type(parent_assignment.location),
+                        'id': str(parent_assignment.location),
                         'display_name': parent_assignment.display_name
                     })
                 if course.end and self._has_date_after_end(ora, course.end):
                     parent_unit = modulestore().get_item(ora.parent)
                     parent_assignment = modulestore().get_item(parent_unit.parent)
                     assignments_with_ora_dates_after_end.append({
-                        'id': six.text_type(parent_assignment.location),
+                        'id': str(parent_assignment.location),
                         'display_name': parent_assignment.display_name
                     })
 
@@ -218,7 +226,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
             has_update=len(updates) > 0,
         )
 
-    def _get_assignments(self, course):
+    def _get_assignments(self, course):  # lint-amnesty, pylint: disable=missing-function-docstring
         store = modulestore()
         sections = [store.get_item(section_usage_key) for section_usage_key in course.children]
         assignments = [
@@ -245,7 +253,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
         oras = modulestore().get_items(course.id, qualifiers={'category': 'openassessment'})
         return oras if not graded_only else [ora for ora in oras if ora.graded]
 
-    def _has_date_before_start(self, ora, start):
+    def _has_date_before_start(self, ora, start):  # lint-amnesty, pylint: disable=missing-function-docstring
         if ora.submission_start:
             if dateutil.parser.parse(ora.submission_start).replace(tzinfo=UTC) < start:
                 return True
@@ -262,7 +270,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
 
         return False
 
-    def _has_date_after_end(self, ora, end):
+    def _has_date_after_end(self, ora, end):  # lint-amnesty, pylint: disable=missing-function-docstring
         if ora.submission_start:
             if dateutil.parser.parse(ora.submission_start).replace(tzinfo=UTC) > end:
                 return True
@@ -281,7 +289,7 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
     def _has_start_date(self, course):
         return not course.start_date_is_still_default
 
-    def _has_grading_policy(self, course):
+    def _has_grading_policy(self, course):  # lint-amnesty, pylint: disable=missing-function-docstring
         grading_policy_formatted = {}
         default_grading_policy_formatted = {}
 
@@ -325,3 +333,10 @@ class CourseValidationView(DeveloperErrorViewMixin, GenericAPIView):
                     return True
 
         return False
+
+    def _proctoring_validation(self, course):
+        # A proctoring escalation email is currently only required for courses using Proctortrack
+        return dict(
+            needs_proctoring_escalation_email=course.proctoring_provider == 'proctortrack',
+            has_proctoring_escalation_email=bool(course.proctoring_escalation_email)
+        )

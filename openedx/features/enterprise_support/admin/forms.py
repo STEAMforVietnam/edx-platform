@@ -3,11 +3,11 @@ Enterprise support admin forms.
 """
 
 from django import forms
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from enterprise.admin.utils import validate_csv
 
 
-class CSVImportForm(forms.Form):
+class CSVImportForm(forms.Form):  # lint-amnesty, pylint: disable=missing-class-docstring
     csv_file = forms.FileField(
         required=True,
         label=_('CSV File'),

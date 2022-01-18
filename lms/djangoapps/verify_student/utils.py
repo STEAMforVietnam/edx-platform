@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Common Utilities for the verify_student application.
 """
@@ -8,8 +7,6 @@ import logging
 
 from django.conf import settings
 from django.utils.timezone import now
-
-from six import text_type
 
 from lms.djangoapps.verify_student.tasks import send_request_to_ss_for_user
 
@@ -27,9 +24,9 @@ def submit_request_to_ss(user_verification, copy_id_photo_from):
         send_request_to_ss_for_user.delay(
             user_verification_id=user_verification.id, copy_id_photo_from=copy_id_photo_from
         )
-    except Exception as error:
+    except Exception as error:  # pylint: disable=broad-except
         log.error(
-            "Software Secure submit request %r failed, result: %s", user_verification.user.username, text_type(error)
+            "Software Secure submit request %r failed, result: %s", user_verification.user.username, str(error)
         )
         user_verification.mark_must_retry()
 
@@ -51,6 +48,25 @@ def earliest_allowed_verification_date():
     """
     days_good_for = settings.VERIFY_STUDENT["DAYS_GOOD_FOR"]
     return now() - datetime.timedelta(days=days_good_for)
+
+
+def active_verifications(candidates, deadline):
+    """
+    Based on the deadline, only return verification attempts
+    that are considered active (non-expired and wasn't created for future)
+    """
+    relevant_attempts = []
+    if not candidates:
+        return relevant_attempts
+
+    # Look for a verification that was in effect at the deadline,
+    # preferring recent verifications.
+    # If no such verification is found, implicitly return empty array
+    for verification in candidates:
+        if verification.active_at_datetime(deadline):
+            relevant_attempts.append(verification)
+
+    return relevant_attempts
 
 
 def verification_for_datetime(deadline, candidates):
@@ -79,47 +95,33 @@ def verification_for_datetime(deadline, candidates):
     if not candidates:
         return None
 
-    # If there's no deadline, then return the most recently created verification
-    if deadline is None:
+    if not deadline:
         return candidates[0]
 
-    # Otherwise, look for a verification that was in effect at the deadline,
-    # preferring recent verifications.
-    # If no such verification is found, implicitly return `None`
-    for verification in candidates:
-        if verification.active_at_datetime(deadline):
-            return verification
+    attempts = active_verifications(candidates, deadline)
+    if attempts:
+        return attempts[0]
+    else:
+        return None
 
 
-def most_recent_verification(photo_id_verifications, sso_id_verifications, manual_id_verifications, most_recent_key):
+def most_recent_verification(verification_sets):
     """
-    Return the most recent verification given querysets for photo, sso and manual verifications.
-
-    This function creates a map of the latest verification of all types and then returns the earliest
-    verification using the max of the map values.
+    Return the most recent verification (by updated date) given querysets for multiple types of verifications.
+    Photo, sso and manual are the current use.
 
     Arguments:
-        photo_id_verifications: Queryset containing photo verifications
-        sso_id_verifications: Queryset containing sso verifications
-        manual_id_verifications: Queryset containing manual verifications
-        most_recent_key: Either 'updated_at' or 'created_at'
+        tuple or other iterable of verification sets
 
     Returns:
         The most recent verification.
     """
-    photo_id_verification = photo_id_verifications and photo_id_verifications.first()
-    sso_id_verification = sso_id_verifications and sso_id_verifications.first()
-    manual_id_verification = manual_id_verifications and manual_id_verifications.first()
-
-    verifications = [photo_id_verification, sso_id_verification, manual_id_verification]
-
-    verifications_map = {
-        verification: getattr(verification, most_recent_key)
-        for verification in verifications
-        if getattr(verification, most_recent_key, False)
-    }
-
-    return max(verifications_map, key=lambda k: verifications_map[k]) if verifications_map else None
+    most_recent = None
+    for s in verification_sets:
+        for v in s:
+            if not most_recent or v.updated_at > most_recent.updated_at:
+                most_recent = v
+    return most_recent
 
 
 def auto_verify_for_testing_enabled(override=None):

@@ -5,11 +5,10 @@ Commerce-related models.
 
 from config_models.models import ConfigurationModel
 from django.db import models
-from django.utils.encoding import python_2_unicode_compatible
-from django.utils.translation import ugettext_lazy as _
+
+from django.utils.translation import gettext_lazy as _
 
 
-@python_2_unicode_compatible
 class CommerceConfiguration(ConfigurationModel):
     """
     Commerce configuration
@@ -17,7 +16,7 @@ class CommerceConfiguration(ConfigurationModel):
     .. no_pii:
     """
 
-    class Meta(object):
+    class Meta:
         app_label = "commerce"
 
     API_NAME = 'commerce'
@@ -32,7 +31,7 @@ class CommerceConfiguration(ConfigurationModel):
 
     basket_checkout_page = models.CharField(
         max_length=255,
-        default=u'/basket/add/',
+        default='/basket/add/',
         help_text=_('Path to course(s) checkout page hosted by the E-Commerce service.')
     )
     cache_ttl = models.PositiveIntegerField(

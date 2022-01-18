@@ -7,15 +7,18 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django.views.generic import View
 from rest_framework.generics import GenericAPIView
 
-from edxmako.shortcuts import render_to_response
+from common.djangoapps.edxmako.shortcuts import render_to_response
+from common.djangoapps.student.models import UserPasswordToggleHistory
+from common.djangoapps.util.json_request import JsonResponse
 from lms.djangoapps.support.decorators import require_support_permission
 from openedx.core.djangoapps.user_api.accounts.serializers import AccountUserSerializer
-from openedx.core.djangoapps.user_authn.utils import generate_password
-from util.json_request import JsonResponse
+from openedx.core.djangolib.oauth2_retirement_utils import retire_dot_oauth2_models
+
+from edx_django_utils.user import generate_password  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class ManageUserSupportView(View):
@@ -66,10 +69,18 @@ class ManageUserDetailView(GenericAPIView):
         user = get_user_model().objects.get(
             Q(username=username_or_email) | Q(email=username_or_email)
         )
+        comment = request.data.get("comment")
         if user.has_usable_password():
             user.set_unusable_password()
+            UserPasswordToggleHistory.objects.create(
+                user=user, comment=comment, created_by=request.user, disabled=True
+            )
+            retire_dot_oauth2_models(request.user)
         else:
             user.set_password(generate_password(length=25))
+            UserPasswordToggleHistory.objects.create(
+                user=user, comment=comment, created_by=request.user, disabled=False
+            )
         user.save()
 
         if user.has_usable_password():

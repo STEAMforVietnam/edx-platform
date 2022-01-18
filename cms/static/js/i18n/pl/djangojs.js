@@ -1,13 +1,14 @@
 
 
-(function(globals) {
-
-  var django = globals.django || (globals.django = {});
+'use strict';
+{
+  const globals = this;
+  const django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    var v=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);
-    if (typeof(v) == 'boolean') {
+    const v = (n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);
+    if (typeof v === 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -19,20 +20,9 @@
 
   django.catalog = django.catalog || {};
   
-  var newcatalog = {
+  const newcatalog = {
     " ${price} {currency} )": " ${price} {currency} )",
-    " Link": "Odno\u015bnik",
     " and ": "i",
-    " learner does not exist in LMS and not added to the exception list": "student nie figuruje w LMS i nie zostanie dodany do listy wyj\u0105tk\u00f3w",
-    " learner is already white listed and not added to the exception list": "student znajduje si\u0119 ju\u017c na bia\u0142ej li\u015bcie i nie zosta\u0142 dodany do listy wyj\u0105tk\u00f3w",
-    " learner is not enrolled in course and not added to the exception list": "student nie uczestniczy w kursie i nie zosta\u0142 dodany do listy wyj\u0105tk\u00f3w",
-    " learner is successfully added to the exception list": "student pomy\u015blnie dodany do listy wyj\u0105tk\u00f3w",
-    " learners are already white listed and not added to the exception list": "student\u00f3w znajduje si\u0119 ju\u017c na bia\u0142ej li\u015bcie i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
-    " learners are not enrolled in course and not added to the exception list": "student\u00f3w nie uczestniczy w kursie i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
-    " learners are successfully added to exception list": "student\u00f3w pomy\u015blnie dodanych do listy wyj\u0105tk\u00f3w",
-    " learners do not exist in LMS and not added to the exception list": "student\u00f3w nie figuruje w LMS i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
-    " record is not in correct format and not added to the exception list": "pozycja nie znajduje si\u0119 we w\u0142a\u015bciwym formacie i nie zosta\u0142a dodana do listy wyj\u0105tk\u00f3w",
-    " records are not in correct format and not added to the exception list": "pozycji nie znajduje si\u0119 we w\u0142a\u015bciwym formacie i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
     "${listPrice}": "${listPrice}",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
     "%(errorCount)s error found in form.": [
@@ -71,9 +61,6 @@
     "6 a.m.": "6 rano",
     "6 p.m.": "6 po po\u0142udniu",
     ": video upload complete.": ": przesy\u0142anie filmu uko\u0144czone.",
-    "<%= user %> already in exception list.": "<%= user %> ju\u017c figuruje na li\u015bcie wyj\u0105tk\u00f3w.",
-    "<%= user %> has been successfully added to the exception list. Click Generate Exception Certificate below to send the certificate.": "Student <%= user %> zosta\u0142 pomy\u015blnie dodany do listy wyj\u0105tk\u00f3w. Kliknij przycisk poni\u017cej, aby wys\u0142a\u0107 certyfikat.",
-    "A driver's license, passport, or government-issued ID with your name and photo.": "Dow\u00f3d osobisty, prawo jazdy, paszport lub inny dokument to\u017csamo\u015bci zawieraj\u0105cy twoje zdj\u0119cie oraz imi\u0119 i nazwisko.",
     "A driver's license, passport, or other government-issued ID with your name and photo": "Dow\u00f3d osobisty, prawo jazdy, paszport lub inny dokument to\u017csamo\u015bci zawieraj\u0105cy twoje zdj\u0119cie oraz imi\u0119 i nazwisko.",
     "A highlight to look forward to this week.": "Wskaz\u00f3wka na ten tydzie\u0144.",
     "A list of courses you have just enrolled in as a verified student": "Lista kurs\u00f3w na kt\u00f3re zapisa\u0142e\u015b si\u0119 ostatnio jako zweryfikowany student",
@@ -160,7 +147,6 @@
     "Already have an {platformName} account?": "Posiadasz ju\u017c konto na platformie {platformName}?",
     "Always divide content-specific discussion topics": "Zawsze dziel tematy dyskusji okre\u015blonej tre\u015bci",
     "Always show assessment results": "Zawsze pokazuj wyniki zada\u0144",
-    "Amount": "Ilo\u015b\u0107",
     "An email has been sent to {userEmail} with a link for you to activate your account.": "Na adres {userEmail} zosta\u0142a wys\u0142ana wiadomo\u015b\u0107 e-mail zawieraj\u0105ca odno\u015bnik do aktywacji konta.",
     "An error has occurred. Check your Internet connection and try again.": "Wyst\u0105pi\u0142 b\u0142\u0105d. Sprawd\u017a swoje po\u0142\u0105czenie z Internetem i spr\u00f3buj ponownie.",
     "An error has occurred. Make sure that you are connected to the Internet, and then try refreshing the page.": "Wyst\u0105pi\u0142 b\u0142\u0105d. Upewnij si\u0119, \u017ce masz po\u0142\u0105czenie z Internetem i od\u015bwie\u017c stron\u0119.",
@@ -219,7 +205,6 @@
     "Be sure your entire face is inside the frame": "Upewnij si\u0119, \u017ce ca\u0142a twarz znajduje si\u0119 w ramce.",
     "Before proceeding, please confirm that your details match": "Przed przej\u015bciem dalej, prosz\u0119 potwierdzi\u0107 zgodno\u015b\u0107 danych",
     "Before you upgrade to a certificate track, you must activate your account.": "Zanim podniesiesz swoje zaanga\u017cowanie w kursie, musisz aktywowa\u0107 swoje konto.",
-    "Billed to": "Nabywca:",
     "Biography": "Profil",
     "Block view is unavailable": "Podgl\u0105d bloku jest niedost\u0119pny",
     "Blockquote": "Cytat",
@@ -241,7 +226,6 @@
     "Cancel team updating.": "Anuluj edycj\u0119 zespo\u0142u",
     "Cannot delete when in use by a unit": "Nie mo\u017cna usun\u0105\u0107 je\u015bli znajduje si\u0119 w u\u017cyciu w ekranie",
     "Cannot delete when in use by an experiment": "Nie mo\u017cna usun\u0105\u0107 gdy znajduje si\u0119 w eksperymencie",
-    "Cannot drop more <%= types %> assignments than are assigned.": "Nie mo\u017cna pomin\u0105\u0107 wi\u0119cej ni\u017c <%= types %> przydzielonych zada\u0144.",
     "Caution: The last published version of this unit is live. By publishing changes you will change the student experience.": "Uwaga: Ostatnio opublikowana wersja tego ekranu znajduje si\u0119 obecnie w u\u017cyciu. Dokonuj\u0105c zmian, zmienisz stan post\u0119pu student\u00f3w.",
     "Certificate Details": "Szczeg\u00f3\u0142y certyfikatu",
     "Certificate Generated": "Certyfikat wygenerowany",
@@ -270,7 +254,6 @@
     "Check Your Email": "Sprawd\u017a swoj\u0105 poczt\u0119 e-mail",
     "Check the highlighted fields below and try again.": "Sprawd\u017a oznaczone pola i spr\u00f3buj ponownie.",
     "Check this box to receive an email digest once a day notifying you about new, unread activity from posts you are following.": "Zaznacz to pole, aby raz dziennie otrzymywa\u0107 zbiorczy e-mail z aktualno\u015bciami i nowymi wpisami w tematach, kt\u00f3re \u015bledzisz.",
-    "Check your email": "Sprawd\u017a poczt\u0119 e-mail",
     "Check your email account for instructions to reset your password.": "Sprawd\u017a poczt\u0119 e-mail, aby zapozna\u0107 si\u0119 z instrukcj\u0105 resetowania has\u0142a.",
     "Check your email for an activation message.": "Sprawd\u017a poczt\u0119 e-mail i odszuka\u0107 wiadomo\u015b\u0107 aktywacyjn\u0105.",
     "Checkout": "Zap\u0142a\u0107",
@@ -333,18 +316,15 @@
     "Copy Email To Editor": "Skopiuj e-mail do edytora",
     "Correct failed component": "Napraw b\u0142\u0119dny element",
     "Cost": "Cena",
-    "Could not find Certificate Exception in white list. Please refresh the page and try again": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 wyj\u0105tku certyfikatu na bia\u0142ej li\u015bcie. Prosz\u0119 od\u015bwie\u017cy\u0107 stron\u0119 i spr\u00f3bowa\u0107 ponownie.",
     "Could not find Certificate Invalidation in the list. Please refresh the page and try again": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 uniewa\u017cnienia certyfikatu na li\u015bcie. Prosz\u0119 od\u015bwie\u017cy\u0107 stron\u0119 i spr\u00f3bowa\u0107 ponownie.",
     "Could not find a user with username or email address '<%- identifier %>'.": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 u\u017cytkownika o nazwie lub adresie e-mail '<%- identifier %>'.",
     "Could not find users associated with the following identifiers:": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 u\u017cytkownik\u00f3w o podanych identyfikatorach:",
     "Could not override problem score for {user}.": "Nie uda\u0142o si\u0119 nadpisa\u0107 wyniku \u0107wiczenia dla studenta {user}.",
     "Could not retrieve download url.": "Nie mo\u017cna odczyta\u0107 adresu URL pobierania.",
-    "Could not retrieve payment information": "Pobieranie informacji o p\u0142atno\u015bci nie powiod\u0142o si\u0119",
     "Could not retrieve upload url.": "Nie mo\u017cna odczyta\u0107 adresu URL uploadu.",
     "Could not submit order": "Sk\u0142adanie zam\u00f3wienia nie powiod\u0142o si\u0119",
     "Could not submit photos": "Przes\u0142anie zdj\u0119cia nie powiod\u0142o si\u0119.",
     "Could not upload the video image file": "Nie uda\u0142o si\u0119 przes\u0142a\u0107 pliku obrazka filmu.",
-    "Couldn't Save This Assignment": "Nie uda\u0142o si\u0119 zapisa\u0107 tego zadania",
     "Country": "Region",
     "Country of residence": "Kraj zamieszkania",
     "Country or Region of Residence": "Kraj lub region",
@@ -386,14 +366,12 @@
     "Creative Commons licensed content, with terms as follow:": "Tre\u015b\u0107 na licencji Creative Commons na nast\u0119puj\u0105cych warunkach:",
     "Criterion Added": "Dodano kryterium",
     "Criterion Deleted": "Kryterium usuni\u0119te",
-    "Crossed out items have been refunded.": "Za wykre\u015blone elementy nast\u0105pi\u0142 zwrot pieni\u0119dzy.",
     "Current Role:": "Obecna rola:",
     "Current conversation": "Aktualna dyskusja",
     "Current enrollment mode:": "Obecny tryb uczestnictwa:",
     "Current location": "Obecna lokalizacja",
     "Current tab": "Aktualna zak\u0142adka",
     "Currently selected": "Obecnie wybrane",
-    "Date": "Data",
     "Date Added": "Data dodania",
     "Date Joined": "Data do\u0142\u0105czenia",
     "Date Placed": "Data z\u0142o\u017cenia",
@@ -414,7 +392,6 @@
     "Deleting this %(item_display_name)s is permanent and cannot be undone.": "Usuni\u0119cie tego elementu: %(item_display_name)s jest procesem nieodwracalnym.",
     "Deprecated": "Przestarza\u0142y",
     "Describe ": "Opis",
-    "Description": "Opis",
     "Description of the certificate": "Opis certyfikatu",
     "Discard Changes": "Odrzu\u0107 zmiany",
     "Discussion Home": "Strona g\u0142\u00f3wna dyskusji",
@@ -425,7 +402,6 @@
     "Divided": "Podzielone",
     "Do you want to allow this student ('{student_id}') to skip the entrance exam?": "Czy chcesz zwolni\u0107 studenta ('{student_id}') z egzaminu wst\u0119pnego?",
     "Do you want to replace the edX transcript with the YouTube transcript?": "Czy chcesz podmieni\u0107 bie\u017c\u0105c\u0105 transkrypcj\u0119 na nowsz\u0105 transkrypcj\u0119 z YouTube?",
-    "Do you want to upload your file before submitting?": "Czy chcesz wgra\u0107 sw\u00f3j plik przed wys\u0142aniem odpowiedzi?",
     "Does the name on your ID match your account name: %(fullName)s?": "Czy imi\u0119 i nazwisko na dokumencie zgadzaj\u0105 si\u0119 z danymi konta: %(fullName)s?",
     "Does the photo of you show your whole face?": "Czy na zdj\u0119ciu wida\u0107 ca\u0142\u0105 twoj\u0105 twarz?",
     "Don't see your picture? Make sure to allow your browser to use your camera when it asks for permission.": "Nie widzisz swojego zdj\u0119cia? Upewnij si\u0119, \u017ce zezwalasz swojej przegl\u0105darce na u\u017cycie kamerki, gdy pojawia si\u0119 pro\u015bba o zgod\u0119.",
@@ -470,7 +446,6 @@
     "Enable": "W\u0142\u0105cz",
     "Enable Cohorts": "W\u0142\u0105cz kohorty",
     "Enable Now": "W\u0142\u0105cz",
-    "Enable Weekly Highlight Emails": "W\u0142\u0105cz cotygodniowe e-maile podsumowuj\u0105ce",
     "Enabled": "W\u0142\u0105czone",
     "End My Exam": "Zako\u0144cz m\u00f3j egzamin",
     "Ends {end}": "Zako\u0144czy si\u0119 {end}",
@@ -498,7 +473,6 @@
     "Enter the page number you'd like to quickly navigate to.": "Podaj numer strony do kt\u00f3rej chcesz si\u0119 przenie\u015b\u0107.",
     "Enter the username or email address of each learner that you want to add as an exception.": "Wprowad\u017a nazw\u0119 u\u017cytkownika lub adres e-mail ka\u017cdego studenta, kt\u00f3rego chcesz doda\u0107 do listy wyj\u0105tk\u00f3w.",
     "Enter username or email": "Wprowad\u017a nazw\u0119 u\u017cytkownika lub adres e-mail",
-    "Enter your ": "Wprowad\u017a sw\u00f3j",
     "Entrance exam attempts is being reset for student '{student_id}'.": "Podej\u015bcia do egzaminu wst\u0119pnego s\u0105 resetowane dla studenta '{student_id}'.",
     "Entrance exam state is being deleted for student '{student_id}'.": "Stan egzaminu wst\u0119pnego dla studenta '{student_id}' jest usuwany.",
     "Error": "B\u0142\u0105d",
@@ -525,7 +499,6 @@
     "Error listing task history for this student and problem.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie generowania historii czynno\u015bci dla tego studenta i \u0107wiczenia.",
     "Error removing user": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie usuwania u\u017cytkownika",
     "Error resetting entrance exam attempts for student '{student_id}'. Make sure student identifier is correct.": "Wyst\u0105pi\u0142 b\u0142\u0105d przy zerowaniu podej\u015b\u0107 do egzaminu wst\u0119pnego dla studenta '{student_id}'. Upewnij si\u0119, \u017ce identyfikator studenta jest poprawny. ",
-    "Error resetting problem attempts for problem '<%= problem_id %>' and student '<%- student_id %>'. Make sure that the problem and student identifiers are complete and correct.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie resetowania podej\u015b\u0107 do \u0107wiczenia '<%= problem_id %>'  studenta '<%- student_id %>'. Upewnij si\u0119, \u017ce identyfikatory \u0107wiczenia i studenta s\u0105 kompletne i poprawne.",
     "Error retrieving grading configuration.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie pobierania konfiguracji ocen.",
     "Error sending email.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie wysy\u0142ania wiadomo\u015bci e-mail.",
     "Error starting a task to override score for problem '<%- problem_id %>' for student '<%- student_id %>'. Make sure that the the score and the problem and student identifiers are complete and correct.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie nadpisywania wyniku \u0107wiczenia '<%- problem_id %>' dla studenta '<%- student_id %>'. Upewnij si\u0119, \u017ce wynik, oraz identyfikatory \u0107wiczenia oraz studenta s\u0105 poprawne.",
@@ -555,7 +528,6 @@
     "February": "Luty",
     "Feedback available for selection.": "Komentarz zwrotny dost\u0119pny do wyboru.",
     "File Name": "Nazwa pliku",
-    "File type is not allowed.": "Ten typ pliku jest niedozwolony.",
     "File types can not be empty.": "Typy plik\u00f3w nie mog\u0105 by\u0107 puste.",
     "File upload succeeded": "Przesy\u0142anie pliku zako\u0144czone powodzeniem",
     "File {filename} exceeds maximum size of {maxFileSizeInMBs} MB": "Plik {filename} przekracza maksymalny dopuszczalny rozmiar {maxFileSizeInMBs} MB.",
@@ -628,7 +600,6 @@
     "If the subsection does not have a due date, learners always see their scores when they submit answers to assessments.": "Je\u015bli lekcja nie posiada terminu ko\u0144cowego, studenci zawsze zobacz\u0105 swoje wyniki po przes\u0142aniu odpowiedzi na zadania.",
     "If the unit was previously published and released to learners, any changes you made to the unit when it was hidden will now be visible to learners.": "Je\u015bli ten ekran zosta\u0142 wcze\u015bniej opublikowany i upubliczniony dla student\u00f3w, wszystkie zmiany, jakich dokona\u0142e\u015b kiedy ekran by\u0142 ukryty, b\u0119d\u0105 teraz widoczne dla student\u00f3w.",
     "If you do not yet have an account, use the button below to register.": "Je\u015bli nie posiadasz konta, u\u017cyj poni\u017cszego przycisku, aby si\u0119 zarejestrowa\u0107.",
-    "If you don't verify your identity now, you can still explore your course from your dashboard. You will receive periodic reminders from %(platformName)s to verify your identity.": "Je\u015bli nie potwierdzisz swojej to\u017csamo\u015bci ju\u017c teraz, wci\u0105\u017c mo\u017cesz uczestniczy\u0107 w kursie z poziomu pulpitu studenta. B\u0119dziesz otrzymywa\u0107 cykliczne powiadomienia od %(platformName)s z pro\u015bb\u0105 o poddanie si\u0119 weryfikacji to\u017csamo\u015bci.",
     "If you leave this page without saving or submitting your response, you will lose any work you have done on the response.": "Je\u017celi opu\u015bcisz t\u0119 stron\u0119 bez zapisania lub przes\u0142ania swojej odpowiedzi, stracisz ca\u0142\u0105 swoj\u0105 prac\u0119.",
     "If you leave this page without submitting your peer assessment, you will lose any work you have done.": "Je\u017celi opu\u015bcisz t\u0119 stron\u0119 bez przes\u0142ania zadania do oceny, stracisz ca\u0142\u0105 swoj\u0105 prac\u0119.",
     "If you leave this page without submitting your self assessment, you will lose any work you have done.": "Je\u017celi opu\u015bcisz t\u0119 stron\u0119 bez przes\u0142ania swojego zadania, stracisz ca\u0142\u0105 swoj\u0105 prac\u0119.",
@@ -777,7 +748,6 @@
     "New Address": "Nowy adres",
     "New enrollment mode:": "Nowy tryb uczestnictwa:",
     "Next": "Nast\u0119pny",
-    "Next Step: Confirm your identity": "Nast\u0119pny krok: potwierd\u017a swoj\u0105 to\u017csamo\u015b\u0107",
     "Next: %(nextStepTitle)s": "Nast\u0119pnie: %(nextStepTitle)s",
     "No Content Group": "Brak grupy tre\u015bci",
     "No EdX Timed Transcript": "Brak transkrypcji",
@@ -788,9 +758,7 @@
     "No description available": "Brak dost\u0119pnego opisu",
     "No posts matched your query.": "Brak wpis\u00f3w pasuj\u0105cych do zapytania.",
     "No prerequisite": "Brak wymagania wst\u0119pnego",
-    "No receipt available": "Brak dost\u0119pnego pokwitowania",
     "No results": "Brak wynik\u00f3w",
-    "No results found for \"%(query_string)s\". Please try searching again.": "Brak wynik\u00f3w dla \"%(query_string)s\". Spr\u00f3buj wyszuka\u0107 ponownie.",
     "No results found for {original_query}. Showing results for {suggested_query}.": "Brak wynik\u00f3w dla {original_query}. Wy\u015bwietlam wyniki dla {suggested_query}.",
     "No tasks currently running.": "Brak czynno\u015bci w toku.",
     "No transcript uploaded.": "Nie przes\u0142ano transkrypcji.",
@@ -848,7 +816,6 @@
     "Options for {license_name}": "Opcje dla licencji {license_name}",
     "Order Details": "Szczeg\u00f3\u0142y zam\u00f3wienia",
     "Order History": "Historia zam\u00f3wie\u0144",
-    "Order No.": "Nr zam\u00f3wienia",
     "Order Number": "Numer zam\u00f3wienia",
     "Organization": "Organizacja",
     "Organization ": "Organizacja",
@@ -872,7 +839,6 @@
     "Photo requirements:": "Wymagania wobec zdj\u0119\u0107:",
     "Photos don't meet the requirements?": "Zdj\u0119cia nie spe\u0142niaj\u0105 kt\u00f3rego\u015b warunku?",
     "Placeholder": "Zast\u0119pczy",
-    "Please Note": "Uwaga",
     "Please add a photo of the instructor (Note: only JPEG or PNG format supported)": "Prosz\u0119 doda\u0107 zdj\u0119cie prowadz\u0105cego (uwaga: obs\u0142ugiwane s\u0105 wy\u0142\u0105cznie formaty JPEG i PNG).",
     "Please add the institute where the instructor is associated": "Prosz\u0119 poda\u0107 wydzia\u0142 lub instytucj\u0119 prowadz\u0105cego",
     "Please add the instructor's biography": "Prosz\u0119 poda\u0107 profil prowadz\u0105cego",
@@ -880,7 +846,6 @@
     "Please add the instructor's title": "Prosz\u0119 poda\u0107 tytu\u0142 prowadz\u0105cego",
     "Please address the errors on this page first, and then save your progress.": "Zwr\u00f3\u0107 uwag\u0119 na b\u0142\u0119dy wskazane na tej stronie, a nast\u0119pnie zapisz sw\u00f3j post\u0119p.",
     "Please check the following validation feedbacks and reflect them in your course settings:": "Prosz\u0119 zapozna\u0107 si\u0119 z poni\u017cszymi komunikatami uwierzytelniania i nanie\u015b\u0107 stosowne zmiany do ustawie\u0144 kursu:",
-    "Please correct the outlined fields.": "Prosz\u0119 poprawi\u0107 zaznaczone pola.",
     "Please describe this image or agree that it has no contextual value by checking the checkbox.": "Prosz\u0119 opisa\u0107 ten obraz lub zaznaczy\u0107 okienko je\u015bli obraz nie posiada warto\u015bci kontekstowej.",
     "Please do not use any spaces in this field.": "Prosimy nie u\u017cywa\u0107 spacji w tym polu.",
     "Please do not use any spaces or special characters in this field.": "Prosimy nie u\u017cywa\u0107 spacji ani znak\u00f3w specjalnych.",
@@ -897,7 +862,6 @@
     "Please enter valid start date and time.": "Podaj poprawn\u0105 dat\u0119 i godzin\u0119 rozpocz\u0119cia.",
     "Please enter your %(field)s.": "Prosz\u0119 poda\u0107 %(field)s.",
     "Please follow the instructions here to upload a file elsewhere and link to it: {maxFileSizeRedirectUrl}": "Prosz\u0119 post\u0119powa\u0107 wed\u0142ug poni\u017cszej instrukcji w celu przes\u0142ania pliku w innym miejscu i wykorzystania odno\u015bnika: {maxFileSizeRedirectUrl}",
-    "Please print this page for your records; it serves as your receipt. You will also receive an email with the same information.": "Prosz\u0119 zapisa\u0107 lub wydrukowa\u0107 t\u0119 stron\u0119, gdy\u017c s\u0142u\u017cy ona za rachunek. Ten sam rachunek otrzymasz r\u00f3wnie\u017c drog\u0105 poczty elektronicznej.",
     "Please provide a description of the link destination.": "Prosz\u0119 poda\u0107 opis miejsca do kt\u00f3rego przekierowuje odno\u015bnik.",
     "Please provide a valid URL.": "Prosz\u0119 poda\u0107 poprawny URL",
     "Please specify a reason.": "Prosz\u0119 poda\u0107 pow\u00f3d.",
@@ -930,7 +894,6 @@
     "Processing Re-run Request": "Przetwarzanie \u017c\u0105dania wznowienia",
     "Proctored": "Nadzorowany",
     "Proctored Exam": "Egzamin nadzorowany",
-    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "Egzaminy nadzorowane s\u0105 egzaminami z limitem czasu i obejmuj\u0105 nagrywanie filmowe ka\u017cdego studenta w trakcie przebiegu jego egzaminu. Filmy mo\u017cna nast\u0119pnie sprawdzi\u0107 i upewni\u0107 si\u0119, \u017ce studenci stosowali si\u0119 do zasad egzaminacyjnych.",
     "Product Name": "Nazwa produktu",
     "Professional Certificate for {courseName}": "Certyfikat Edukacji Specjalistycznej kursu {courseName}",
     "Professional Education": "Edukacja Specjalistyczna",
@@ -1117,7 +1080,6 @@
     "Status": "Status",
     "Status of Your Response": "Status twojej odpowiedzi",
     "Student": "Student",
-    "Student Removed from certificate white list successfully.": "Student zosta\u0142 pomy\u015blnie usuni\u0119ty z bia\u0142ej listy certyfikat\u00f3w.",
     "Student email or username": "Nazwa u\u017cytkownika lub adres e-mail studenta",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Add to Exception List\" button.": "Pole nazwa u\u017cytkownika/adres e-mail studenta jest wymagane i nie mo\u017ce pozosta\u0107 puste. Uzupe\u0142nij brakuj\u0105ce informacje, a nast\u0119pnie kliknij \"Dodaj do listy wyj\u0105tk\u00f3w\".",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Invalidate Certificate\" button.": "Pole nazwa u\u017cytkownika/adres e-mail studenta jest wymagane i nie mo\u017ce pozosta\u0107 puste. Uzupe\u0142nij brakuj\u0105ce informacje, a nast\u0119pnie kliknij \"Uniewa\u017cnij certyfikat\".",
@@ -1181,7 +1143,6 @@
     "Textbook information": "Informacje o podr\u0119czniku",
     "Thank you for submitting your financial assistance application for {course_name}! You can expect a response in 2-4 business days.": "Dzi\u0119kujemy za twoje zg\u0142oszenie do wsparcia finansowego dla kursu {course_name}. Mo\u017cesz spodziewa\u0107 si\u0119 odpowiedzi w ci\u0105gu 2-4 dni roboczych.",
     "Thank you for submitting your photos. We will review them shortly. You can now sign up for any %(platformName)s course that offers verified certificates. Verification is good for one year. After one year, you must submit photos for verification again.": "Dzi\u0119kujemy za przes\u0142anie twoich zdj\u0119\u0107. Wkr\u00f3tce dokonamy ich sprawdzenia. Mo\u017cesz si\u0119 teraz zapisa\u0107 na dowolny kurs w %(platformName)s, kt\u00f3ry oferuje potwierdzone certyfikaty. Weryfikacja to\u017csamo\u015bci jest wa\u017cna przez okres jednego roku. Po tym okresie konieczne b\u0119dzie ponowne przes\u0142anie zdj\u0119\u0107 do cel\u00f3w potwierdzenia to\u017csamo\u015bci.",
-    "Thank you! We have received your payment for {courseName}.": "Dzi\u0119kujemy! Otrzymali\u015bmy twoj\u0105 op\u0142at\u0119 za kurs {courseName}.",
     "Thanks for returning to verify your ID in: {courseName}": "Dzi\u0119kujemy za powr\u00f3t do procedury potwierdzenia to\u017csamo\u015bci dla potrzeb kursu {courseName}",
     "The assignment type must have a name.": "Typ zadania musi posiada\u0107 nazw\u0119.",
     "The certificate available date must be later than the course end date.": "Data udost\u0119pnienia certyfikatu musi by\u0107 p\u00f3\u017aniejsza od daty zako\u0144czenia kursu.",
@@ -1222,7 +1183,6 @@
     "The post you selected has been deleted.": "Wybrany przez ciebie wpis zosta\u0142 usuni\u0119ty.",
     "The published branch version, {published}, was reset to the draft branch version, {draft}.": "Opublikowana wersja ga\u0142\u0119zi {published} zosta\u0142a zresetowana do wersji roboczej ga\u0142\u0119zi {draft}.",
     "The raw error message is:": "Surowy komunikat b\u0142\u0119du:",
-    "The refund deadline for this course has passed,so you will not receive a refund.": "Termin mo\u017cliwego zwrotu pieni\u0119dzy za ten kurs ju\u017c min\u0105\u0142, wi\u0119c nie mo\u017cesz otrzyma\u0107 zwrotu pieni\u0119dzy.",
     "The selected content group does not exist": "Wybrana grupa tre\u015bci nie istnieje",
     "The selected image must be larger than {minFileSizeInKB}.": "Wybrany obrazek musi wa\u017cy\u0107 wi\u0119cej ni\u017c {minFileSizeInKB}.",
     "The selected image must be smaller than {maxFileSizeInMB}.": "Wybrany obrazek musi wa\u017cy\u0107 mniej ni\u017c {maxFileSizeInMB}.",
@@ -1284,7 +1244,6 @@
     "This course has automatic cohorting enabled for verified track learners, but the required cohort does not exist. You must create a manually-assigned cohort named '{verifiedCohortName}' for the feature to work.": "Ten kurs wykorzystuje system automatycznych kohort dla student\u00f3w \u015bcie\u017cki zweryfikowanej, jednak wymagana kohorta nie istnieje. Musisz utworzy\u0107 r\u0119cznie przydzielon\u0105 kohort\u0119 o nazwie '{verifiedCohortName}'.",
     "This course uses automatic cohorting for verified track learners. You cannot disable cohorts, and you cannot rename the manual cohort named '{verifiedCohortName}'. To change the configuration for verified track cohorts, contact your edX partner manager.": "Ten kurs wykorzystuje system automatycznych kohort dla student\u00f3w \u015bcie\u017cki zweryfikowanej. Nie mo\u017cesz wy\u0142\u0105czy\u0107 kohort, ani zmieni\u0107 nazwy kohorty '{verifiedCohortName}'. Aby zmieni\u0107 konfiguracj\u0119 kohort \u015bcie\u017cki zweryfikowanej, skontaktuj si\u0119 ze swoim Opiekunem Partnera.",
     "This discussion could not be loaded. Refresh the page and try again.": "Nie uda\u0142o si\u0119 wczyta\u0107 dyskusji. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
-    "This feature is currently in testing. Course teams can enter highlights, but learners will not receive email messages.": "Ta funkcja znajduje si\u0119 obecnie w fazie test\u00f3w. Kadry kurs\u00f3w mog\u0105 wprowadza\u0107 szczeg\u00f3\u0142y, jednak studenci nie otrzymaj\u0105 wiadomo\u015bci e-mail.",
     "This feedback could not be submitted.": "Nie uda\u0142o si\u0119 wys\u0142a\u0107 tej opinii.",
     "This file type is not supported. Supported file type is {supportedFileFormat}.": "Ten format pliku jest niewspierany. Wspieranym formatem plik\u00f3w jest {supportedFileFormat}.",
     "This group controls access to:": "Ta grupa odpowiada za dost\u0119p do:",
@@ -1305,7 +1264,6 @@
     "This post could not be unflagged for abuse. Refresh the page and try again.": "Nie uda\u0142o si\u0119 cofn\u0105\u0107 oflagowania tego wpisu jako nieodpowiedniego. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This post could not be unpinned. Refresh the page and try again.": "Nie uda\u0142o si\u0119 odpi\u0105\u0107 tego wpisu. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This problem could not be saved.": "Nie uda\u0142o si\u0119 zapisa\u0107 \u0107wiczenia.",
-    "This problem has already been released. Any changes will apply only to future assessments.": "To \u0107wiczenie zosta\u0142o ju\u017c opublikowane. Jakiekolwiek zmiany b\u0119d\u0105 obowi\u0105zywa\u0107 tylko dla przysz\u0142ych ocen.",
     "This response could not be marked as an answer. Refresh the page and try again.": "Nie uda\u0142o si\u0119 oznaczy\u0107 tej odpowiedzi jako udzielonej odpowiedzi. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This response could not be marked as endorsed. Refresh the page and try again.": "Nie uda\u0142o si\u0119 oznaczy\u0107 tej odpowiedzi jako zatwierdzonej. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This response could not be saved.": "Nie uda\u0142o si\u0119 zapisa\u0107 tej odpowiedzi.",
@@ -1481,7 +1439,6 @@
     "Visible to Staff Only": "Widoczna tylko dla kadry",
     "Vote for good posts and responses": "G\u0142osuj na dobre wpisy i odpowiedzi",
     "Waiting": "Oczekuje",
-    "Want to confirm your identity later?": "Czy chcesz potwierdzi\u0107 swoj\u0105 to\u017csamo\u015b\u0107 p\u00f3\u017aniej?",
     "Warning": "Ostrze\u017cenie",
     "Warnings": "Ostrze\u017cenia",
     "We ask you to activate your account to ensure it is really you creating the account and to prevent fraud.": "Prosimy ci\u0119 o aktywacj\u0119 konta w celu potwierdzenia, \u017ce to faktycznie ty pr\u00f3bujesz utworzy\u0107 konto oraz \u017ce tw\u00f3j adres e-mail nie zawiera b\u0142\u0119du.",
@@ -1496,7 +1453,6 @@
     "We've sent a message to {email}. Click the link in the message to reset your password. Didn't receive the message? Contact {anchorStart}technical support{anchorEnd}.": "Na adres {email} zosta\u0142a wys\u0142ana wiadomo\u015b\u0107. Kliknij w odno\u015bnik w wiadomo\u015bci, aby zresetowa\u0107 has\u0142o. Je\u015bli wiadomo\u015b\u0107 nie dotar\u0142a, skontaktuj si\u0119 z {anchorStart}pomoc\u0105 techniczn\u0105{anchorEnd}.",
     "Web:": "Sie\u0107:",
     "Webcam": "Kamerka internetowa",
-    "Weekly Highlight Emails": "Cotygodniowe e-maile podsumowuj\u0105ce",
     "Weight of Total Grade": "Waga w ocenie ko\u0144cowej",
     "What You Need for Verification": "Czego potrzebujesz do potwierdzenia to\u017csamo\u015bci",
     "What does %(platformName)s do with this photo?": "W jaki spos\u00f3b %(platformName)s dba o bezpiecze\u0144stwo danych?",
@@ -1528,7 +1484,6 @@
     "You can pay now even if you don't have the following items available, but you will need to have these by {date} to qualify to earn a Verified Certificate.": "Mo\u017cesz ju\u017c teraz dokona\u0107 zap\u0142aty nie dope\u0142niwszy jeszcze wszystkich formalno\u015bci, jednak w celu kwalifikowania si\u0119 do potwierdzonego certyfikatu, musisz zd\u0105\u017cy\u0107 ze spe\u0142nieniem wymaga\u0144 przed {date}.",
     "You can pay now even if you don't have the following items available, but you will need to have these to qualify to earn a Verified Certificate.": "Mo\u017cesz ju\u017c teraz dokona\u0107 zap\u0142aty nie dope\u0142niwszy jeszcze wszystkich formalno\u015bci, jednak w celu kwalifikowania si\u0119 do potwierdzonego certyfikatu, musisz spe\u0142ni\u0107 wszystkie wymagania.",
     "You can remove members from this team, especially if they have not participated in the team's activity.": "Mo\u017cesz usun\u0105\u0107 poszczeg\u00f3lnych cz\u0142onk\u00f3w zespo\u0142u, szczeg\u00f3lnie je\u015bli nie bior\u0105 aktywnego udzia\u0142u.",
-    "You can upload files with these file types: ": "Mo\u017cesz wgra\u0107 pliki o nast\u0119puj\u0105cych formatach:",
     "You can use your {accountName} account to sign in to your {platformName} account.": "Mo\u017cesz u\u017cywa\u0107 konta {accountName} do logowania si\u0119 do swojego konta w {platformName}.",
     "You can view your information or unlink from {enterprise_name} anytime in your Account Settings.": "Mo\u017cesz przejrze\u0107 swoje dane lub od\u0142\u0105czy\u0107 konto {enterprise_name} z poziomu ustawie\u0144 w swoim profilu.",
     "You cannot view the course as a student or beta tester before the course release date.": "Nie mo\u017cesz zobaczy\u0107 kursu jako student lub beta tester przed dat\u0105 udost\u0119pnienia kursu.",
@@ -1540,9 +1495,7 @@
     "You did not select a content group": "Nie wybrano grupy tre\u015bci",
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "Wygl\u0105da na to, \u017ce nie posiadasz zainstalowanego flasha. Zainstaluj flasha, aby kontynuowa\u0107 swoj\u0105 weryfikacj\u0119.",
     "You don't seem to have a webcam connected.": "Wygl\u0105da na to, \u017ce nie masz pod\u0142\u0105czonej kamery internetowej.",
-    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "Doda\u0142e\u015b kryterium. Musisz teraz wybra\u0107 opcj\u0119 dla kryterium z poziomu Szkolenia Studenta. Aby to zrobi\u0107, kliknij na Ustawienia.",
     "You have already verified your ID!": "Ju\u017c potwierdzi\u0142e\u015b swoj\u0105 to\u017csamo\u015b\u0107!",
-    "You have been logged out of your edX account. Click Okay to log in again now. Click Cancel to stay on this page (you must log in again to save your work).": "Zosta\u0142e\u015b wylogowany ze swojego konta. Kliknij OK, aby zalogowa\u0107 si\u0119 ponownie. Kliknij anuluj, aby pozosta\u0107 na tej stronie (musisz zalogowa\u0107 si\u0119 ponownie, aby zapisa\u0107 swoj\u0105 prac\u0119).",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "Usun\u0105\u0142e\u015b kryterium. Tak wi\u0119c kryterium zosta\u0142o usuni\u0119te z przyk\u0142adowych odpowiedzi w Szkoleniu Studenta.",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "Usun\u0105\u0142e\u015b wszystkie opcje dla tego kryterium. Tak wi\u0119c kryterium zosta\u0142o usuni\u0119te z przyk\u0142adowych odpowiedzi w Szkoleniu Studenta.",
     "You have deleted an option. That option has been removed from its criterion in the sample responses in the Learner Training step. You might have to select a new option for the criterion.": "Usun\u0105\u0142e\u015b opcj\u0119. Ta opcja zosta\u0142a usuni\u0119ta z kryterium w przyk\u0142adowych odpowiedziach w Szkoleniu Studenta. By\u0107 mo\u017ce musisz teraz wybra\u0107 now\u0105 opcj\u0119 dla tego kryterium.",
@@ -1552,8 +1505,8 @@
     "You have not created any certificates yet.": "Nie stworzy\u0142e\u015b jeszcze \u017cadnych certyfikat\u00f3w.",
     "You have not created any content groups yet.": "Nie stworzy\u0142e\u015b jeszcze \u017cadnej grupy tre\u015bci.",
     "You have not created any group configurations yet.": "Nie stworzy\u0142e\u015b jeszcze \u017cadnych konfiguracji grupy.",
-    "You have selected an action, and you haven't made any changes on individual fields. You're probably looking for the Go button rather than the Save button.": "Wybrano akcj\u0119, lecz nie dokonano \u017cadnych zmian w polach. Prawdopodobnie szukasz przycisku \u201eWykonaj\u201d, a nie \u201eZapisz\u201d.",
-    "You have selected an action, but you haven't saved your changes to individual fields yet. Please click OK to save. You'll need to re-run the action.": "Wybrano akcj\u0119, lecz cz\u0119\u015b\u0107 zmian w polach nie zosta\u0142a zachowana. Kliknij OK, aby zapisa\u0107. Aby wykona\u0107 akcj\u0119, nale\u017cy j\u0105 ponownie uruchomi\u0107.",
+    "You have selected an action, and you haven\u2019t made any changes on individual fields. You\u2019re probably looking for the Go button rather than the Save button.": "Wybrano akcj\u0119, lecz nie dokonano \u017cadnych zmian w polach. Prawdopodobnie szukasz przycisku \u201eWykonaj\u201d, a nie \u201eZapisz\u201d.",
+    "You have selected an action, but you haven\u2019t saved your changes to individual fields yet. Please click OK to save. You\u2019ll need to re-run the action.": "Wybrano akcj\u0119, lecz cz\u0119\u015b\u0107 zmian w polach nie zosta\u0142a zachowana. Kliknij OK, aby zapisa\u0107. Aby wykona\u0107 akcj\u0119, nale\u017cy j\u0105 ponownie uruchomi\u0107.",
     "You have successfully signed into %(currentProvider)s, but your %(currentProvider)s account does not have a linked %(platformName)s account. To link your accounts, sign in now using your %(platformName)s password.": "Pomy\u015blnie zalogowa\u0142e\u015b si\u0119 do %(currentProvider)s, ale twoje konto %(currentProvider)s nie jest po\u0142\u0105czone z kontem w %(platformName)s. Aby po\u0142\u0105czy\u0107 konta, zaloguj si\u0119 u\u017cywaj\u0105c swojego has\u0142a w %(platformName)s.",
     "You have successfully updated your goal.": "Pomy\u015blnie zaktualizowano cel nauki.",
     "You have unsaved changes on individual editable fields. If you run an action, your unsaved changes will be lost.": "Zmiany w niekt\u00f3rych polach nie zosta\u0142y zachowane. Po wykonaniu akcji, zmiany te zostan\u0105 utracone.",
@@ -1568,7 +1521,6 @@
     "You must sign out and sign back in before your language changes take effect.": "Musisz si\u0119 wylogowa\u0107 i ponownie zalogowa\u0107, aby zmiany j\u0119zykowe zacz\u0119\u0142y obowi\u0105zywa\u0107.",
     "You must specify a name for the cohort": "Musisz okre\u015bli\u0107 nazw\u0119 tej kohorty",
     "You must specify your birth year before you can share your full profile. To specify your birth year, go to the {account_settings_page_link}": "Przed udost\u0119pnieniem swojego pe\u0142nego profilu musisz poda\u0107 rok urodzenia. Aby wskaza\u0107 sw\u00f3j rok urodzenia, odwied\u017a {account_settings_page_link}",
-    "You need to activate your account before you can enroll in courses. Check your inbox for an activation email.": "Aby m\u00f3c zarejestrowa\u0107 si\u0119 na kursy, musisz najpierw aktywowa\u0107 swoje konto. Sprawd\u017a poczt\u0119 i odnajd\u017a e-mail z odno\u015bnikiem aktywacyjnym.",
     "You need to activate your account before you can enroll in courses. Check your inbox for an activation email. After you complete activation you can return and refresh this page.": "Przed zapisaniem si\u0119 na pierwszy kurs musisz aktywowa\u0107 swoje konto. Sprawd\u017a poczt\u0119 e-mail i znajd\u017a wiadomo\u015b\u0107 z instrukcj\u0105 aktywacji. Po jej dokonaniu wr\u00f3\u0107 i od\u015bwie\u017c t\u0119 stron\u0119.",
     "You receive messages from {platform_name} and course teams at this address.": "Na ten adres otrzymujesz wiadomo\u015bci z {platform_name} i od prowadz\u0105cych kursy.",
     "You will be refunded the amount you paid.": "Zap\u0142acona kwota zostanie zwr\u00f3cona.",
@@ -1618,6 +1570,18 @@
     "Zoom In": "Powi\u0119ksz",
     "Zoom Out": "Pomniejsz",
     "[no tags]": "[brak tag\u00f3w]",
+    "abbrev. month April\u0004Apr": "Kwi",
+    "abbrev. month August\u0004Aug": "Sie",
+    "abbrev. month December\u0004Dec": "Gru",
+    "abbrev. month February\u0004Feb": "Lut",
+    "abbrev. month January\u0004Jan": "Sty",
+    "abbrev. month July\u0004Jul": "Lip",
+    "abbrev. month June\u0004Jun": "Cze",
+    "abbrev. month March\u0004Mar": "Mar",
+    "abbrev. month May\u0004May": "Maj",
+    "abbrev. month November\u0004Nov": "Lis",
+    "abbrev. month October\u0004Oct": "Pa\u017a",
+    "abbrev. month September\u0004Sep": "Wrz",
     "and others": "i inni",
     "anonymous": "anonimowy",
     "bytes": "bajt\u00f3w",
@@ -1744,34 +1708,28 @@
     "{selectedProvider} credentials saved": "Dane {selectedProvider} zapisane",
     "{sessionDates} (Open until {enrollmentEnd})": "{sessionDates} (Otwarte do {enrollmentEnd})",
     "{sessionDates} - Currently Selected": "{sessionDates} - obecnie wybrana",
-    "{total_results} result": [
-      "{total_results} wynik",
-      "{total_results} wyniki",
-      "{total_results} wynik\u00f3w",
-      "{total_results} wynik\u00f3w"
-    ],
     "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}": "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}",
     "{type} Progress": "{type} - post\u0119p",
     "\u2026": "\u2026"
   };
-  for (var key in newcatalog) {
+  for (const key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      var value = django.catalog[msgid];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[msgid];
+      if (typeof value === 'undefined') {
         return msgid;
       } else {
-        return (typeof(value) == 'string') ? value : value[0];
+        return (typeof value === 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      var value = django.catalog[singular];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[singular];
+      if (typeof value === 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1781,16 +1739,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      var value = django.gettext(context + '\x04' + msgid);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.gettext(context + '\x04' + msgid);
+      if (value.includes('\x04')) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.includes('\x04')) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1813,7 +1771,6 @@
       "%d.%m.%Y %H:%M:%S",
       "%d.%m.%Y %H:%M:%S.%f",
       "%d.%m.%Y %H:%M",
-      "%d.%m.%Y",
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
@@ -1843,8 +1800,8 @@
   };
 
     django.get_format = function(format_type) {
-      var value = django.formats[format_type];
-      if (typeof(value) == 'undefined') {
+      const value = django.formats[format_type];
+      if (typeof value === 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1863,6 +1820,5 @@
 
     django.jsi18n_initialized = true;
   }
-
-}(this));
+};
 

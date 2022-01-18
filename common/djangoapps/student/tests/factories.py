@@ -5,16 +5,14 @@ from datetime import datetime
 from uuid import uuid4
 
 import factory
-import six
 from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.test.client import RequestFactory
 from factory.django import DjangoModelFactory
 from opaque_keys.edx.keys import CourseKey
 from pytz import UTC
 
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
-from student.models import (
+from common.djangoapps.student.models import (
     AccountRecovery,
     CourseAccessRole,
     CourseEnrollment,
@@ -26,22 +24,28 @@ from student.models import (
     UserProfile,
     UserStanding
 )
-
-# Factories are self documenting
+from common.djangoapps.student.roles import GlobalStaff
+from common.djangoapps.student.roles import CourseBetaTesterRole
+from common.djangoapps.student.roles import CourseInstructorRole
+from common.djangoapps.student.roles import CourseStaffRole
+from common.djangoapps.student.roles import OrgInstructorRole
+from common.djangoapps.student.roles import OrgStaffRole
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 
 TEST_PASSWORD = 'test'
 
 
-class GroupFactory(DjangoModelFactory):
-    class Meta(object):
+class GroupFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = Group
         django_get_or_create = ('name', )
 
-    name = factory.Sequence(u'group{0}'.format)
+    name = factory.Sequence('group{}'.format)
 
 
-class UserStandingFactory(DjangoModelFactory):
-    class Meta(object):
+class UserStandingFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = UserStanding
 
     user = None
@@ -49,39 +53,38 @@ class UserStandingFactory(DjangoModelFactory):
     changed_by = None
 
 
-class UserProfileFactory(DjangoModelFactory):
-    class Meta(object):
+class UserProfileFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = UserProfile
         django_get_or_create = ('user', )
 
     user = None
-    name = factory.LazyAttribute(u'{0.user.first_name} {0.user.last_name}'.format)
+    name = factory.LazyAttribute('{0.user.first_name} {0.user.last_name}'.format)
     level_of_education = None
-    gender = u'm'
+    gender = 'm'
     mailing_address = None
-    goals = u'Learn a lot'
-    allow_certificate = True
+    goals = 'Learn a lot'
 
 
-class RegistrationFactory(DjangoModelFactory):
-    class Meta(object):
+class RegistrationFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = Registration
 
     user = None
-    activation_key = six.text_type(uuid4().hex)
+    activation_key = str(uuid4().hex)
 
 
-class UserFactory(DjangoModelFactory):
-    class Meta(object):
+class UserFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = User
         django_get_or_create = ('email', 'username')
 
     _DEFAULT_PASSWORD = 'test'
 
-    username = factory.Sequence(u'robot{0}'.format)
-    email = factory.Sequence(u'robot+test+{0}@edx.org'.format)
+    username = factory.Sequence('robot{}'.format)
+    email = factory.Sequence('robot+test+{}@edx.org'.format)
     password = factory.PostGenerationMethodCall('set_password', _DEFAULT_PASSWORD)
-    first_name = factory.Sequence(u'Robot{0}'.format)
+    first_name = factory.Sequence('Robot{}'.format)
     last_name = 'Test'
     is_staff = False
     is_active = True
@@ -100,19 +103,29 @@ class UserFactory(DjangoModelFactory):
             return None
 
     @factory.post_generation
-    def groups(self, create, extracted, **kwargs):
+    def groups(self, create, extracted, **kwargs):  # lint-amnesty, pylint: disable=missing-function-docstring, unused-argument
         if extracted is None:
             return
 
-        if isinstance(extracted, six.string_types):
+        if isinstance(extracted, str):
             extracted = [extracted]
 
         for group_name in extracted:
-            self.groups.add(GroupFactory.simple_generate(create, name=group_name))
+            self.groups.add(GroupFactory.simple_generate(create, name=group_name))  # lint-amnesty, pylint: disable=no-member
+
+
+class RequestFactoryNoCsrf(RequestFactory):
+    """
+    RequestFactory, which disables csrf checks.
+    """
+    def request(self, **kwargs):
+        request = super().request(**kwargs)
+        setattr(request, '_dont_enforce_csrf_checks', True)  # pylint: disable=literal-used-as-attribute
+        return request
 
 
 class AnonymousUserFactory(factory.Factory):
-    class Meta(object):
+    class Meta:
         model = AnonymousUser
 
 
@@ -124,8 +137,8 @@ class SuperuserFactory(UserFactory):
     is_superuser = True
 
 
-class CourseEnrollmentFactory(DjangoModelFactory):
-    class Meta(object):
+class CourseEnrollmentFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = CourseEnrollment
 
     user = factory.SubFactory(UserFactory)
@@ -147,7 +160,7 @@ class CourseEnrollmentFactory(DjangoModelFactory):
                 # foreign key constraint to CourseEnrollment.
                 del kwargs['course_id']
 
-                if isinstance(course_id, six.string_types):
+                if isinstance(course_id, str):
                     course_id = CourseKey.from_string(course_id)
                     course_kwargs.setdefault('id', course_id)
 
@@ -173,8 +186,8 @@ class CourseEnrollmentCelebrationFactory(DjangoModelFactory):
     enrollment = factory.SubFactory(CourseEnrollmentFactory)
 
 
-class CourseAccessRoleFactory(DjangoModelFactory):
-    class Meta(object):
+class CourseAccessRoleFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = CourseAccessRole
 
     user = factory.SubFactory(UserFactory)
@@ -182,8 +195,8 @@ class CourseAccessRoleFactory(DjangoModelFactory):
     role = 'TestRole'
 
 
-class CourseEnrollmentAllowedFactory(DjangoModelFactory):
-    class Meta(object):
+class CourseEnrollmentAllowedFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = CourseEnrollmentAllowed
 
     email = 'test@edx.org'
@@ -197,34 +210,115 @@ class PendingEmailChangeFactory(DjangoModelFactory):
     new_email: sequence of new+email+{}@edx.org
     activation_key: sequence of integers, padded to 30 characters
     """
-    class Meta(object):
+    class Meta:
         model = PendingEmailChange
 
     user = factory.SubFactory(UserFactory)
-    new_email = factory.Sequence(u'new+email+{0}@edx.org'.format)
-    activation_key = factory.Sequence(u'{:0<30d}'.format)
+    new_email = factory.Sequence('new+email+{}@edx.org'.format)
+    activation_key = factory.Sequence('{:0<30d}'.format)
 
 
 class ContentTypeFactory(DjangoModelFactory):
-    class Meta(object):
+    class Meta:
         model = ContentType
 
     app_label = factory.Faker('app_name')
 
 
-class PermissionFactory(DjangoModelFactory):
-    class Meta(object):
+class PermissionFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = Permission
 
     codename = factory.Faker('codename')
     content_type = factory.SubFactory(ContentTypeFactory)
 
 
-class AccountRecoveryFactory(DjangoModelFactory):
-    class Meta(object):
+class AccountRecoveryFactory(DjangoModelFactory):  # lint-amnesty, pylint: disable=missing-class-docstring
+    class Meta:
         model = AccountRecovery
         django_get_or_create = ('user',)
 
     user = None
-    secondary_email = factory.Sequence(u'robot+test+recovery+{0}@edx.org'.format)
+    secondary_email = factory.Sequence('robot+test+recovery+{}@edx.org'.format)
     is_active = True
+
+
+class BetaTesterFactory(UserFactory):
+    """
+    Given a course Location, returns a User object with beta-tester
+    permissions for `course`.
+    """
+    last_name = 'Beta-Tester'
+
+    @factory.post_generation
+    def course_key(self, _create, extracted, **kwargs):
+        if extracted is None:
+            raise ValueError('Must specify a CourseKey for a beta-tester user')
+        CourseBetaTesterRole(extracted).add_users(self)
+
+
+class GlobalStaffFactory(UserFactory):
+    """
+    Returns a User object with global staff access
+    """
+    last_name = 'GlobalStaff'
+
+    @factory.post_generation
+    def set_staff(self, _create, _extracted, **kwargs):
+        GlobalStaff().add_users(self)
+
+
+class InstructorFactory(UserFactory):
+    """
+    Given a course Location, returns a User object with instructor
+    permissions for `course`.
+    """
+    last_name = 'Instructor'
+
+    @factory.post_generation
+    def course_key(self, _create, extracted, **kwargs):
+        if extracted is None:
+            raise ValueError('Must specify a CourseKey for a course instructor user')
+        CourseInstructorRole(extracted).add_users(self)
+
+
+class OrgInstructorFactory(UserFactory):
+    """
+    Given a course Location, returns a User object with org-instructor
+    permissions for `course`.
+    """
+    last_name = 'Org-Instructor'
+
+    @factory.post_generation
+    def course_key(self, _create, extracted, **kwargs):
+        if extracted is None:
+            raise ValueError('Must specify a CourseKey for an org-instructor user')
+        OrgInstructorRole(extracted.org).add_users(self)
+
+
+class OrgStaffFactory(UserFactory):
+    """
+    Given a course Location, returns a User object with org-staff
+    permissions for `course`.
+    """
+    last_name = 'Org-Staff'
+
+    @factory.post_generation
+    def course_key(self, _create, extracted, **kwargs):
+        if extracted is None:
+            raise ValueError('Must specify a CourseKey for an org-staff user')
+        OrgStaffRole(extracted.org).add_users(self)
+
+
+class StaffFactory(UserFactory):
+    """
+    Given a course Location, returns a User object with staff
+    permissions for `course`.
+    """
+    last_name = 'Staff'
+
+    @factory.post_generation
+    def course_key(self, _create, extracted, **kwargs):
+        if extracted is None:
+            raise ValueError('Must specify a CourseKey for a course staff user')
+        CourseStaffRole(extracted).add_users(self)

@@ -12,43 +12,44 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from edx_django_utils import monitoring as monitoring_utils
+from edx_django_utils.plugins import get_plugins_view_context
+from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace
 from opaque_keys.edx.keys import CourseKey
 from pytz import UTC
-from six import iteritems, text_type
 
-import track.views
-from bulk_email.api import is_bulk_email_feature_enabled
-from bulk_email.models import Optout
-from course_modes.models import CourseMode
-from edxmako.shortcuts import render_to_response, render_to_string
-from entitlements.models import CourseEntitlement
+from lms.djangoapps.bulk_email.api import is_bulk_email_feature_enabled
+from lms.djangoapps.bulk_email.models import Optout
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.edxmako.shortcuts import render_to_response, render_to_string
+from common.djangoapps.entitlements.models import CourseEntitlement
 from lms.djangoapps.commerce.utils import EcommerceService
 from lms.djangoapps.courseware.access import has_access
-from lms.djangoapps.experiments.utils import get_dashboard_course_info
+from lms.djangoapps.experiments.utils import get_dashboard_course_info, get_experiment_user_metadata_context
 from lms.djangoapps.verify_student.services import IDVerificationService
+from openedx.core.djangoapps.agreements.toggles import is_integrity_signature_enabled
 from openedx.core.djangoapps.catalog.utils import (
     get_programs,
     get_pseudo_session_for_entitlement,
     get_visible_sessions_for_entitlement
 )
 from openedx.core.djangoapps.credit.email_utils import get_credit_provider_attribute_values, make_providers_strings
-from openedx.core.djangoapps.plugins import constants as plugin_constants
-from openedx.core.djangoapps.plugins.plugin_contexts import get_plugins_view_context
+from openedx.core.djangoapps.plugins.constants import ProjectType
 from openedx.core.djangoapps.programs.models import ProgramsApiConfig
 from openedx.core.djangoapps.programs.utils import ProgramDataExtender, ProgramProgressMeter
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.user_api.accounts.utils import is_secondary_email_feature_enabled
 from openedx.core.djangoapps.util.maintenance_banner import add_maintenance_banner
-from openedx.core.djangoapps.waffle_utils import WaffleFlag, WaffleFlagNamespace
 from openedx.core.djangolib.markup import HTML, Text
-from openedx.features.enterprise_support.api import get_dashboard_consent_notification
-from shoppingcart.models import DonationConfiguration
-from student.api import COURSE_DASHBOARD_PLUGIN_VIEW_NAME
-from student.helpers import cert_info, check_verify_status_by_course, get_resume_urls_for_enrollments
-from student.models import (
+from openedx.features.enterprise_support.api import (
+    get_dashboard_consent_notification,
+    get_enterprise_learner_portal_context,
+)
+from common.djangoapps.student.api import COURSE_DASHBOARD_PLUGIN_VIEW_NAME
+from common.djangoapps.student.helpers import cert_info, check_verify_status_by_course, get_resume_urls_for_enrollments
+from common.djangoapps.student.models import (
     AccountRecovery,
     CourseEnrollment,
     CourseEnrollmentAttribute,
@@ -56,12 +57,12 @@ from student.models import (
     PendingSecondaryEmailChange,
     UserProfile
 )
-from util.milestones_helpers import get_pre_requisite_courses_not_completed
-from xmodule.modulestore.django import modulestore
+from common.djangoapps.util.milestones_helpers import get_pre_requisite_courses_not_completed
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger("edx.student")
 
-experiments_namespace = WaffleFlagNamespace(name=u'student.experiments')
+experiments_namespace = LegacyWaffleFlagNamespace(name='student.experiments')
 
 
 def get_org_black_and_whitelist_for_site():
@@ -109,48 +110,7 @@ def _get_recently_enrolled_courses(course_enrollments):
     ]
 
 
-def _allow_donation(course_modes, course_id, enrollment):
-    """
-    Determines if the dashboard will request donations for the given course.
-
-    Check if donations are configured for the platform, and if the current course is accepting donations.
-
-    Args:
-        course_modes (dict): Mapping of course ID's to course mode dictionaries.
-        course_id (str): The unique identifier for the course.
-        enrollment(CourseEnrollment): The enrollment object in which the user is enrolled
-
-    Returns:
-        True if the course is allowing donations.
-
-    """
-    if course_id not in course_modes:
-        flat_unexpired_modes = {
-            text_type(course_id): [mode for mode in modes]
-            for course_id, modes in iteritems(course_modes)
-        }
-        flat_all_modes = {
-            text_type(course_id): [mode.slug for mode in modes]
-            for course_id, modes in iteritems(CourseMode.all_modes_for_courses([course_id]))
-        }
-        log.error(
-            u'Can not find `%s` in course modes.`%s`. All modes: `%s`',
-            course_id,
-            flat_unexpired_modes,
-            flat_all_modes
-        )
-    donations_enabled = configuration_helpers.get_value(
-        'ENABLE_DONATIONS',
-        DonationConfiguration.current().enabled
-    )
-    return (
-        donations_enabled and
-        enrollment.mode in course_modes[course_id] and
-        course_modes[course_id][enrollment.mode].min_price == 0
-    )
-
-
-def _create_recent_enrollment_message(course_enrollments, course_modes):
+def _create_recent_enrollment_message(course_enrollments, course_modes):  # lint-amnesty, pylint: disable=unused-argument
     """
     Builds a recent course enrollment message.
 
@@ -179,11 +139,6 @@ def _create_recent_enrollment_message(course_enrollments, course_modes):
             [enrollment.course_overview.display_name for enrollment in recently_enrolled_courses]
         )
 
-        allow_donations = any(
-            _allow_donation(course_modes, enrollment.course_overview.id, enrollment)
-            for enrollment in recently_enrolled_courses
-        )
-
         platform_name = configuration_helpers.get_value('platform_name', settings.PLATFORM_NAME)
 
         return render_to_string(
@@ -191,7 +146,6 @@ def _create_recent_enrollment_message(course_enrollments, course_modes):
             {
                 'course_names': course_names,
                 'enrollments_count': enrollments_count,
-                'allow_donations': allow_donations,
                 'platform_name': platform_name,
                 'course_id': recently_enrolled_courses[0].course_overview.id if enrollments_count == 1 else None
             }
@@ -200,7 +154,7 @@ def _create_recent_enrollment_message(course_enrollments, course_modes):
 
 def get_course_enrollments(user, org_whitelist, org_blacklist, course_limit=None):
     """
-    Given a user, return a filtered set of his or her course enrollments.
+    Given a user, return a filtered set of their course enrollments.
 
     Arguments:
         user (User): the user in question.
@@ -239,7 +193,7 @@ def get_course_enrollments(user, org_whitelist, org_blacklist, course_limit=None
 
 def get_filtered_course_entitlements(user, org_whitelist, org_blacklist):
     """
-    Given a user, return a filtered set of his or her course entitlements.
+    Given a user, return a filtered set of their course entitlements.
 
     Arguments:
         user (User): the user in question.
@@ -448,10 +402,10 @@ def _credit_statuses(user, course_enrollments):
 
     statuses = {}
     for eligibility in credit_api.get_eligibilities_for_user(user.username):
-        course_key = CourseKey.from_string(text_type(eligibility["course_key"]))
+        course_key = CourseKey.from_string(str(eligibility["course_key"]))
         providers_names = get_credit_provider_attribute_values(course_key, 'display_name')
         status = {
-            "course_key": text_type(course_key),
+            "course_key": str(course_key),
             "eligible": True,
             "deadline": eligibility["deadline"],
             "purchased": course_key in credit_enrollments,
@@ -471,10 +425,10 @@ def _credit_statuses(user, course_enrollments):
             if provider_id is None:
                 status["error"] = True
                 log.error(
-                    u"Could not find credit provider associated with credit enrollment "
-                    u"for user %s in course %s.  The user will not be able to see his or her "
-                    u"credit request status on the student dashboard.  This attribute should "
-                    u"have been set when the user purchased credit in the course.",
+                    "Could not find credit provider associated with credit enrollment "
+                    "for user %s in course %s.  The user will not be able to see their "
+                    "credit request status on the student dashboard.  This attribute should "
+                    "have been set when the user purchased credit in the course.",
                     user.id, course_key
                 )
             else:
@@ -486,8 +440,8 @@ def _credit_statuses(user, course_enrollments):
                 if not status["provider_name"] and not status["provider_status_url"]:
                     status["error"] = True
                     log.error(
-                        u"Could not find credit provider info for [%s] in [%s]. The user will not "
-                        u"be able to see his or her credit request status on the student dashboard.",
+                        "Could not find credit provider info for [%s] in [%s]. The user will not "
+                        "be able to see their credit request status on the student dashboard.",
                         provider_id, provider_info_by_id
                     )
 
@@ -519,10 +473,26 @@ def get_dashboard_course_limit():
     return course_limit
 
 
+def check_for_unacknowledged_notices(context):
+    """
+    Checks the notices apps plugin context to see if there are any unacknowledged notices the user needs to take action
+    on. If so, build a redirect url to the first unack'd notice.
+    """
+    notice_url = None
+
+    notices = context.get("plugins", {}).get("notices", {}).get("unacknowledged_notices")
+    if notices:
+        # We will only show one notice to the user one at a time. Build a redirect URL to the first notice in the
+        # list of unacknowledged notices.
+        notice_url = f"{settings.LMS_ROOT_URL}{notices[0]}?next={settings.LMS_ROOT_URL}/dashboard/"
+
+    return notice_url
+
+
 @login_required
 @ensure_csrf_cookie
 @add_maintenance_banner
-def student_dashboard(request):
+def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statements
     """
     Provides the LMS dashboard view
 
@@ -594,7 +564,7 @@ def student_dashboard(request):
             mode.slug: mode
             for mode in modes
         }
-        for course_id, modes in iteritems(unexpired_course_modes)
+        for course_id, modes in unexpired_course_modes.items()
     }
 
     # Check to see if the student has recently enrolled in a course.
@@ -626,10 +596,10 @@ def student_dashboard(request):
     recovery_email_message = recovery_email_activation_message = None
     if is_secondary_email_feature_enabled():
         try:
-            pending_email = PendingSecondaryEmailChange.objects.get(user=user)
+            pending_email = PendingSecondaryEmailChange.objects.get(user=user)  # lint-amnesty, pylint: disable=unused-variable
         except PendingSecondaryEmailChange.DoesNotExist:
             try:
-                account_recovery_obj = AccountRecovery.objects.get(user=user)
+                account_recovery_obj = AccountRecovery.objects.get(user=user)  # lint-amnesty, pylint: disable=unused-variable
             except AccountRecovery.DoesNotExist:
                 recovery_email_message = Text(
                     _(
@@ -649,11 +619,9 @@ def student_dashboard(request):
                 )
             )
 
-
-# Disable lookup of Enterprise consent_required_course due to ENT-727
+    # Disable lookup of Enterprise consent_required_course due to ENT-727
     # Will re-enable after fixing WL-1315
     consent_required_courses = set()
-    enterprise_customer_name = None
 
     # Account activation message
     account_activation_messages = [
@@ -681,7 +649,7 @@ def student_dashboard(request):
     inverted_programs = meter.invert_programs()
 
     urls, programs_data = {}, {}
-    bundles_on_dashboard_flag = WaffleFlag(experiments_namespace, u'bundles_on_dashboard')
+    bundles_on_dashboard_flag = LegacyWaffleFlag(experiments_namespace, 'bundles_on_dashboard', __name__)  # lint-amnesty, pylint: disable=toggle-missing-annotation
 
     # TODO: Delete this code and the relevant HTML code after testing LEARNER-3072 is complete
     if bundles_on_dashboard_flag.is_enabled() and inverted_programs and list(inverted_programs.items()):
@@ -725,7 +693,7 @@ def student_dashboard(request):
     # there is no verification messaging to display.
     verify_status_by_course = check_verify_status_by_course(user, course_enrollments)
     cert_statuses = {
-        enrollment.course_id: cert_info(request.user, enrollment.course_overview)
+        enrollment.course_id: cert_info(request.user, enrollment)
         for enrollment in course_enrollments
     }
 
@@ -748,6 +716,12 @@ def student_dashboard(request):
     enrolled_courses_either_paid = frozenset(
         enrollment.course_id for enrollment in course_enrollments
         if enrollment.is_paid_course()
+    )
+
+    # Checks if a course enrollment redeemed using a voucher is refundable
+    enrolled_courses_voucher_refundable = frozenset(
+        enrollment.course_id for enrollment in course_enrollments
+        if enrollment.is_order_voucher_refundable()
     )
 
     # If there are *any* denied reverifications that have not been toggled off,
@@ -775,8 +749,17 @@ def student_dashboard(request):
     else:
         redirect_message = ''
 
+    all_integrity_enabled = True
+    if not course_enrollments:
+        all_integrity_enabled = is_integrity_signature_enabled(None)
+    for enrollment in course_enrollments:
+        if not is_integrity_signature_enabled(enrollment.course_id):
+            all_integrity_enabled = False
+            break
+
     valid_verification_statuses = ['approved', 'must_reverify', 'pending', 'expired']
-    display_sidebar_on_dashboard = verification_status['status'] in valid_verification_statuses and \
+    display_sidebar_on_dashboard = not all_integrity_enabled and \
+        verification_status['status'] in valid_verification_statuses and \
         verification_status['should_display']
 
     # Filter out any course enrollment course cards that are associated with fulfilled entitlements
@@ -785,12 +768,13 @@ def student_dashboard(request):
             enr for enr in course_enrollments if entitlement.enrollment_course_run.course_id != enr.course_id
         ]
 
+    show_account_activation_popup = request.COOKIES.get(settings.SHOW_ACTIVATE_CTA_POPUP_COOKIE_NAME, None)
+
     context = {
         'urls': urls,
         'programs_data': programs_data,
         'enterprise_message': enterprise_message,
         'consent_required_courses': consent_required_courses,
-        'enterprise_customer_name': enterprise_customer_name,
         'enrollment_message': enrollment_message,
         'redirect_message': Text(redirect_message),
         'account_activation_messages': account_activation_messages,
@@ -815,10 +799,12 @@ def student_dashboard(request):
         'verification_errors': verification_errors,
         'denied_banner': denied_banner,
         'billing_email': settings.PAYMENT_SUPPORT_EMAIL,
+        'show_account_activation_popup': show_account_activation_popup,
         'user': user,
         'logout_url': reverse('logout'),
         'platform_name': platform_name,
         'enrolled_courses_either_paid': enrolled_courses_either_paid,
+        'enrolled_courses_voucher_refundable': enrolled_courses_voucher_refundable,
         'provider_states': [],
         'courses_requirements_not_met': courses_requirements_not_met,
         'nav_hidden': True,
@@ -839,13 +825,28 @@ def student_dashboard(request):
         # TODO START: clean up as part of REVEM-199 (END)
     }
 
+    # Include enterprise learner portal metadata and messaging
+    enterprise_learner_portal_context = get_enterprise_learner_portal_context(request)
+    context.update(enterprise_learner_portal_context)
+
     context_from_plugins = get_plugins_view_context(
-        plugin_constants.ProjectType.LMS,
+        ProjectType.LMS,
         COURSE_DASHBOARD_PLUGIN_VIEW_NAME,
         context
     )
     context.update(context_from_plugins)
 
+    notice_url = check_for_unacknowledged_notices(context)
+    if notice_url:
+        return redirect(notice_url)
+
+    course = None
+    context.update(
+        get_experiment_user_metadata_context(
+            course,
+            user,
+        )
+    )
     if ecommerce_service.is_enabled(request.user):
         context.update({
             'use_ecommerce_payment_flow': True,
@@ -862,4 +863,12 @@ def student_dashboard(request):
         'resume_button_urls': resume_button_urls
     })
 
-    return render_to_response('dashboard.html', context)
+    response = render_to_response('dashboard.html', context)
+    if show_account_activation_popup:
+        response.delete_cookie(
+            settings.SHOW_ACTIVATE_CTA_POPUP_COOKIE_NAME,
+            domain=settings.SESSION_COOKIE_DOMAIN,
+            path='/',
+        )
+
+    return response

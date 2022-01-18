@@ -2,15 +2,15 @@
 Tests for masquerading functionality on course_experience
 """
 
+from edx_toggles.toggles.testutils import override_waffle_flag
 from lms.djangoapps.courseware.tests.helpers import MasqueradeMixin
-from openedx.core.djangoapps.waffle_utils.testutils import override_waffle_flag
 from openedx.features.course_experience import DISPLAY_COURSE_SOCK_FLAG, SHOW_UPGRADE_MSG_ON_COURSE_HOME
-from student.roles import CourseStaffRole
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
-from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID
-from xmodule.partitions.partitions_service import PartitionService
+from common.djangoapps.student.roles import CourseStaffRole
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions_service import PartitionService  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .helpers import add_course_mode
 from .test_course_home import course_home_url
@@ -26,7 +26,7 @@ class MasqueradeTestBase(SharedModuleStoreTestCase, MasqueradeMixin):
     """
     @classmethod
     def setUpClass(cls):
-        super(MasqueradeTestBase, cls).setUpClass()
+        super().setUpClass()
 
         # Create two courses
         cls.verified_course = CourseFactory.create()
@@ -37,7 +37,7 @@ class MasqueradeTestBase(SharedModuleStoreTestCase, MasqueradeMixin):
         add_course_mode(cls.masters_course, mode_slug='masters', mode_display_name='Masters')
 
     def setUp(self):
-        super(MasqueradeTestBase, self).setUp()
+        super().setUp()
         self.course_staff = UserFactory.create()
         CourseStaffRole(self.verified_course.id).add_users(self.course_staff)
         CourseStaffRole(self.masters_course.id).add_users(self.course_staff)

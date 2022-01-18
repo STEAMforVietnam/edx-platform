@@ -6,22 +6,13 @@ Instructor tasks related to enrollments.
 import logging
 from datetime import datetime
 from time import time
-
-from django.conf import settings
-from django.utils.translation import ugettext as _
 from pytz import UTC
-from six import StringIO
-
-from edxmako.shortcuts import render_to_string
-from lms.djangoapps.courseware.courses import get_course_by_id
 from lms.djangoapps.instructor_analytics.basic import enrolled_students_features, list_may_enroll
 from lms.djangoapps.instructor_analytics.csvs import format_dictlist
-from lms.djangoapps.instructor_task.models import ReportStore
-from student.models import CourseAccessRole, CourseEnrollment
-from util.file import course_filename_prefix_generator
+from common.djangoapps.student.models import CourseEnrollment  # lint-amnesty, pylint: disable=unused-import
 
 from .runner import TaskProgress
-from .utils import tracker_emit, upload_csv_to_report_store
+from .utils import upload_csv_to_report_store  # lint-amnesty, pylint: disable=unused-import
 
 TASK_LOG = logging.getLogger('edx.celery.task')
 FILTERED_OUT_ROLES = ['staff', 'instructor', 'finance_admin', 'sales_admin']
@@ -74,7 +65,7 @@ def upload_students_csv(_xmodule_instance_args, _entry_id, course_id, task_input
     task_progress.update_task_state(extra_meta=current_step)
 
     # compute the student features table and format it
-    query_features = task_input
+    query_features = task_input.get('features')
     student_data = enrolled_students_features(course_id, query_features)
     header, rows = format_dictlist(student_data, query_features)
 
@@ -87,6 +78,8 @@ def upload_students_csv(_xmodule_instance_args, _entry_id, course_id, task_input
     task_progress.update_task_state(extra_meta=current_step)
 
     # Perform the upload
-    upload_csv_to_report_store(rows, 'student_profile_info', course_id, start_date)
+    upload_parent_dir = task_input.get('upload_parent_dir', '')
+    upload_filename = task_input.get('filename', 'student_profile_info')
+    upload_csv_to_report_store(rows, upload_filename, course_id, start_date, parent_dir=upload_parent_dir)
 
     return task_progress.update_task_state(extra_meta=current_step)

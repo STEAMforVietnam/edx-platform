@@ -4,7 +4,10 @@
 <%namespace name='static' file='/static_content.html'/>
 
 <%!
+from lms.djangoapps.courseware.masquerade import is_masquerading_as_student
 from lms.djangoapps.courseware.tabs import get_course_tab_list
+from lms.djangoapps.course_goals.models import UserActivity
+
 from django.conf import settings
 from django.urls import reverse
 from django.utils.translation import ugettext as _
@@ -21,6 +24,8 @@ if course is not None:
     settings.FEATURES.get('ENABLE_SPECIAL_EXAMS', False) and
     (course.enable_proctored_exams or course.enable_timed_exams)
     )
+
+masquerading_as_student = is_masquerading_as_student(request.user, course.id)
 %>
 
 % if include_special_exams is not UNDEFINED and include_special_exams:
@@ -36,6 +41,9 @@ if course is not None:
 % if disable_tabs is UNDEFINED or not disable_tabs:
     <%
     tab_list = get_course_tab_list(request.user, course)
+
+    # Record course goals user activity for (web) courseware and course tabs that are outside of the learning mfe
+    UserActivity.record_user_activity(user, course.id)
     %>
     % if uses_bootstrap:
         <nav class="navbar course-tabs pb-0 navbar-expand" aria-label="${_('Course')}">
@@ -44,19 +52,23 @@ if course is not None:
                     <%
                     tab_is_active = tab.tab_id in (active_page, default_tab)
                     %>
-                    <li class="nav-item ${'active' if tab_is_active else ''}">
-                        <a href="${tab.link_func(course, reverse)}" class="nav-link">
-                            ${_(tab.name)}
-                            % if tab_is_active:
-                                <span class="sr-only">, ${_('current location')}</span>
-                            %endif
-                            % if tab_image:
-                                ## Translators: 'needs attention' is an alternative string for the
-                                ## notification image that indicates the tab "needs attention".
-                                <img src="${tab_image}" alt="${_('needs attention')}" />
-                            %endif
-                        </a>
-                    </li>
+                        %  if tab.name == 'Instructor' and masquerading_as_student:
+                            <% continue %>
+                        % else:
+                            <li class="nav-item ${'active' if tab_is_active else ''}">
+                                <a href="${tab.link_func(course, reverse)}" class="nav-link">
+                                    ${_(tab.name)}
+                                    % if tab_is_active:
+                                        <span class="sr-only">, ${_('current location')}</span>
+                                    %endif
+                                    % if tab_image:
+                                        ## Translators: 'needs attention' is an alternative string for the
+                                        ## notification image that indicates the tab "needs attention".
+                                        <img src="${tab_image}" alt="${_('needs attention')}" />
+                                    %endif
+                                </a>
+                            </li>
+                        %endif
                 % endfor
             </ul>
         </nav>

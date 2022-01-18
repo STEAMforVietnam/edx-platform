@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 End-to-end tests for the LMS.
 """
 
+import pytest
 
 from common.test.acceptance.fixtures.course import CourseFixture
 from common.test.acceptance.pages.common.auto_auth import AutoAuthPage
@@ -30,7 +30,7 @@ class CourseWikiA11yTest(UniqueCourseTest):
         """
         Initialize pages and install a course fixture.
         """
-        super(CourseWikiA11yTest, self).setUp()
+        super().setUp()
 
         # self.course_info['number'] must be shorter since we are accessing the wiki. See TNL-1751
         self.course_info['number'] = self.unique_id[0:6]
@@ -56,6 +56,7 @@ class CourseWikiA11yTest(UniqueCourseTest):
         self.course_wiki_page.open_editor()
         self.course_wiki_edit_page.wait_for_page()
 
+    @pytest.mark.skip(reason='This test fails when using the new coursehome MFE.')
     def test_view(self):
         """
         Verify the basic accessibility of the wiki page as initially displayed.
@@ -68,6 +69,7 @@ class CourseWikiA11yTest(UniqueCourseTest):
         })
         self.course_wiki_page.a11y_audit.check_for_accessibility_errors()
 
+    @pytest.mark.skip(reason='This test fails when using the new coursehome MFE.')
     def test_edit(self):
         """
         Verify the basic accessibility of edit wiki page.
@@ -81,6 +83,7 @@ class CourseWikiA11yTest(UniqueCourseTest):
         })
         self.course_wiki_edit_page.a11y_audit.check_for_accessibility_errors()
 
+    @pytest.mark.skip(reason='This test fails when using the new coursehome MFE.')
     def test_changes(self):
         """
         Verify the basic accessibility of changes wiki page.
@@ -96,6 +99,7 @@ class CourseWikiA11yTest(UniqueCourseTest):
         history_page.wait_for_page()
         history_page.a11y_audit.check_for_accessibility_errors()
 
+    @pytest.mark.skip(reason='This test fails when using the new coursehome MFE.')
     def test_children(self):
         """
         Verify the basic accessibility of changes wiki page.

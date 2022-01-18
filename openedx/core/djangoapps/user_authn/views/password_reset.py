@@ -1,57 +1,71 @@
 """ Password reset logic and views . """
-
 import logging
 
 from django import forms
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.views import INTERNAL_RESET_SESSION_TOKEN, PasswordResetConfirmView
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import ValidationError
-from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.encoding import force_bytes, force_text
+from django.utils.encoding import force_bytes, force_str
 from django.utils.http import base36_to_int, int_to_base36, urlsafe_base64_encode
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from edx_ace import ace
 from edx_ace.recipient import Recipient
 from eventtracking import tracker
 from ratelimit.decorators import ratelimit
+from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
-from edxmako.shortcuts import render_to_string
+from common.djangoapps.edxmako.shortcuts import render_to_string
 from openedx.core.djangoapps.ace_common.template_context import get_base_template_context
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from openedx.core.djangoapps.oauth_dispatch.api import destroy_oauth_tokens
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.theming.helpers import get_current_request, get_current_site
 from openedx.core.djangoapps.user_api import accounts, errors, helpers
+from openedx.core.djangoapps.user_authn.toggles import should_redirect_to_authn_microfrontend
 from openedx.core.djangoapps.user_api.accounts.utils import is_secondary_email_feature_enabled
 from openedx.core.djangoapps.user_api.helpers import FormDescription
 from openedx.core.djangoapps.user_api.models import UserRetirementRequest
 from openedx.core.djangoapps.user_api.preferences.api import get_user_preference
-from openedx.core.djangoapps.user_authn.message_types import PasswordReset
+from openedx.core.djangoapps.user_authn.message_types import PasswordReset, PasswordResetSuccess
+from openedx.core.djangoapps.user_authn.utils import check_pwned_password
 from openedx.core.djangolib.markup import HTML
-from student.forms import send_account_recovery_email_for_user
-from student.models import AccountRecovery
-from util.json_request import JsonResponse
-from util.password_policy_validators import normalize_password, validate_password
+from common.djangoapps.student.forms import send_account_recovery_email_for_user
+from common.djangoapps.student.models import AccountRecovery, LoginFailures
+from common.djangoapps.util.json_request import JsonResponse
+from common.djangoapps.util.password_policy_validators import normalize_password, validate_password
 
-POST_EMAIL_KEY = 'post:email'
+POST_EMAIL_KEY = 'openedx.core.djangoapps.util.ratelimit.request_post_email'
 REAL_IP_KEY = 'openedx.core.djangoapps.util.ratelimit.real_ip'
 SETTING_CHANGE_INITIATED = 'edx.user.settings.change_initiated'
 
 # Maintaining this naming for backwards compatibility.
 log = logging.getLogger("edx.student")
 AUDIT_LOG = logging.getLogger("audit")
+
+
+def get_user_default_email_params(user):
+    """
+    Get default email params for the user.
+    """
+    site = get_current_site()
+    message_context = get_base_template_context(site)
+    user_language_pref = get_user_preference(user, LANGUAGE_KEY)
+    return [message_context, user_language_pref]
 
 
 def get_password_reset_form():
@@ -72,16 +86,16 @@ def get_password_reset_form():
 
     # Translators: This label appears above a field on the password reset
     # form meant to hold the user's email address.
-    email_label = _(u"Email")
+    email_label = _("Email")
 
     # Translators: This example email address is used as a placeholder in
     # a field on the password reset form meant to hold the user's email address.
-    email_placeholder = _(u"username@domain.com")
+    email_placeholder = _("username@domain.com")
 
     # Translators: These instructions appear on the password reset form,
     # immediately below a field meant to hold the user's email address.
     # pylint: disable=no-member
-    email_instructions = _(u"The email address you used to register with {platform_name}").format(
+    email_instructions = _("The email address you used to register with {platform_name}").format(
         platform_name=configuration_helpers.get_value('PLATFORM_NAME', settings.PLATFORM_NAME)
     )
 
@@ -100,6 +114,31 @@ def get_password_reset_form():
     return form_desc
 
 
+def send_password_reset_success_email(user, request):
+    """
+    Send an email to user indicating that password reset was successful.
+
+    Arguments:
+        user (User): Django User object
+        request (HttpRequest): Django request object
+    """
+    message_context, user_language_preference = get_user_default_email_params(user)
+    lms_root_url = configuration_helpers.get_value('LMS_ROOT_URL', settings.LMS_ROOT_URL)
+    message_context.update(
+        {'login_link': f'{lms_root_url}/login', 'request': request, }
+    )
+
+    msg = PasswordResetSuccess(context=message_context).personalize(
+        recipient=Recipient(user.id, user.email),
+        language=user_language_preference,
+        user_context={"name": user.profile.name},
+    )
+    try:
+        ace.send(msg)
+    except Exception:  # pylint: disable=broad-except
+        log.exception('PasswordResetSuccess: sending email to user [%s] failed.', user.username)
+
+
 def send_password_reset_email_for_user(user, request, preferred_email=None):
     """
     Send out a password reset email for the given user.
@@ -109,15 +148,16 @@ def send_password_reset_email_for_user(user, request, preferred_email=None):
         request (HttpRequest): Django request object
         preferred_email (str): Send email to this address if present, otherwise fallback to user's email address.
     """
-    site = get_current_site()
-    message_context = get_base_template_context(site)
+    message_context, user_language_preference = get_user_default_email_params(user)
+    site_name = settings.AUTHN_MICROFRONTEND_DOMAIN if should_redirect_to_authn_microfrontend() \
+        else configuration_helpers.get_value('SITE_NAME', settings.SITE_NAME)
     message_context.update({
         'request': request,  # Used by google_analytics_tracking_pixel
         # TODO: This overrides `platform_name` from `get_base_template_context` to make the tests passes
         'platform_name': configuration_helpers.get_value('PLATFORM_NAME', settings.PLATFORM_NAME),
         'reset_link': '{protocol}://{site}{link}?track=pwreset'.format(
             protocol='https' if request.is_secure() else 'http',
-            site=configuration_helpers.get_value('SITE_NAME', settings.SITE_NAME),
+            site=site_name,
             link=reverse('password_reset_confirm', kwargs={
                 'uidb36': int_to_base36(user.id),
                 'token': default_token_generator.make_token(user),
@@ -126,8 +166,8 @@ def send_password_reset_email_for_user(user, request, preferred_email=None):
     })
 
     msg = PasswordReset().personalize(
-        recipient=Recipient(user.username, preferred_email or user.email),
-        language=get_user_preference(user, LANGUAGE_KEY),
+        recipient=Recipient(user.id, preferred_email or user.email),
+        language=user_language_preference,
         user_context=message_context,
     )
     ace.send(msg)
@@ -197,7 +237,7 @@ class PasswordResetView(APIView):
 
     @method_decorator(ensure_csrf_cookie)
     def get(self, request):
-        return HttpResponse(get_password_reset_form().to_json(), content_type="application/json")
+        return HttpResponse(get_password_reset_form().to_json(), content_type="application/json")  # lint-amnesty, pylint: disable=http-response-with-content-type-json
 
 
 @helpers.intercept_errors(errors.UserAPIInternalError, ignore_errors=[errors.UserAPIRequestError])
@@ -299,7 +339,7 @@ def _uidb36_to_uidb64(uidb36):
     Returns: base64-encoded user ID. Otherwise returns a dummy, invalid ID
     """
     try:
-        uidb64 = force_text(urlsafe_base64_encode(force_bytes(base36_to_int(uidb36))))
+        uidb64 = force_str(urlsafe_base64_encode(force_bytes(base36_to_int(uidb36))))
     except ValueError:
         uidb64 = '1'  # dummy invalid ID (incorrect padding for base64)
     return uidb64
@@ -312,8 +352,6 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
       We also optionally do some additional password policy checks.
     """
 
-    reset_url_token = 'set-password'
-
     def __init__(self):
         self.platform_name = PasswordResetConfirmWrapper._get_platform_name()
         self.validlink = False
@@ -323,7 +361,7 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
         self.uidb64 = ''
         self.uid_int = -1
 
-    def _process_password_reset_success(self, request, token, uidb64, extra_context):
+    def _process_password_reset_success(self, request, token, uidb64, extra_context):  # lint-amnesty, pylint: disable=missing-function-docstring
         self.user = self.get_user(uidb64)
         form = SetPasswordForm(self.user, request.POST)
         if self.token_generator.check_token(self.user, token) and form.is_valid():
@@ -336,21 +374,17 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
                 context.update(extra_context)
             return self.render_to_response(context)
 
-    def _set_token_in_session(self, request, token):
+    def _get_token_from_session(self, request):
         """
-        method to store password reset token in session received in reset password url
+        Internal method to get password reset token from session.
         """
-        if not token:
-            return
-        session = request.session
-        session[INTERNAL_RESET_SESSION_TOKEN] = token
-        session.save()
+        return request.session[INTERNAL_RESET_SESSION_TOKEN]
 
     @staticmethod
     def _get_platform_name():
         return {"platform_name": configuration_helpers.get_value('platform_name', settings.PLATFORM_NAME)}
 
-    def _set_user(self, request):
+    def _set_user(self, request):  # lint-amnesty, pylint: disable=missing-function-docstring
         try:
             self.uid_int = base36_to_int(self.uidb36)
             if request.user.is_authenticated and request.user.id != self.uid_int:
@@ -359,8 +393,7 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
         except (ValueError, User.DoesNotExist):
             # if there's any error getting a user, just let django's
             # password_reset_confirm function handle it.
-            return super(PasswordResetConfirmWrapper, self).dispatch(request, uidb64=self.uidb64, token=self.token,
-                                                                     extra_context=self.platform_name)
+            return super().dispatch(request, uidb64=self.uidb64, token=self.token, extra_context=self.platform_name)
 
     def _handle_retired_user(self, request):
         """
@@ -378,7 +411,7 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
             request, 'registration/password_reset_confirm.html', context
         )
 
-    def _validate_password(self, password, request):
+    def _validate_password(self, password, request):  # lint-amnesty, pylint: disable=missing-function-docstring
         try:
             validate_password(password, user=self.user)
         except ValidationError as err:
@@ -393,18 +426,18 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
                 request, 'registration/password_reset_confirm.html', context
             )
 
-    def _handle_password_reset_failure(self, response):
+    def _handle_password_reset_failure(self, response):  # lint-amnesty, pylint: disable=missing-function-docstring
         form_valid = response.context_data['form'].is_valid() if response.context_data['form'] else False
         if not form_valid:
             log.warning(
-                u'Unable to reset password for user [%s] because form is not valid. '
-                u'A possible cause is that the user had an invalid reset token',
+                'Unable to reset password for user [%s] because form is not valid. '
+                'A possible cause is that the user had an invalid reset token',
                 self.user.username,
             )
             response.context_data['err_msg'] = _('Error in resetting your password. Please try again.')
             return response
 
-    def _handle_primary_email_update(self, updated_user):
+    def _handle_primary_email_update(self, updated_user):  # lint-amnesty, pylint: disable=missing-function-docstring
         try:
             updated_user.email = updated_user.account_recovery.secondary_email
             updated_user.account_recovery.delete()
@@ -426,8 +459,8 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
         messages.success(
             request,
             HTML(_(
-                u'{html_start}Password Creation Complete{html_end}'
-                u'Your password has been created. {bold_start}{email}{bold_end} is now your primary login email.'
+                '{html_start}Password Creation Complete{html_end}'
+                'Your password has been created. {bold_start}{email}{bold_end} is now your primary login email.'
             )).format(
                 support_url=configuration_helpers.get_value('SUPPORT_SITE_LINK', settings.SUPPORT_SITE_LINK),
                 html_start=HTML('<p class="message-title">'),
@@ -449,6 +482,7 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
         request.POST = request.POST.copy()
         request.POST['new_password1'] = normalize_password(request.POST['new_password1'])
         request.POST['new_password2'] = normalize_password(request.POST['new_password2'])
+        is_account_recovery = 'is_account_recovery' in request.GET
 
         password = request.POST['new_password1']
         response = self._validate_password(password, request)
@@ -461,17 +495,24 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
         # If password reset was unsuccessful a template response is returned (status_code 200).
         # Check if form is invalid then show an error to the user.
         # Note if password reset was successful we get response redirect (status_code 302).
-        if response.status_code == 200:
+        password_reset_successful = response.status_code == 302
+        if not password_reset_successful:
             return self._handle_password_reset_failure(response)
 
         updated_user = User.objects.get(id=self.uid_int)
-        if 'is_account_recovery' in request.GET:
+        if is_account_recovery:
             self._handle_primary_email_update(updated_user)
 
         updated_user.save()
-        if response.status_code == 302 and 'is_account_recovery' in request.GET:
+        if password_reset_successful and is_account_recovery:
             self._handle_password_creation(request, updated_user)
 
+        # Handles clearing the failed login counter upon password reset.
+        if LoginFailures.is_feature_enabled():
+            LoginFailures.clear_lockout_counter(updated_user)
+
+        update_session_auth_hash(request, updated_user)
+        send_password_reset_success_email(updated_user, request)
         return response
 
     def dispatch(self, *args, **kwargs):
@@ -490,16 +531,23 @@ class PasswordResetConfirmWrapper(PasswordResetConfirmView):
             return self._handle_retired_user(self.request)
 
         if self.request.method == 'POST':
+            # Get actual token from session before processing the POST request.
+            # This is needed because django's post process is not called on password reset
+            # post request and the correct token needs to be extracted from session.
+            self.token = self._get_token_from_session(self.request)
             return self.post(self.request, *args, **kwargs)
         else:
-            self._set_token_in_session(self.request, self.token)
-            token = self.reset_url_token
-            response = super(PasswordResetConfirmWrapper, self).dispatch(self.request, uidb64=self.uidb64, token=token,
-                                                                         extra_context=self.platform_name)
-            response_was_successful = response.context_data.get('validlink')
-            if response_was_successful and not self.user.is_active:
-                self.user.is_active = True
-                self.user.save()
+            response = super().dispatch(
+                self.request,
+                uidb64=self.uidb64,
+                token=self.token,
+                extra_context=self.platform_name
+            )
+            if hasattr(response, 'context_data'):
+                response_was_successful = response.context_data.get('validlink')
+                if response_was_successful and not self.user.is_active:
+                    self.user.is_active = True
+                    self.user.save()
             return response
 
 
@@ -553,9 +601,12 @@ def password_change_request_handler(request):
 
     """
     user = request.user
-    # Prefer logged-in user's email
-    email = user.email if user.is_authenticated else request.POST.get('email')
-    AUDIT_LOG.info("Password reset initiated for user %s.", email)
+    if (user.is_staff or user.is_superuser) and request.POST.get('email_from_support_tools'):
+        email = request.POST.get('email_from_support_tools')
+    else:
+        # Prefer logged-in user's email
+        email = user.email if user.is_authenticated else request.POST.get('email')
+    AUDIT_LOG.info("Password reset initiated for email %s.", email)
 
     if getattr(request, 'limited', False):
         AUDIT_LOG.warning("Password reset rate limit exceeded for email %s.", email)
@@ -567,7 +618,8 @@ def password_change_request_handler(request):
     if email:
         try:
             request_password_change(email, request.is_secure())
-            user = user if user.is_authenticated else _get_user_from_email(email=email)
+            user = user if not request.POST.get('email_from_support_tools') and user.is_authenticated \
+                else _get_user_from_email(email=email)
             destroy_oauth_tokens(user)
         except errors.UserNotFound:
             AUDIT_LOG.info("Invalid password reset attempt")
@@ -585,16 +637,180 @@ def password_change_request_handler(request):
                 })
 
                 msg = PasswordReset().personalize(
-                    recipient=Recipient(username='', email_address=email),
+                    recipient=Recipient(lms_user_id=0, email_address=email),
                     language=settings.LANGUAGE_CODE,
                     user_context=message_context,
                 )
                 ace.send(msg)
         except errors.UserAPIInternalError as err:
-            log.exception(u'Error occured during password change for user {email}: {error}'
+            log.exception('Error occurred during password change for user {email}: {error}'
                           .format(email=email, error=err))
-            return HttpResponse(_("Some error occured during password change. Please try again"), status=500)
+            return HttpResponse(_("Some error occurred during password change. Please try again"), status=500)
 
         return HttpResponse(status=200)
     else:
         return HttpResponseBadRequest(_("No email address provided."))
+
+
+def _get_rate(rate):
+    """
+    Given the request rate string, return a two tuple of:
+    <allowed number of requests>, <period of time in seconds>
+    """
+
+    requests, duration = rate.split('/')
+    num_requests = int(requests)
+    num = int(duration[:-1] if duration[:-1] else 1)
+    symbol = duration[-1:]
+    duration = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}[symbol] * num
+    return (num_requests, duration)
+
+
+class ResetTokenValidationThrottle(AnonRateThrottle):
+    """
+    Setting rate limit for token validation
+    """
+    rate = settings.RESET_PASSWORD_TOKEN_VALIDATE_API_RATELIMIT
+
+    def parse_rate(self, rate):
+        return _get_rate(rate)
+
+
+class PasswordResetTokenValidation(APIView):  # lint-amnesty, pylint: disable=missing-class-docstring
+    """
+    API to validate generated password reset token
+    """
+    throttle_classes = [ResetTokenValidationThrottle]
+
+    def post(self, request):
+        """ HTTP end-point to validate password reset token. """
+        is_valid = False
+        token = request.data.get('token')
+        try:
+            token = token.split('-', 1)
+            uid_int = base36_to_int(token[0])
+            if request.user.is_authenticated and request.user.id != uid_int:
+                return Response({'is_valid': is_valid})
+
+            user = User.objects.get(id=uid_int)
+            if UserRetirementRequest.has_user_requested_retirement(user):
+                return Response({'is_valid': is_valid})
+
+            is_valid = default_token_generator.check_token(user, token[1])
+            if is_valid and not user.is_active:
+                user.is_active = True
+                user.save()
+        except Exception:   # pylint: disable=broad-except
+            AUDIT_LOG.exception("Invalid password reset confirm token")
+
+        return Response({'is_valid': is_valid})
+
+
+class PasswordResetThrottle(AnonRateThrottle):
+    """
+    Setting rate limit for password reset
+    """
+    rate = settings.RESET_PASSWORD_API_RATELIMIT
+
+    def parse_rate(self, rate):
+        return _get_rate(rate)
+
+
+class LogistrationPasswordResetView(APIView):  # lint-amnesty, pylint: disable=missing-class-docstring
+    """
+    API to update new password credentials for a correct token
+    """
+    throttle_classes = [PasswordResetThrottle]
+
+    def post(self, request, **kwargs):
+        """ Reset learner password using passed token and new credentials """
+
+        reset_status = False
+        uidb36 = kwargs.get('uidb36')
+        token = kwargs.get('token')
+
+        has_required_values, uid_int = self._check_token_has_required_values(uidb36, token)
+        if not has_required_values:
+            AUDIT_LOG.exception("Invalid password reset confirm token")
+            return Response({'reset_status': reset_status})
+
+        request.data._mutable = True  # lint-amnesty, pylint: disable=protected-access
+        request.data['new_password1'] = normalize_password(request.data['new_password1'])
+        request.data['new_password2'] = normalize_password(request.data['new_password2'])
+
+        password = request.data['new_password1']
+        try:
+            user = User.objects.get(id=uid_int)
+            if not default_token_generator.check_token(user, token):
+                AUDIT_LOG.exception("Token validation failed")
+                return Response({'reset_status': reset_status})
+
+            validate_password(password, user=user)
+
+            if settings.ENABLE_AUTHN_RESET_PASSWORD_HIBP_POLICY:
+                # Checks the Pwned Databases for password vulnerability.
+                pwned_response = check_pwned_password(password)
+                if pwned_response.get('vulnerability', 'no') == 'yes':
+                    error_status = {
+                        'reset_status': reset_status,
+                        'err_msg': accounts.AUTHN_PASSWORD_COMPROMISED_MSG
+                    }
+                    return Response(error_status)
+
+            form = SetPasswordForm(user, request.data)
+            if form.is_valid():
+                form.save()
+                reset_status = True
+
+                if 'is_account_recovery' in request.GET:
+                    try:
+                        old_primary_email = user.email
+                        user.email = user.account_recovery.secondary_email
+                        user.account_recovery.delete()
+                        # emit an event that the user changed their secondary email to the primary email
+                        tracker.emit(
+                            SETTING_CHANGE_INITIATED,
+                            {
+                                "setting": "email",
+                                "old": old_primary_email,
+                                "new": user.email,
+                                "user_id": user.id,
+                            }
+                        )
+                        user.save()
+                    except ObjectDoesNotExist:
+                        err = 'Account recovery process initiated without AccountRecovery instance for user {username}'
+                        log.error(err.format(username=user.username))
+
+                # Handles clearing the failed login counter upon password reset.
+                if LoginFailures.is_feature_enabled():
+                    LoginFailures.clear_lockout_counter(user)
+
+                send_password_reset_success_email(user, request)
+                update_session_auth_hash(request, user)
+        except ValidationError as err:
+            AUDIT_LOG.exception("Password validation failed")
+            error_status = {
+                'reset_status': reset_status,
+                'err_msg': ' '.join(err.messages)
+            }
+            return Response(error_status)
+        except Exception:   # pylint: disable=broad-except
+            AUDIT_LOG.exception("Setting new password failed")
+
+        return Response({'reset_status': reset_status})
+
+    def _check_token_has_required_values(self, uidb36, token):
+        """
+        Helper function to test that token
+        string passed has the required kwargs needed
+        to process token validation.
+        """
+
+        if not uidb36 or not token:
+            return False, None
+        try:
+            uid_int = base36_to_int(uidb36)
+        except ValueError:
+            return False, None
+        return True, uid_int

@@ -2,9 +2,7 @@
 Support tool for changing course enrollments.
 """
 
-
-import six
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponseBadRequest
@@ -14,10 +12,18 @@ from django.views.generic import View
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from rest_framework.generics import GenericAPIView
-from six import text_type
 
-from course_modes.models import CourseMode
-from edxmako.shortcuts import render_to_response
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.edxmako.shortcuts import render_to_response
+from common.djangoapps.student.models import (
+    ENROLLED_TO_ENROLLED,
+    UNENROLLED_TO_ENROLLED,
+    CourseEnrollment,
+    CourseEnrollmentAttribute,
+    ManualEnrollmentAudit
+)
+from common.djangoapps.util.json_request import JsonResponse
+from common.djangoapps.entitlements.models import CourseEntitlement
 from lms.djangoapps.support.decorators import require_support_permission
 from lms.djangoapps.support.serializers import ManualEnrollmentSerializer
 from lms.djangoapps.verify_student.models import VerificationDeadline
@@ -25,8 +31,6 @@ from openedx.core.djangoapps.credit.email_utils import get_credit_provider_attri
 from openedx.core.djangoapps.enrollments.api import get_enrollments, update_enrollment
 from openedx.core.djangoapps.enrollments.errors import CourseModeNotFoundError
 from openedx.core.djangoapps.enrollments.serializers import ModeSerializer
-from student.models import ENROLLED_TO_ENROLLED, CourseEnrollment, CourseEnrollmentAttribute, ManualEnrollmentAudit
-from util.json_request import JsonResponse
 
 
 class EnrollmentSupportView(View):
@@ -81,6 +85,58 @@ class EnrollmentSupportListView(GenericAPIView):
 
     @method_decorator(require_support_permission)
     def post(self, request, username_or_email):
+        """
+        Allows support staff to create a user's enrollment.
+        """
+        try:
+            course_id = request.data['course_id']
+            course_key = CourseKey.from_string(course_id)
+            mode = request.data['mode']
+            reason = request.data['reason']
+            user = User.objects.get(Q(username=username_or_email) | Q(email=username_or_email))
+        except KeyError as err:
+            return HttpResponseBadRequest(f'The field {str(err)} is required.')
+        except InvalidKeyError:
+            return HttpResponseBadRequest('Could not parse course key.')
+        except User.DoesNotExist:
+            return HttpResponseBadRequest(
+                'Could not find user {username}.'.format(
+                    username=username_or_email
+                )
+            )
+
+        enrollment = CourseEnrollment.get_enrollment(user=user, course_key=course_key)
+        if enrollment is not None:
+            return HttpResponseBadRequest(
+                f'The user {str(username_or_email)} is already enrolled in {str(course_id)}.'
+            )
+
+        enrollment_modes = [
+            enrollment_mode['slug']
+            for enrollment_mode in self.get_course_modes(course_key)
+        ]
+        if mode not in enrollment_modes:
+            return HttpResponseBadRequest(
+                f'{str(mode)} is not a valid mode for {str(course_id)}. '
+                f'Possible valid modes are {str(enrollment_modes)}'
+            )
+
+        enrollment = CourseEnrollment.enroll(user=user, course_key=course_key, mode=mode)
+
+        # Wrapped in a transaction so that we can be sure the
+        # ManualEnrollmentAudit record is always created correctly.
+        with transaction.atomic():
+            manual_enrollment = ManualEnrollmentAudit.create_manual_enrollment_audit(
+                request.user,
+                enrollment.user.email,
+                UNENROLLED_TO_ENROLLED,
+                reason=reason,
+                enrollment=enrollment
+            )
+            return JsonResponse(ManualEnrollmentSerializer(instance=manual_enrollment).data)
+
+    @method_decorator(require_support_permission)
+    def patch(self, request, username_or_email):
         """Allows support staff to alter a user's enrollment."""
         try:
             user = User.objects.get(Q(username=username_or_email) | Q(email=username_or_email))
@@ -91,19 +147,19 @@ class EnrollmentSupportListView(GenericAPIView):
             reason = request.data['reason']
             enrollment = CourseEnrollment.objects.get(user=user, course_id=course_key)
             if enrollment.mode != old_mode:
-                return HttpResponseBadRequest(u'User {username} is not enrolled with mode {old_mode}.'.format(
+                return HttpResponseBadRequest('User {username} is not enrolled with mode {old_mode}.'.format(
                     username=user.username,
                     old_mode=old_mode
                 ))
         except KeyError as err:
-            return HttpResponseBadRequest(u'The field {} is required.'.format(text_type(err)))
+            return HttpResponseBadRequest(f'The field {str(err)} is required.')
         except InvalidKeyError:
-            return HttpResponseBadRequest(u'Could not parse course key.')
+            return HttpResponseBadRequest('Could not parse course key.')
         except (CourseEnrollment.DoesNotExist, User.DoesNotExist):
             return HttpResponseBadRequest(
-                u'Could not find enrollment for user {username} in course {course}.'.format(
+                'Could not find enrollment for user {username} in course {course}.'.format(
                     username=username_or_email,
-                    course=six.text_type(course_key)
+                    course=str(course_key)
                 )
             )
         try:
@@ -128,9 +184,14 @@ class EnrollmentSupportListView(GenericAPIView):
                     CourseEnrollmentAttribute.add_enrollment_attr(
                         enrollment=enrollment, data_list=[credit_provider_attr]
                     )
+                entitlement = CourseEntitlement.get_fulfillable_entitlement_for_user_course_run(
+                    user=user, course_run_key=course_id
+                )
+                if entitlement is not None and entitlement.mode == new_mode:
+                    entitlement.set_enrollment(CourseEnrollment.get_enrollment(user, course_id))
                 return JsonResponse(ManualEnrollmentSerializer(instance=manual_enrollment).data)
         except CourseModeNotFoundError as err:
-            return HttpResponseBadRequest(text_type(err))
+            return HttpResponseBadRequest(str(err))
 
     @staticmethod
     def include_verified_mode_info(enrollment_data, course_key):

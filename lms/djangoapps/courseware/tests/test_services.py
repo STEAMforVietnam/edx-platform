@@ -8,10 +8,11 @@ import json
 
 import ddt
 
+from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.courseware.services import UserStateService
-from lms.djangoapps.courseware.tests.factories import StudentModuleFactory, UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from lms.djangoapps.courseware.tests.factories import StudentModuleFactory
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 @ddt.ddt
@@ -24,7 +25,7 @@ class TestUserStateService(ModuleStoreTestCase):
         """
         Creating pre-requisites for the test cases.
         """
-        super(TestUserStateService, self).setUp()
+        super().setUp()
         self.user = UserFactory.create()
         self.course = CourseFactory.create()
         chapter = ItemFactory.create(
@@ -84,7 +85,7 @@ class TestUserStateService(ModuleStoreTestCase):
         Scenario:
             Given a user and a problem or block
             Then create a student module entry for the user
-            If the state is obtained from student module service
+            If the state is obtained from common.djangoapps.student module service
             Then the state is equal to previously created student module state
         """
         self._create_student_module(expected_state)
@@ -122,4 +123,4 @@ class TestUserStateService(ModuleStoreTestCase):
         params.update(state_params)
         self._create_student_module({'key_1': 'value_1'})
         state = UserStateService().get_state_as_dict(**params)
-        self.assertFalse(state)
+        assert not state

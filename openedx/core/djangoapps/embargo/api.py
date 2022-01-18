@@ -10,12 +10,12 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
-from ipware.ip import get_ip
+from ipware.ip import get_client_ip
 from rest_framework import status
 from rest_framework.response import Response
 
-import geoip2.database
-from student.auth import has_course_author_access
+from common.djangoapps.student.auth import has_course_author_access
+from openedx.core.djangoapps.geoinfo.api import country_code_from_ip
 
 from .models import CountryAccessRule, RestrictedCourse
 
@@ -79,14 +79,14 @@ def check_course_access(course_key, user=None, ip_address=None, url=None):
     if ip_address is not None:
         # Retrieve the country code from the IP address
         # and check it against the allowed countries list for a course
-        user_country_from_ip = _country_code_from_ip(ip_address)
+        user_country_from_ip = country_code_from_ip(ip_address)
 
         if not CountryAccessRule.check_country_access(course_key, user_country_from_ip):
             log.info(
                 (
-                    u"Blocking user %s from accessing course %s at %s "
-                    u"because the user's IP address %s appears to be "
-                    u"located in %s."
+                    "Blocking user %s from accessing course %s at %s "
+                    "because the user's IP address %s appears to be "
+                    "located in %s."
                 ),
                 getattr(user, 'id', '<Not Authenticated>'),
                 course_key,
@@ -104,8 +104,8 @@ def check_course_access(course_key, user=None, ip_address=None, url=None):
         if not CountryAccessRule.check_country_access(course_key, user_country_from_profile):
             log.info(
                 (
-                    u"Blocking user %s from accessing course %s at %s "
-                    u"because the user's profile country is %s."
+                    "Blocking user %s from accessing course %s at %s "
+                    "because the user's profile country is %s."
                 ),
                 user.id, course_key, url, user_country_from_profile
             )
@@ -146,7 +146,7 @@ def _get_user_country_from_profile(user):
         user country from profile.
 
     """
-    cache_key = u'user.{user_id}.profile.country'.format(user_id=user.id)
+    cache_key = f'user.{user.id}.profile.country'
     profile_country = cache.get(cache_key)
     if profile_country is None:
         profile = getattr(user, 'profile', None)
@@ -157,30 +157,6 @@ def _get_user_country_from_profile(user):
         cache.set(cache_key, profile_country)
 
     return profile_country
-
-
-def _country_code_from_ip(ip_addr):
-    """
-    Return the country code associated with an IP address.
-    Handles both IPv4 and IPv6 addresses.
-
-    Args:
-        ip_addr (str): The IP address to look up.
-
-    Returns:
-        str: A 2-letter country code.
-
-    """
-    reader = geoip2.database.Reader(settings.GEOIP_PATH)
-
-    try:
-        response = reader.country(ip_addr)
-        # pylint: disable=no-member
-        country_code = response.country.iso_code
-    except geoip2.errors.AddressNotFoundError:
-        country_code = ""
-    reader.close()
-    return country_code
 
 
 def get_embargo_response(request, course_id, user):
@@ -197,13 +173,13 @@ def get_embargo_response(request, course_id, user):
 
     """
     redirect_url = redirect_if_blocked(
-        course_id, user=user, ip_address=get_ip(request), url=request.path)
+        course_id, user=user, ip_address=get_client_ip(request)[0], url=request.path)
     if redirect_url:
         return Response(
             status=status.HTTP_403_FORBIDDEN,
             data={
                 "message": (
-                    u"Users from this location cannot access the course '{course_id}'."
+                    "Users from this location cannot access the course '{course_id}'."
                 ).format(course_id=course_id),
                 "user_message_url": request.build_absolute_uri(redirect_url)
             }

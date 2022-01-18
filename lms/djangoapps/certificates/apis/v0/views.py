@@ -4,26 +4,29 @@
 import logging
 
 import edx_api_doc_tools as apidocs
-import six
 from django.contrib.auth import get_user_model
 from edx_rest_framework_extensions import permissions
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
-from rest_condition import C
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from lms.djangoapps.certificates.api import get_certificate_for_user, get_certificates_for_user
-from openedx.core.djangoapps.catalog.utils import get_course_run_details
-from openedx.core.djangoapps.certificates.api import certificates_viewable_for_course
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from lms.djangoapps.certificates.api import (
+    certificates_viewable_for_course,
+    get_certificate_for_user,
+    get_certificates_for_user
+)
+from lms.djangoapps.certificates.apis.v0.permissions import IsOwnerOrPublicCertificates
+from openedx.core.djangoapps.content.course_overviews.api import (
+    get_course_overview_or_none,
+    get_course_overviews_from_ids,
+    get_pseudo_course_overview
+)
 from openedx.core.djangoapps.user_api.accounts.api import visible_fields
 from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
-
-from .permissions import IsOwnerOrPublicCertificates
 
 log = logging.getLogger(__name__)
 User = get_user_model()
@@ -96,7 +99,7 @@ class CertificatesDetailView(APIView):
 
     def get(self, request, username, course_id):
         """
-        Gets a certificate information.
+        Retrieves certificate information for a user in a specified course run.
 
         Args:
             request (Request): Django request object.
@@ -109,7 +112,7 @@ class CertificatesDetailView(APIView):
         try:
             course_key = CourseKey.from_string(course_id)
         except InvalidKeyError:
-            log.warning(u'Course ID string "%s" is not valid', course_id)
+            log.warning('Course ID string "%s" is not valid', course_id)
             return Response(
                 status=404,
                 data={'error_code': 'course_id_not_valid'}
@@ -122,9 +125,10 @@ class CertificatesDetailView(APIView):
                 data={'error_code': 'no_certificate_for_user'}
             )
 
-        course_overview = CourseOverview.get_from_id(course_id)
+        course_overview = get_course_overview_or_none(course_id)
         # return 404 if it's not a PDF certificates and there is no active certificate configuration.
-        if not user_cert['is_pdf_certificate'] and not course_overview.has_any_active_web_certificate:
+        if not user_cert['is_pdf_certificate'] and (not course_overview or
+                                                    not course_overview.has_any_active_web_certificate):
             return Response(
                 status=404,
                 data={'error_code': 'no_certificate_configuration_for_course'}
@@ -133,7 +137,7 @@ class CertificatesDetailView(APIView):
         return Response(
             {
                 "username": user_cert.get('username'),
-                "course_id": six.text_type(user_cert.get('course_key')),
+                "course_id": str(user_cert.get('course_key')),
                 "certificate_type": user_cert.get('type'),
                 "created_date": user_cert.get('created'),
                 "status": user_cert.get('status'),
@@ -151,16 +155,17 @@ class CertificatesListView(APIView):
         BearerAuthenticationAllowInactiveUser,
         SessionAuthenticationAllowInactiveUser,
     )
+    # pylint: disable=unsupported-binary-operation
     permission_classes = (
-        C(IsAuthenticated) & (
-            C(permissions.NotJwtRestrictedApplication) |
+        IsAuthenticated & (
+            permissions.NotJwtRestrictedApplication |
             (
-                C(permissions.JwtRestrictedApplication) &
+                permissions.JwtRestrictedApplication &
                 permissions.JwtHasScope &
                 permissions.JwtHasUserFilterForRequestedUser
             )
         ),
-        (C(permissions.IsStaff) | IsOwnerOrPublicCertificates),
+        permissions.IsStaff | IsOwnerOrPublicCertificates,
     )
 
     required_scopes = ['certificates:read']
@@ -173,7 +178,7 @@ class CertificatesListView(APIView):
         )
     ])
     def get(self, request, username):
-        """Get a paginated list of bookmarks for a user.
+        """Get a paginated list of certificates for a user.
 
         **Use Case**
 
@@ -229,7 +234,7 @@ class CertificatesListView(APIView):
             for user_cert in self._get_certificates_for_user(username):
                 user_certs.append({
                     'username': user_cert.get('username'),
-                    'course_id': six.text_type(user_cert.get('course_key')),
+                    'course_id': str(user_cert.get('course_key')),
                     'course_display_name': user_cert.get('course_display_name'),
                     'course_organization': user_cert.get('course_organization'),
                     'certificate_type': user_cert.get('type'),
@@ -269,32 +274,22 @@ class CertificatesListView(APIView):
                 passing_certificates[course_key] = course_certificate
 
         viewable_certificates = []
-        for course_key, course_overview in CourseOverview.get_from_ids(
-            list(passing_certificates.keys())
-        ).items():
+        course_ids = list(passing_certificates.keys())
+        course_overviews = get_course_overviews_from_ids(course_ids)
+        for course_key, course_overview in course_overviews.items():
             if not course_overview:
                 # For deleted XML courses in which learners have a valid certificate.
                 # i.e. MITx/7.00x/2013_Spring
-                course_overview = self._get_pseudo_course_overview(course_key)
+                course_overview = get_pseudo_course_overview(course_key)
             if certificates_viewable_for_course(course_overview):
                 course_certificate = passing_certificates[course_key]
                 # add certificate into viewable certificate list only if it's a PDF certificate
                 # or there is an active certificate configuration.
-                if course_certificate['is_pdf_certificate'] or course_overview.has_any_active_web_certificate:
+                if course_certificate['is_pdf_certificate'] or (course_overview and
+                                                                course_overview.has_any_active_web_certificate):
                     course_certificate['course_display_name'] = course_overview.display_name_with_default
                     course_certificate['course_organization'] = course_overview.display_org_with_default
                     viewable_certificates.append(course_certificate)
 
         viewable_certificates.sort(key=lambda certificate: certificate['created'])
         return viewable_certificates
-
-    def _get_pseudo_course_overview(self, course_key):
-        """
-        Returns a pseudo course overview object for deleted courses.
-        """
-        course_run = get_course_run_details(course_key, ['title'])
-        return CourseOverview(
-            display_name=course_run.get('title'),
-            display_org_with_default=course_key.org,
-            certificates_show_before_end=True
-        )

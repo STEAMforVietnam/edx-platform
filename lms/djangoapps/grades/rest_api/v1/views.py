@@ -18,7 +18,7 @@ from lms.djangoapps.grades.rest_api.serializers import GradingPolicySerializer
 from lms.djangoapps.grades.rest_api.v1.utils import CourseEnrollmentPagination, GradeViewMixin
 from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
 from openedx.core.lib.api.view_utils import PaginatedAPIView, get_course_key, verify_course_exists
-from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ class CourseGradesView(GradeViewMixin, PaginatedAPIView):
 
     required_scopes = ['grades:read']
 
-    @verify_course_exists
+    @verify_course_exists("Requested grade for unknown course {course}")
     def get(self, request, course_id=None):
         """
         Gets a course progress status.
@@ -182,7 +182,7 @@ class CourseGradingPolicy(GradeViewMixin, ListAPIView):
         try:
             course_key = get_course_key(request, course_id)
         except InvalidKeyError:
-            raise self.api_error(
+            raise self.api_error(  # lint-amnesty, pylint: disable=raise-missing-from
                 status_code=status.HTTP_400_BAD_REQUEST,
                 developer_message='The provided course key cannot be parsed.',
                 error_code='invalid_course_key'

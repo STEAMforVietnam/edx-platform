@@ -4,10 +4,10 @@ Utility methods related to course
 
 
 import logging
+from urllib.parse import urlencode
 
-import six
 from django.conf import settings
-from django.utils.timezone import now
+from opaque_keys.edx.keys import CourseKey, UsageKey
 
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 
@@ -32,8 +32,8 @@ def get_encoded_course_sharing_utm_params():
     Returns encoded Course Sharing UTM Parameters.
     """
     return {
-        utm_source: six.moves.urllib.parse.urlencode(utm_params)
-        for utm_source, utm_params in six.iteritems(COURSE_SHARING_UTM_PARAMETERS)
+        utm_source: urlencode(utm_params)
+        for utm_source, utm_params in COURSE_SHARING_UTM_PARAMETERS.items()
     }
 
 
@@ -54,9 +54,9 @@ def get_link_for_about_page(course):
     elif settings.FEATURES.get('ENABLE_MKTG_SITE') and getattr(course, 'marketing_url', None):
         course_about_url = course.marketing_url
     else:
-        course_about_url = u'{about_base_url}/courses/{course_key}/about'.format(
+        course_about_url = '{about_base_url}/courses/{course_key}/about'.format(
             about_base_url=configuration_helpers.get_value('LMS_ROOT_URL', settings.LMS_ROOT_URL),
-            course_key=six.text_type(course.id),
+            course_key=str(course.id),
         )
 
     return course_about_url
@@ -73,15 +73,10 @@ def has_certificates_enabled(course):
     return course.cert_html_view_enabled
 
 
-def should_display_grade(course_overview):
-    """
-    Returns True or False depending upon either certificate available date
-    or course-end-date
-    """
-    course_end_date = course_overview.end_date
-    cert_available_date = course_overview.certificate_available_date
-    current_date = now().replace(hour=0, minute=0, second=0, microsecond=0)
-    if cert_available_date:
-        return cert_available_date < current_date
-
-    return course_end_date and course_end_date < current_date
+def course_location_from_key(course_key: CourseKey) -> UsageKey:
+    """Creates a usage key for the toplevel course item, handling differences between mongo and newer keys"""
+    if getattr(course_key, 'deprecated', False):
+        block_id = course_key.run
+    else:
+        block_id = 'course'
+    return course_key.make_usage_key('course', block_id)

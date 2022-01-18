@@ -20,8 +20,8 @@ from ..models import UserCourseTag
 COURSE_SCOPE = 'course'
 
 
-class BulkCourseTags(object):
-    CACHE_NAMESPACE = u'user_api.course_tag.api'
+class BulkCourseTags:  # lint-amnesty, pylint: disable=missing-class-docstring
+    CACHE_NAMESPACE = 'user_api.course_tag.api'
 
     @classmethod
     def prefetch(cls, course_id, users):
@@ -53,7 +53,7 @@ class BulkCourseTags(object):
 
     @classmethod
     def _cache_key(cls, course_id):
-        return u'course_tag.{}'.format(course_id)
+        return f'course_tag.{course_id}'
 
 
 def get_course_tag(user, course_id, key):
@@ -69,6 +69,9 @@ def get_course_tag(user, course_id, key):
     Returns:
         string value, or None if there is no value saved
     """
+    if user.is_anonymous:
+        return None
+
     if BulkCourseTags.is_prefetched(course_id):
         try:
             return BulkCourseTags.get_course_tag(user.id, course_id, key)
@@ -103,6 +106,9 @@ def set_course_tag(user, course_id, key, value):
     # TODO: There is a risk of IntegrityErrors being thrown here given
     # simultaneous calls from many processes. Handle by retrying after
     # a short delay?
+
+    if not user.id:
+        return
 
     record, _ = UserCourseTag.objects.get_or_create(
         user=user,

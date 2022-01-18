@@ -6,13 +6,12 @@ API function for retrieving course blocks data
 import lms.djangoapps.course_blocks.api as course_blocks_api
 from lms.djangoapps.course_blocks.transformers.access_denied_filter import AccessDeniedMessageFilterTransformer
 from lms.djangoapps.course_blocks.transformers.hidden_content import HiddenContentTransformer
-from lms.djangoapps.course_blocks.transformers.hide_empty import HideEmptyTransformer
 from openedx.core.djangoapps.content.block_structure.transformers import BlockStructureTransformers
-from openedx.core.lib.mobile_utils import is_request_from_mobile_app
+from openedx.core.djangoapps.discussions.transformers import DiscussionsTopicLinkTransformer
+from openedx.features.effort_estimation.api import EffortEstimationTransformer
 
 from .serializers import BlockDictSerializer, BlockSerializer
 from .toggles import HIDE_ACCESS_DENIALS_FLAG
-from .transformers.block_completion import BlockCompletionTransformer
 from .transformers.blocks_api import BlocksAPITransformer
 from .transformers.milestones import MilestonesAndSpecialExamsTransformer
 
@@ -72,8 +71,15 @@ def get_blocks(
     if requested_fields is None:
         requested_fields = []
     include_completion = 'completion' in requested_fields
-    include_special_exams = 'special_exam_info' in requested_fields
+    include_effort_estimation = (EffortEstimationTransformer.EFFORT_TIME in requested_fields or
+                                 EffortEstimationTransformer.EFFORT_ACTIVITIES in requested_fields)
     include_gated_sections = 'show_gated_sections' in requested_fields
+    include_has_scheduled_content = 'has_scheduled_content' in requested_fields
+    include_special_exams = 'special_exam_info' in requested_fields
+    include_discussions_context = (
+        DiscussionsTopicLinkTransformer.EMBED_URL in requested_fields or
+        DiscussionsTopicLinkTransformer.EXTERNAL_ID in requested_fields
+    )
 
     if user is not None:
         transformers += course_blocks_api.get_course_block_access_transformers(user)
@@ -85,12 +91,21 @@ def get_blocks(
             HiddenContentTransformer()
         ]
 
+    # Note: A change to the BlockCompletionTransformer (https://github.com/edx/edx-platform/pull/27622/)
+    # will be introducing a bug if hide_access_denials is True.  I'm accepting this risk because in
+    # the AccessDeniedMessageFilterTransformer, there is note about deleting it and I believe it is
+    # technically deprecated functionality. The only use case where hide_access_denials is True
+    # (outside of explicitly setting the temporary waffle flag) is in lms/djangoapps/course_api/blocks/urls.py
+    # for a v1 api that I also believe should have been deprecated and removed. When this code is removed,
+    # please also remove this comment. Thanks!
     if hide_access_denials:
         transformers += [AccessDeniedMessageFilterTransformer()]
 
-    # TODO: Remove this after REVE-52 lands and old-mobile-app traffic falls to < 5% of mobile traffic
-    if is_request_from_mobile_app(request):
-        transformers += [HideEmptyTransformer()]
+    if include_effort_estimation:
+        transformers += [EffortEstimationTransformer()]
+
+    if include_discussions_context:
+        transformers += [DiscussionsTopicLinkTransformer()]
 
     transformers += [
         BlocksAPITransformer(
@@ -98,15 +113,18 @@ def get_blocks(
             student_view_data,
             depth,
             nav_depth
-        )
+        ),
     ]
-
-    if include_completion:
-        transformers += [BlockCompletionTransformer()]
 
     # transform
     blocks = course_blocks_api.get_course_blocks(
-        user, usage_key, transformers, allow_start_dates_in_future=allow_start_dates_in_future)
+        user,
+        usage_key,
+        transformers,
+        allow_start_dates_in_future=allow_start_dates_in_future,
+        include_completion=include_completion,
+        include_has_scheduled_content=include_has_scheduled_content
+    )
 
     # filter blocks by types
     if block_types_filter:

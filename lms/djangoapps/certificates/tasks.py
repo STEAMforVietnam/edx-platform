@@ -1,53 +1,48 @@
 """
-Module for generating certificate for a user
+Tasks that generate a course certificate for a user
 """
-
 
 from logging import getLogger
 
-from celery import task
+from celery import shared_task
 from celery_utils.persist_on_failure import LoggedPersistOnFailureTask
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from edx_django_utils.monitoring import set_code_owner_attribute
 from opaque_keys.edx.keys import CourseKey
 
-from lms.djangoapps.verify_student.services import IDVerificationService
+from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.certificates.generation import generate_course_certificate
 
-from .api import generate_user_certificates
+log = getLogger(__name__)
+User = get_user_model()
 
-logger = getLogger(__name__)
+# Certificate generation is delayed in case the caller is still completing their changes
+# (for example a certificate regeneration reacting to a post save rather than post commit signal)
+CERTIFICATE_DELAY_SECONDS = 2
 
 
-@task(base=LoggedPersistOnFailureTask, bind=True, default_retry_delay=30, max_retries=2)
-def generate_certificate(self, **kwargs):
+@shared_task(base=LoggedPersistOnFailureTask, bind=True, default_retry_delay=30, max_retries=2)
+@set_code_owner_attribute
+def generate_certificate(self, **kwargs):  # pylint: disable=unused-argument
     """
     Generates a certificate for a single user.
 
     kwargs:
-        - student: The student for whom to generate a certificate.
+        - student: The student for whom to generate a certificate. Required.
         - course_key: The course key for the course that the student is
-            receiving a certificate in.
-        - expected_verification_status: The expected verification status
-            for the user.  When the status has changed, we double check
-            that the actual verification status is as expected before
-            generating a certificate, in the off chance that the database
-            has not yet updated with the user's new verification status.
+            receiving a certificate in. Required.
+        - status: Certificate status (value from the CertificateStatuses model). Defaults to 'downloadable'.
+        - enrollment_mode: User's enrollment mode (ex. verified). Required.
+        - course_grade: User's course grade. Defaults to ''.
+        - generation_mode: Used when emitting an event. Options are "self" (implying the user generated the cert
+            themself) and "batch" for everything else. Defaults to 'batch'.
     """
-    original_kwargs = kwargs.copy()
     student = User.objects.get(id=kwargs.pop('student'))
     course_key = CourseKey.from_string(kwargs.pop('course_key'))
-    expected_verification_status = kwargs.pop('expected_verification_status', None)
-    if expected_verification_status:
-        actual_verification_status = IDVerificationService.user_status(student)
-        actual_verification_status = actual_verification_status['status']
-        if expected_verification_status != actual_verification_status:
-            logger.warning(
-                u'Expected verification status {expected} '
-                u'differs from actual verification status {actual} '
-                u'for user {user} in course {course}'.format(
-                    expected=expected_verification_status,
-                    actual=actual_verification_status,
-                    user=student.id,
-                    course=course_key
-                ))
-            raise self.retry(kwargs=original_kwargs)
-    generate_user_certificates(student=student, course_key=course_key, **kwargs)
+    status = kwargs.pop('status', CertificateStatuses.downloadable)
+    enrollment_mode = kwargs.pop('enrollment_mode')
+    course_grade = kwargs.pop('course_grade', '')
+    generation_mode = kwargs.pop('generation_mode', 'batch')
+
+    generate_course_certificate(user=student, course_key=course_key, status=status, enrollment_mode=enrollment_mode,
+                                course_grade=course_grade, generation_mode=generation_mode)

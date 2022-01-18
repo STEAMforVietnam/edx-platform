@@ -5,13 +5,13 @@ Common mixins for Course API Tests
 
 from datetime import datetime
 
-from student.tests.factories import UserFactory
-from xmodule.modulestore.tests.factories import ToyCourseFactory
+from common.djangoapps.student.tests.factories import UserFactory, CourseEnrollmentFactory, CourseAccessRoleFactory
+from xmodule.modulestore.tests.factories import ToyCourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
-TEST_PASSWORD = u'edx'
+TEST_PASSWORD = 'edx'
 
 
-class CourseApiFactoryMixin(object):
+class CourseApiFactoryMixin:
     """
     Mixin to allow creation of test courses and users.
     """
@@ -37,7 +37,21 @@ class CourseApiFactoryMixin(object):
         """
         return UserFactory(
             username=username,
-            email=u'{}@example.com'.format(username),
+            email=f'{username}@example.com',
             password=TEST_PASSWORD,
             is_staff=is_staff
         )
+
+    @staticmethod
+    def create_enrollment(**kwargs):
+        """
+        Create a CourseEnrollment to use in tests.
+        """
+        return CourseEnrollmentFactory(**kwargs)
+
+    @staticmethod
+    def create_courseaccessrole(**kwargs):
+        """
+        Create a CourseAccessRole to use in tests.
+        """
+        return CourseAccessRoleFactory(**kwargs)

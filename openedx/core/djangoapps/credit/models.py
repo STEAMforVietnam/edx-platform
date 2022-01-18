@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Models for Credit Eligibility for courses.
 
@@ -12,16 +11,14 @@ import logging
 from collections import defaultdict
 
 import pytz
-import six
 from config_models.models import ConfigurationModel
 from django.conf import settings
 from django.core.cache import cache
 from django.core.validators import RegexValidator
 from django.db import IntegrityError, models, transaction
 from django.dispatch import receiver
-from django.utils.encoding import python_2_unicode_compatible
-from django.utils.translation import ugettext as _
-from django.utils.translation import ugettext_lazy
+from django.utils.translation import gettext as _  # lint-amnesty, pylint: disable=unused-import
+from django.utils.translation import gettext_lazy
 from edx_django_utils.cache import RequestCache
 from jsonfield.fields import JSONField
 from model_utils.models import TimeStampedModel
@@ -29,11 +26,10 @@ from opaque_keys.edx.django.models import CourseKeyField
 
 from openedx.core.lib.cache_utils import request_cached
 
-CREDIT_PROVIDER_ID_REGEX = u"[a-z,A-Z,0-9,\\-]+"
+CREDIT_PROVIDER_ID_REGEX = "[a-z,A-Z,0-9,\\-]+"
 log = logging.getLogger(__name__)
 
 
-@python_2_unicode_compatible
 class CreditProvider(TimeStampedModel):
     """
     This model represents an institution that can grant credit for a course.
@@ -51,11 +47,11 @@ class CreditProvider(TimeStampedModel):
         validators=[
             RegexValidator(
                 regex=CREDIT_PROVIDER_ID_REGEX,
-                message=u"Only alphanumeric characters and hyphens (-) are allowed",
-                code=u"invalid_provider_id",
+                message="Only alphanumeric characters and hyphens (-) are allowed",
+                code="invalid_provider_id",
             )
         ],
-        help_text=ugettext_lazy(
+        help_text=gettext_lazy(
             "Unique identifier for this credit provider. "
             "Only alphanumeric characters and hyphens (-) are allowed. "
             "The identifier is case-sensitive."
@@ -64,17 +60,17 @@ class CreditProvider(TimeStampedModel):
 
     active = models.BooleanField(
         default=True,
-        help_text=ugettext_lazy("Whether the credit provider is currently enabled.")
+        help_text=gettext_lazy("Whether the credit provider is currently enabled.")
     )
 
     display_name = models.CharField(
         max_length=255,
-        help_text=ugettext_lazy("Name of the credit provider displayed to users")
+        help_text=gettext_lazy("Name of the credit provider displayed to users")
     )
 
     enable_integration = models.BooleanField(
         default=False,
-        help_text=ugettext_lazy(
+        help_text=gettext_lazy(
             "When true, automatically notify the credit provider "
             "when a user requests credit. "
             "In order for this to work, a shared secret key MUST be configured "
@@ -83,8 +79,8 @@ class CreditProvider(TimeStampedModel):
     )
 
     provider_url = models.URLField(
-        default=u"",
-        help_text=ugettext_lazy(
+        default="",
+        help_text=gettext_lazy(
             "URL of the credit provider.  If automatic integration is "
             "enabled, this will the the end-point that we POST to "
             "to notify the provider of a credit request.  Otherwise, the "
@@ -94,8 +90,8 @@ class CreditProvider(TimeStampedModel):
     )
 
     provider_status_url = models.URLField(
-        default=u"",
-        help_text=ugettext_lazy(
+        default="",
+        help_text=gettext_lazy(
             "URL from the credit provider where the user can check the status "
             "of his or her request for credit.  This is displayed to students "
             "*after* they have requested credit."
@@ -103,8 +99,8 @@ class CreditProvider(TimeStampedModel):
     )
 
     provider_description = models.TextField(
-        default=u"",
-        help_text=ugettext_lazy(
+        default="",
+        help_text=gettext_lazy(
             "Description for the credit provider displayed to users."
         )
     )
@@ -112,7 +108,7 @@ class CreditProvider(TimeStampedModel):
     fulfillment_instructions = models.TextField(
         null=True,
         blank=True,
-        help_text=ugettext_lazy(
+        help_text=gettext_lazy(
             "Plain text or html content for displaying further steps on "
             "receipt page *after* paying for the credit to get credit for a "
             "credit course against a credit provider."
@@ -120,8 +116,8 @@ class CreditProvider(TimeStampedModel):
     )
 
     eligibility_email_message = models.TextField(
-        default=u"",
-        help_text=ugettext_lazy(
+        default="",
+        help_text=gettext_lazy(
             "Plain text or html content for displaying custom message inside "
             "credit eligibility email content which is sent when user has met "
             "all credit eligibility requirements."
@@ -129,8 +125,8 @@ class CreditProvider(TimeStampedModel):
     )
 
     receipt_email_message = models.TextField(
-        default=u"",
-        help_text=ugettext_lazy(
+        default="",
+        help_text=gettext_lazy(
             "Plain text or html content for displaying custom message inside "
             "credit receipt email content which is sent *after* paying to get "
             "credit for a credit course."
@@ -138,9 +134,9 @@ class CreditProvider(TimeStampedModel):
     )
 
     thumbnail_url = models.URLField(
-        default=u"",
+        default="",
         max_length=255,
-        help_text=ugettext_lazy(
+        help_text=gettext_lazy(
             "Thumbnail image url of the credit provider."
         )
     )
@@ -216,7 +212,6 @@ def invalidate_provider_cache(sender, **kwargs):  # pylint: disable=unused-argum
     cache.delete(CreditProvider.CREDIT_PROVIDERS_CACHE_KEY)
 
 
-@python_2_unicode_compatible
 class CreditCourse(models.Model):
     """
     Model for tracking a credit course.
@@ -243,13 +238,13 @@ class CreditCourse(models.Model):
         """
         credit_courses = cache.get(cls.CREDIT_COURSES_CACHE_KEY)
         if credit_courses is None:
-            credit_courses = set(
-                six.text_type(course.course_key)
+            credit_courses = {
+                str(course.course_key)
                 for course in cls.objects.filter(enabled=True)
-            )
+            }
             cache.set(cls.CREDIT_COURSES_CACHE_KEY, credit_courses)
 
-        return six.text_type(course_key) in credit_courses
+        return str(course_key) in credit_courses
 
     @classmethod
     def get_credit_course(cls, course_key):
@@ -269,7 +264,7 @@ class CreditCourse(models.Model):
 
     def __str__(self):
         """Unicode representation of the credit course. """
-        return six.text_type(self.course_key)
+        return str(self.course_key)
 
 
 @receiver(models.signals.post_save, sender=CreditCourse)
@@ -279,7 +274,6 @@ def invalidate_credit_courses_cache(sender, **kwargs):   # pylint: disable=unuse
     cache.delete(CreditCourse.CREDIT_COURSES_CACHE_KEY)
 
 
-@python_2_unicode_compatible
 class CreditRequirement(TimeStampedModel):
     """
     This model represents a credit requirement.
@@ -299,19 +293,19 @@ class CreditRequirement(TimeStampedModel):
     course = models.ForeignKey(CreditCourse, related_name="credit_requirements", on_delete=models.CASCADE)
     namespace = models.CharField(max_length=255)
     name = models.CharField(max_length=255)
-    display_name = models.CharField(max_length=255, default=u"")
+    display_name = models.CharField(max_length=255, default="")
     criteria = JSONField()
     active = models.BooleanField(default=True)
     sort_value = models.PositiveIntegerField(default=0)
 
-    CACHE_NAMESPACE = u"credit.CreditRequirement.cache."
+    CACHE_NAMESPACE = "credit.CreditRequirement.cache."
 
-    class Meta(object):
+    class Meta:
         unique_together = ('namespace', 'name', 'course')
         ordering = ["sort_value"]
 
     def __str__(self):
-        return u'{course_id} - {name}'.format(course_id=self.course.course_key, name=self.display_name)
+        return f'{self.course.course_key} - {self.display_name}'
 
     @classmethod
     def add_or_update_course_requirement(cls, credit_course, requirement, sort_value):
@@ -450,9 +444,9 @@ class CreditRequirementStatus(TimeStampedModel):
     # the grade to users later and to send the information to credit providers.
     reason = JSONField(default={})
 
-    class Meta(object):
+    class Meta:
         unique_together = ('username', 'requirement')
-        verbose_name_plural = ugettext_lazy('Credit requirement statuses')
+        verbose_name_plural = gettext_lazy('Credit requirement statuses')
 
     @classmethod
     def get_statuses(cls, requirements, username):
@@ -490,7 +484,7 @@ class CreditRequirementStatus(TimeStampedModel):
             # do not update status to `failed` if user has `satisfied` the requirement
             if status == 'failed' and requirement_status.status == 'satisfied':
                 log.info(
-                    u'Can not change status of credit requirement "%s" from satisfied to failed ',
+                    'Can not change status of credit requirement "%s" from satisfied to failed ',
                     requirement_status.requirement_id
                 )
                 return
@@ -514,7 +508,7 @@ class CreditRequirementStatus(TimeStampedModel):
             requirement_status.delete()
         except cls.DoesNotExist:
             log_msg = (
-                u'The requirement status {requirement} does not exist for username {username}.'.format(
+                'The requirement status {requirement} does not exist for username {username}.'.format(
                     requirement=requirement,
                     username=username
                 )
@@ -548,7 +542,6 @@ def default_deadline_for_credit_eligibility():
     )
 
 
-@python_2_unicode_compatible
 class CreditEligibility(TimeStampedModel):
     """
     A record of a user's eligibility for credit for a specific course.
@@ -565,10 +558,10 @@ class CreditEligibility(TimeStampedModel):
     # we need to override the deadline for particular students.
     deadline = models.DateTimeField(
         default=default_deadline_for_credit_eligibility,
-        help_text=ugettext_lazy("Deadline for purchasing and requesting credit.")
+        help_text=gettext_lazy("Deadline for purchasing and requesting credit.")
     )
 
-    class Meta(object):
+    class Meta:
         unique_together = ('username', 'course')
         verbose_name_plural = "Credit eligibilities"
 
@@ -649,13 +642,12 @@ class CreditEligibility(TimeStampedModel):
 
     def __str__(self):
         """Unicode representation of the credit eligibility. """
-        return u"{user}, {course}".format(
+        return "{user}, {course}".format(
             user=self.username,
             course=self.course.course_key,
         )
 
 
-@python_2_unicode_compatible
 class CreditRequest(TimeStampedModel):
     """
     A request for credit from a particular credit provider.
@@ -676,14 +668,14 @@ class CreditRequest(TimeStampedModel):
     provider = models.ForeignKey(CreditProvider, related_name="credit_requests", on_delete=models.CASCADE)
     parameters = JSONField()
 
-    REQUEST_STATUS_PENDING = u"pending"
-    REQUEST_STATUS_APPROVED = u"approved"
-    REQUEST_STATUS_REJECTED = u"rejected"
+    REQUEST_STATUS_PENDING = "pending"
+    REQUEST_STATUS_APPROVED = "approved"
+    REQUEST_STATUS_REJECTED = "rejected"
 
     REQUEST_STATUS_CHOICES = (
-        (REQUEST_STATUS_PENDING, u"Pending"),
-        (REQUEST_STATUS_APPROVED, u"Approved"),
-        (REQUEST_STATUS_REJECTED, u"Rejected"),
+        (REQUEST_STATUS_PENDING, "Pending"),
+        (REQUEST_STATUS_APPROVED, "Approved"),
+        (REQUEST_STATUS_REJECTED, "Rejected"),
     )
     status = models.CharField(
         max_length=255,
@@ -691,7 +683,7 @@ class CreditRequest(TimeStampedModel):
         default=REQUEST_STATUS_PENDING
     )
 
-    class Meta(object):
+    class Meta:
         # Enforce the constraint that each user can have exactly one outstanding
         # request to a given provider.  Multiple requests use the same UUID.
         unique_together = ('username', 'course', 'provider')
@@ -775,14 +767,13 @@ class CreditRequest(TimeStampedModel):
 
     def __str__(self):
         """Unicode representation of a credit request."""
-        return u"{course}, {provider}, {status}".format(
+        return "{course}, {provider}, {status}".format(
             course=self.course.course_key,
             provider=self.provider.provider_id,
             status=self.status,
         )
 
 
-@python_2_unicode_compatible
 class CreditConfig(ConfigurationModel):
     """
     Manage credit configuration
@@ -792,9 +783,9 @@ class CreditConfig(ConfigurationModel):
     CACHE_KEY = 'credit.providers.api.data'
 
     cache_ttl = models.PositiveIntegerField(
-        verbose_name=ugettext_lazy("Cache Time To Live"),
+        verbose_name=gettext_lazy("Cache Time To Live"),
         default=0,
-        help_text=ugettext_lazy(
+        help_text=gettext_lazy(
             "Specified in seconds. Enable caching by setting this to a value greater than 0."
         )
     )

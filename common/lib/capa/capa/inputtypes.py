@@ -53,7 +53,7 @@ import pyparsing
 import six
 from calc.preview import latex_preview
 from chem import chemcalc
-from django.utils.encoding import python_2_unicode_compatible
+
 from lxml import etree
 from six import text_type
 
@@ -73,7 +73,6 @@ log = logging.getLogger(__name__)
 registry = TagRegistry()  # pylint: disable=invalid-name
 
 
-@python_2_unicode_compatible
 class Status(object):
     """
     Problem status
@@ -113,7 +112,7 @@ class Status(object):
             )
         )
         self.display_name = names.get(status, six.text_type(status))
-        self.display_tooltip = tooltips.get(status, u'')
+        self.display_tooltip = tooltips.get(status, '')
         self._status = status or ''
 
     def __str__(self):
@@ -254,11 +253,10 @@ class InputTypeBase(object):
             # super().__init__, and are isolated from changes to the input
             # constructor interface.
             self.setup()
-        except Exception as err:
+        except Exception as err:  # lint-amnesty, pylint: disable=broad-except
             # Something went wrong: add xml to message, but keep the traceback
-            msg = u"Error in xml '{x}': {err} ".format(
+            msg = "Error in xml '{x}': {err} ".format(
                 x=etree.tostring(xml), err=text_type(err))
-            msg = Exception(msg)
             six.reraise(Exception, Exception(msg), sys.exc_info()[2])
 
     @classmethod
@@ -299,7 +297,7 @@ class InputTypeBase(object):
         If this method raises an exception, it will be wrapped with a message that includes the
         problem xml.
         """
-        pass
+        pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
     def handle_ajax(self, dispatch, data):
         """
@@ -312,7 +310,7 @@ class InputTypeBase(object):
         Output:
             a dictionary object that can be serialized into JSON. This will be sent back to the Javascript.
         """
-        pass
+        pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
     def _get_render_context(self):
         """
@@ -337,7 +335,7 @@ class InputTypeBase(object):
         }
 
         # Generate the list of ids to be used with the aria-describedby field.
-        descriptions = list()
+        descriptions = []
 
         # If there is trailing text, add the id as the first element to the list before adding the status id
         if 'trailing_text' in self.loaded_attributes and self.loaded_attributes['trailing_text']:
@@ -385,11 +383,11 @@ class InputTypeBase(object):
             output = etree.XML(html)
         except etree.XMLSyntaxError as ex:
             # If `html` contains attrs with no values, like `controls` in <audio controls src='smth'/>,
-            # XML parser will raise exception, so wee fallback to html5parser, which will set empty "" values for such attrs.
+            # XML parser will raise exception, so wee fallback to html5parser, which will set empty "" values for such attrs.  # lint-amnesty, pylint: disable=line-too-long
             try:
                 output = html5lib.parseFragment(html, treebuilder='lxml', namespaceHTMLElements=False)[0]
             except IndexError:
-                raise ex
+                raise ex  # lint-amnesty, pylint: disable=raise-missing-from
 
         return output
 
@@ -588,6 +586,7 @@ class JSInput(InputTypeBase):
         - allow-popups
         - allow-forms
         - allow-pointer-lock
+        - allow-downloads
 
     This in turn means that the iframe cannot directly access the top-level
     window elements.
@@ -803,12 +802,12 @@ class CodeInput(InputTypeBase):
             self.value = self.xml.text.strip()
 
         # Check if problem has been queued
-        self.queue_len = 0
+        self.queue_len = 0  # lint-amnesty, pylint: disable=attribute-defined-outside-init
         # Flag indicating that the problem has been queued, 'msg' is length of
         # queue
         if self.status == 'incomplete':
             self.status = 'queued'
-            self.queue_len = self.msg
+            self.queue_len = self.msg  # lint-amnesty, pylint: disable=attribute-defined-outside-init
             self.msg = bleach.clean(self.submitted_msg)
 
     def setup(self):
@@ -909,7 +908,7 @@ class MatlabInput(CodeInput):
 
         Args:
             - queue_msg (str) - message returned from the queue. The message to be rendered
-            - queuekey (str) - a key passed to the queue. Will be matched up to verify that this is the response we're waiting for
+            - queuekey (str) - a key passed to the queue. Will be matched up to verify that this is the response we're waiting for  # lint-amnesty, pylint: disable=line-too-long
 
         Returns:
             nothing
@@ -942,7 +941,7 @@ class MatlabInput(CodeInput):
         queue_msg = self.queue_msg
         if len(self.queue_msg) > 0:  # An empty string cannot be parsed as XML but is okay to include in the template.
             try:
-                etree.XML(HTML(u'<div>{0}</div>').format(HTML(self.queue_msg)))
+                etree.XML(HTML('<div>{0}</div>').format(HTML(self.queue_msg)))
             except etree.XMLSyntaxError:
                 try:
                     html5lib.parseFragment(self.queue_msg, treebuilder='lxml', namespaceHTMLElements=False)[0]
@@ -995,9 +994,9 @@ class MatlabInput(CodeInput):
         response = data['submission']
 
         # construct xqueue headers
-        qinterface = self.capa_system.xqueue['interface']
+        qinterface = self.capa_system.xqueue.interface
         qtime = datetime.utcnow().strftime(xqueue_interface.dateformat)
-        callback_url = self.capa_system.xqueue['construct_callback']('ungraded_response')
+        callback_url = self.capa_system.xqueue.construct_callback('ungraded_response')
         anonymous_student_id = self.capa_system.anonymous_student_id
         # TODO: Why is this using self.capa_system.seed when we have self.seed???
         queuekey = xqueue_interface.make_hashkey(str(self.capa_system.seed) + qtime +
@@ -1226,7 +1225,7 @@ class ChemicalEquationInput(InputTypeBase):
             result['preview'] = chemcalc.render_to_html(formula)
         except pyparsing.ParseException as err:
             result['error'] = _("Couldn't parse formula: {error_msg}").format(error_msg=err.msg)
-        except Exception:
+        except Exception:  # lint-amnesty, pylint: disable=broad-except
             # this is unexpected, so log
             log.warning(
                 "Error while previewing chemical formula", exc_info=True)
@@ -1276,7 +1275,7 @@ class FormulaEquationInput(InputTypeBase):
                 static_url=self.capa_system.STATIC_URL),
         }
 
-    def handle_ajax(self, dispatch, get):
+    def handle_ajax(self, dispatch, get):  # lint-amnesty, pylint: disable=arguments-differ
         """
         Since we only have formcalc preview this input, check to see if it
         matches the corresponding dispatch and send it through if it does
@@ -1317,7 +1316,7 @@ class FormulaEquationInput(InputTypeBase):
         except pyparsing.ParseException:
             result['error'] = _("Sorry, couldn't parse formula")
             result['formula'] = formula
-        except Exception:
+        except Exception:  # lint-amnesty, pylint: disable=broad-except
             # this is unexpected, so log
             log.warning(
                 "Error while previewing formula", exc_info=True
@@ -1363,22 +1362,22 @@ class DragAndDropInput(InputTypeBase):
                     dict{'name': smth, 'label': smth, 'icon': smth,
                     'can_reuse': smth}.
             """
-            tag_attrs = dict()
+            tag_attrs = {}
             tag_attrs['draggable'] = {
-                'id': Attribute._sentinel,
+                'id': Attribute._sentinel,  # lint-amnesty, pylint: disable=protected-access
                 'label': "", 'icon': "",
                 'can_reuse': ""
             }
 
             tag_attrs['target'] = {
-                'id': Attribute._sentinel,
-                'x': Attribute._sentinel,
-                'y': Attribute._sentinel,
-                'w': Attribute._sentinel,
-                'h': Attribute._sentinel
+                'id': Attribute._sentinel,  # lint-amnesty, pylint: disable=protected-access
+                'x': Attribute._sentinel,  # lint-amnesty, pylint: disable=protected-access
+                'y': Attribute._sentinel,  # lint-amnesty, pylint: disable=protected-access
+                'w': Attribute._sentinel,  # lint-amnesty, pylint: disable=protected-access
+                'h': Attribute._sentinel  # lint-amnesty, pylint: disable=protected-access
             }
 
-            dic = dict()
+            dic = {}
 
             for attr_name in tag_attrs[tag_type].keys():
                 dic[attr_name] = Attribute(attr_name,
@@ -1397,7 +1396,7 @@ class DragAndDropInput(InputTypeBase):
         self.no_labels = Attribute('no_labels',
                                    default="False").parse_from_xml(self.xml)
 
-        to_js = dict()
+        to_js = {}
 
         # image drag and drop onto
         to_js['base_image'] = Attribute('img').parse_from_xml(self.xml)
@@ -1543,7 +1542,7 @@ class AnnotationInput(InputTypeBase):
                 They are the ones who, at the public assembly, had put savage derangement [ate] into my thinking
                 [phrenes] |89 on that day when I myself deprived Achilles of his honorific portion [geras]
             </text>
-            <comment>Agamemnon says that ate or 'derangement' was the cause of his actions: why could Zeus say the same thing?</comment>
+            <comment>Agamemnon says that ate or 'derangement' was the cause of his actions: why could Zeus say the same thing?</comment>  # lint-amnesty, pylint: disable=line-too-long
             <comment_prompt>Type a commentary below:</comment_prompt>
             <tag_prompt>Select one tag:</tag_prompt>
             <options>
@@ -1594,7 +1593,7 @@ class AnnotationInput(InputTypeBase):
         valid_choices = ('correct', 'partially-correct', 'incorrect')
         for option in self.options:
             choice = option['choice']
-            if choice is None:
+            if choice is None:  # lint-amnesty, pylint: disable=no-else-raise
                 raise ValueError('Missing required choice attribute.')
             elif choice not in valid_choices:
                 raise ValueError('Invalid choice attribute: {0}. Must be one of: {1}'.format(

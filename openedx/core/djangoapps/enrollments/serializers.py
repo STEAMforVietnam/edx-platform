@@ -7,8 +7,8 @@ import logging
 
 from rest_framework import serializers
 
-from course_modes.models import CourseMode
-from student.models import CourseEnrollment
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.student.models import CourseEnrollment
 
 log = logging.getLogger(__name__)
 
@@ -44,14 +44,15 @@ class CourseSerializer(serializers.Serializer):  # pylint: disable=abstract-meth
     course_end = serializers.DateTimeField(source="end", format=None)
     invite_only = serializers.BooleanField(source="invitation_only")
     course_modes = serializers.SerializerMethodField()
+    pacing_type = serializers.SerializerMethodField()
 
-    class Meta(object):
+    class Meta:
         # For disambiguating within the drf-yasg swagger schema
         ref_name = 'enrollment.Course'
 
     def __init__(self, *args, **kwargs):
         self.include_expired = kwargs.pop("include_expired", False)
-        super(CourseSerializer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def get_course_modes(self, obj):
         """
@@ -66,6 +67,12 @@ class CourseSerializer(serializers.Serializer):  # pylint: disable=abstract-meth
             ModeSerializer(mode).data
             for mode in course_modes
         ]
+
+    def get_pacing_type(self, obj):
+        """
+        Get a string representation of the course pacing.
+        """
+        return "Self Paced" if obj.self_paced else "Instructor Paced"
 
 
 class CourseEnrollmentSerializer(serializers.ModelSerializer):
@@ -82,7 +89,7 @@ class CourseEnrollmentSerializer(serializers.ModelSerializer):
         """Retrieves the username from the associated model."""
         return model.username
 
-    class Meta(object):
+    class Meta:
         model = CourseEnrollment
         fields = ('created', 'mode', 'is_active', 'course_details', 'user')
         lookup_field = 'username'
@@ -96,7 +103,7 @@ class CourseEnrollmentsApiListSerializer(CourseEnrollmentSerializer):
     course_id = serializers.CharField(source='course_overview.id')
 
     def __init__(self, *args, **kwargs):
-        super(CourseEnrollmentsApiListSerializer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.fields.pop('course_details')
 
     class Meta(CourseEnrollmentSerializer.Meta):

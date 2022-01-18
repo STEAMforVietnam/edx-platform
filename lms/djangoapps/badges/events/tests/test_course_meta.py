@@ -3,19 +3,19 @@ Tests the course meta badging events
 """
 
 
-import six
-from six.moves import range, zip
+from unittest.mock import patch
+
 from ddt import data, ddt, unpack
 from django.conf import settings
 from django.test.utils import override_settings
-from mock import patch
 
-from badges.tests.factories import CourseEventBadgesConfigurationFactory, RandomBadgeClassFactory
-from lms.djangoapps.certificates.models import CertificateStatuses, GeneratedCertificate
-from student.models import CourseEnrollment
-from student.tests.factories import UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from common.djangoapps.student.models import CourseEnrollment
+from common.djangoapps.student.tests.factories import UserFactory
+from lms.djangoapps.badges.tests.factories import CourseEventBadgesConfigurationFactory, RandomBadgeClassFactory
+from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.certificates.models import GeneratedCertificate
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 @ddt
@@ -27,7 +27,7 @@ class CourseEnrollmentBadgeTest(ModuleStoreTestCase):
     """
 
     def setUp(self):
-        super(CourseEnrollmentBadgeTest, self).setUp()
+        super().setUp()
         self.badge_classes = [
             RandomBadgeClassFactory(
                 issuing_component='openedx__course'
@@ -51,7 +51,7 @@ class CourseEnrollmentBadgeTest(ModuleStoreTestCase):
         user = UserFactory()
         course = CourseFactory()
         CourseEnrollment.enroll(user, course_key=course.location.course_key)
-        self.assertFalse(user.badgeassertion_set.all())
+        assert not user.badgeassertion_set.all()
 
     @unpack
     @data((1, 3), (2, 5), (3, 8))
@@ -64,8 +64,8 @@ class CourseEnrollmentBadgeTest(ModuleStoreTestCase):
         for course in courses:
             CourseEnrollment.enroll(user, course_key=course.location.course_key)
         assertions = user.badgeassertion_set.all().order_by('id')
-        self.assertEqual(user.badgeassertion_set.all().count(), checkpoint)
-        self.assertEqual(assertions[checkpoint - 1].badge_class, self.badge_classes[checkpoint - 1])
+        assert user.badgeassertion_set.all().count() == checkpoint
+        assert assertions[(checkpoint - 1)].badge_class == self.badge_classes[(checkpoint - 1)]
 
 
 @ddt
@@ -77,7 +77,7 @@ class CourseCompletionBadgeTest(ModuleStoreTestCase):
     """
 
     def setUp(self):
-        super(CourseCompletionBadgeTest, self).setUp()
+        super().setUp()
         self.badge_classes = [
             RandomBadgeClassFactory(
                 issuing_component='openedx__course'
@@ -104,7 +104,7 @@ class CourseCompletionBadgeTest(ModuleStoreTestCase):
         GeneratedCertificate(
             user=user, course_id=course.location.course_key, status=CertificateStatuses.downloadable
         ).save()
-        self.assertFalse(user.badgeassertion_set.all())
+        assert not user.badgeassertion_set.all()
 
     @unpack
     @data((1, 2), (2, 6), (3, 9))
@@ -119,8 +119,8 @@ class CourseCompletionBadgeTest(ModuleStoreTestCase):
                 user=user, course_id=course.location.course_key, status=CertificateStatuses.downloadable
             ).save()
         assertions = user.badgeassertion_set.all().order_by('id')
-        self.assertEqual(user.badgeassertion_set.all().count(), checkpoint)
-        self.assertEqual(assertions[checkpoint - 1].badge_class, self.badge_classes[checkpoint - 1])
+        assert user.badgeassertion_set.all().count() == checkpoint
+        assert assertions[(checkpoint - 1)].badge_class == self.badge_classes[(checkpoint - 1)]
 
 
 @patch.dict(settings.FEATURES, {'ENABLE_OPENBADGES': True})
@@ -131,7 +131,7 @@ class CourseGroupBadgeTest(ModuleStoreTestCase):
     """
 
     def setUp(self):
-        super(CourseGroupBadgeTest, self).setUp()
+        super().setUp()
         self.badge_classes = [
             RandomBadgeClassFactory(
                 issuing_component='openedx__course'
@@ -145,8 +145,8 @@ class CourseGroupBadgeTest(ModuleStoreTestCase):
         ]
         self.courses = []
         for _badge_class in self.badge_classes:
-            self.courses.append([CourseFactory().location.course_key for _i in range(3)])
-        lines = [badge_class.slug + ',' + ','.join([six.text_type(course_key) for course_key in keys])
+            self.courses.append([CourseFactory().location.course_key for _i in range(3)])  # lint-amnesty, pylint: disable=no-member
+        lines = [badge_class.slug + ',' + ','.join([str(course_key) for course_key in keys])
                  for badge_class, keys in zip(self.badge_classes, self.courses)]
         config = '\r'.join(lines)
         self.config = CourseEventBadgesConfigurationFactory(course_groups=config)
@@ -161,7 +161,7 @@ class CourseGroupBadgeTest(ModuleStoreTestCase):
         GeneratedCertificate(
             user=user, course_id=course.location.course_key, status=CertificateStatuses.downloadable
         ).save()
-        self.assertFalse(user.badgeassertion_set.all())
+        assert not user.badgeassertion_set.all()
 
     def test_group_matches(self):
         """
@@ -176,9 +176,9 @@ class CourseGroupBadgeTest(ModuleStoreTestCase):
                 ).save()
                 # We don't award badges until all three are set.
                 if i + 1 == len(course_keys):
-                    self.assertTrue(badge_class.get_for_user(user))
+                    assert badge_class.get_for_user(user)
                 else:
-                    self.assertFalse(badge_class.get_for_user(user))
+                    assert not badge_class.get_for_user(user)
         classes = [badge.badge_class.id for badge in user.badgeassertion_set.all()]
         source_classes = [badge.id for badge in self.badge_classes]
-        self.assertEqual(classes, source_classes)
+        assert classes == source_classes

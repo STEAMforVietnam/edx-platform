@@ -5,21 +5,33 @@ Tests for Discussion API internal interface
 
 import itertools
 from datetime import datetime, timedelta
+from unittest import mock
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from opaque_keys.edx.keys import CourseKey
 
 import ddt
 import httpretty
-import mock
-import six
+import pytest
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test.client import RequestFactory
 from opaque_keys.edx.locator import CourseLocator
 from pytz import UTC
 from rest_framework.exceptions import PermissionDenied
-from six.moves import range
-from six.moves.urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.partitions.partitions import Group, UserPartition
 
+from common.djangoapps.student.tests.factories import (
+    BetaTesterFactory,
+    CourseEnrollmentFactory,
+    StaffFactory,
+    UserFactory,
+)
+from common.djangoapps.util.testing import UrlResetMixin
 from common.test.utils import MockSignalHandlerMixin, disable_signal
-from lms.djangoapps.courseware.tests.factories import BetaTesterFactory, StaffFactory
 from lms.djangoapps.discussion.django_comment_client.tests.utils import ForumsEnableMixin
 from lms.djangoapps.discussion.rest_api import api
 from lms.djangoapps.discussion.rest_api.api import (
@@ -32,19 +44,21 @@ from lms.djangoapps.discussion.rest_api.api import (
     get_course_topics,
     get_thread,
     get_thread_list,
+    get_user_comments,
     update_comment,
-    update_thread
+    update_thread,
 )
 from lms.djangoapps.discussion.rest_api.exceptions import (
     CommentNotFoundError,
+    DiscussionBlackOutException,
     DiscussionDisabledError,
-    ThreadNotFoundError
+    ThreadNotFoundError,
 )
 from lms.djangoapps.discussion.rest_api.tests.utils import (
     CommentsServiceMockMixin,
     make_minimal_cs_comment,
     make_minimal_cs_thread,
-    make_paginated_api_response
+    make_paginated_api_response,
 )
 from openedx.core.djangoapps.course_groups.models import CourseUserGroupPartitionGroup
 from openedx.core.djangoapps.course_groups.tests.helpers import CohortFactory
@@ -53,16 +67,11 @@ from openedx.core.djangoapps.django_comment_common.models import (
     FORUM_ROLE_COMMUNITY_TA,
     FORUM_ROLE_MODERATOR,
     FORUM_ROLE_STUDENT,
-    Role
+    Role,
 )
 from openedx.core.lib.exceptions import CourseNotFoundError, PageNotFoundError
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from util.testing import UrlResetMixin
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.partitions.partitions import Group, UserPartition
+
+User = get_user_model()
 
 
 def _remove_discussion_tab(course, user_id):
@@ -88,6 +97,19 @@ def _discussion_disabled_course_for(user):
     return course_with_disabled_forums
 
 
+def _assign_role_to_user(user, course_id, role):
+    """
+    Unset the blackout period for course discussions.
+
+    Arguments:
+            user: User to assign role to
+            course_id: Course id of the course user will be assigned role in
+            role: Role assigned to user for course
+    """
+    role = Role.objects.create(name=role, course_id=course_id)
+    role.users.set([user])
+
+
 def _create_course_and_cohort_with_user_role(course_is_cohorted, user, role_name):
     """
     Creates a course with the value of `course_is_cohorted`, plus `always_cohort_inline_discussions`
@@ -101,55 +123,85 @@ def _create_course_and_cohort_with_user_role(course_is_cohorted, user, role_name
     )
     CourseEnrollmentFactory.create(user=user, course_id=cohort_course.id)
     cohort = CohortFactory.create(course_id=cohort_course.id, users=[user])
-    role = Role.objects.create(name=role_name, course_id=cohort_course.id)
-    role.users.set([user])
+    _assign_role_to_user(user=user, course_id=cohort_course.id, role=role_name)
+
     return [cohort_course, cohort]
 
 
+def _set_course_discussion_blackout(course, user_id):
+    """
+    Set the blackout period for course discussions.
+
+    Arguments:
+            course: Course for which blackout period is set
+            user_id: User id of user enrolled in the course
+    """
+    course.discussion_blackouts = [
+        datetime.now(UTC) - timedelta(days=3),
+        datetime.now(UTC) + timedelta(days=3)
+    ]
+    modulestore().update_item(course, user_id)
+
+
 @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
+@ddt.ddt
 class GetCourseTest(ForumsEnableMixin, UrlResetMixin, SharedModuleStoreTestCase):
     """Test for get_course"""
 
     @classmethod
     def setUpClass(cls):
-        super(GetCourseTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create(org="x", course="y", run="z")
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(GetCourseTest, self).setUp()
+        super().setUp()
         self.user = UserFactory.create()
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
         self.request = RequestFactory().get("/dummy")
         self.request.user = self.user
 
     def test_nonexistent_course(self):
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             get_course(self.request, CourseLocator.from_string("non/existent/course"))
 
     def test_not_enrolled(self):
         unenrolled_user = UserFactory.create()
         self.request.user = unenrolled_user
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             get_course(self.request, self.course.id)
 
     def test_discussions_disabled(self):
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             get_course(self.request, _discussion_disabled_course_for(self.user).id)
 
     def test_basic(self):
-        self.assertEqual(
-            get_course(self.request, self.course.id),
-            {
-                "id": six.text_type(self.course.id),
-                "blackouts": [],
-                "thread_list_url": "http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz",
-                "following_thread_list_url": (
-                    "http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&following=True"
-                ),
-                "topics_url": "http://testserver/api/discussion/v1/course_topics/x/y/z",
-            }
-        )
+        assert get_course(self.request, self.course.id) == {
+            'id': str(self.course.id),
+            'blackouts': [],
+            'thread_list_url': 'http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz',
+            'following_thread_list_url':
+                'http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&following=True',
+            'topics_url': 'http://testserver/api/discussion/v1/course_topics/x/y/z',
+            'allow_anonymous': True,
+            'allow_anonymous_to_peers': False,
+            'user_is_privileged': False,
+            'user_roles': {'Student'},
+        }
+
+    @ddt.data(
+        FORUM_ROLE_ADMINISTRATOR,
+        FORUM_ROLE_MODERATOR,
+        FORUM_ROLE_COMMUNITY_TA,
+    )
+    def test_privileged_roles(self, role):
+        """
+        Test that the api returns the correct roles and privileges.
+        """
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role)
+        course_meta = get_course(self.request, self.course.id)
+        assert course_meta["user_is_privileged"]
+        assert course_meta["user_roles"] == {FORUM_ROLE_STUDENT} | {role}
 
 
 @ddt.ddt
@@ -161,7 +213,7 @@ class GetCourseTestBlackouts(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCa
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(GetCourseTestBlackouts, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create(org="x", course="y", run="z")
         self.user = UserFactory.create()
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
@@ -176,13 +228,10 @@ class GetCourseTestBlackouts(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCa
         ]
         modulestore().update_item(self.course, self.user.id)
         result = get_course(self.request, self.course.id)
-        self.assertEqual(
-            result["blackouts"],
-            [
-                {"start": "2015-06-09T00:00:00+00:00", "end": "2015-06-10T00:00:00+00:00"},
-                {"start": "2015-06-11T00:00:00+00:00", "end": "2015-06-12T00:00:00+00:00"},
-            ]
-        )
+        assert result['blackouts'] == [
+            {'start': '2015-06-09T00:00:00Z', 'end': '2015-06-10T00:00:00Z'},
+            {'start': '2015-06-11T00:00:00Z', 'end': '2015-06-12T00:00:00Z'}
+        ]
 
     @ddt.data(None, "not a datetime", "2015", [])
     def test_blackout_errors(self, bad_value):
@@ -192,16 +241,20 @@ class GetCourseTestBlackouts(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCa
         ]
         modulestore().update_item(self.course, self.user.id)
         result = get_course(self.request, self.course.id)
-        self.assertEqual(result["blackouts"], [])
+        assert result['blackouts'] == []
 
 
 @mock.patch.dict("django.conf.settings.FEATURES", {"DISABLE_START_DATES": False})
 @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
-class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase):
+class GetCourseTopicsTest(CommentsServiceMockMixin, ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase):
     """Test for get_course_topics"""
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(GetCourseTopicsTest, self).setUp()
+        httpretty.reset()
+        httpretty.enable()
+        self.addCleanup(httpretty.reset)
+        self.addCleanup(httpretty.disable)
+        super().setUp()
         self.maxDiff = None  # pylint: disable=invalid-name
         self.partition = UserPartition(
             0,
@@ -224,6 +277,12 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
         self.request = RequestFactory().get("/dummy")
         self.request.user = self.user
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+        self.thread_counts_map = {
+            "courseware-1": {"discussion": 2, "question": 3},
+            "courseware-2": {"discussion": 4, "question": 5},
+            "courseware-3": {"discussion": 7, "question": 2},
+        }
+        self.register_get_course_commentable_counts_response(self.course.id, self.thread_counts_map)
 
     def make_discussion_xblock(self, topic_id, category, subcategory, **kwargs):
         """
@@ -244,7 +303,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
         """
         path = "http://testserver/api/discussion/v1/threads/"
         topic_ids_to_query = [("topic_id", topic_id) for topic_id in topic_id_list]
-        query_list = [("course_id", six.text_type(self.course.id))] + topic_ids_to_query
+        query_list = [("course_id", str(self.course.id))] + topic_ids_to_query
         return urlunparse(("", "", path, "", urlencode(query_list), ""))
 
     def get_course_topics(self):
@@ -261,28 +320,30 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
         """
         topic_id_list = [topic_id] if topic_id else [child["id"] for child in children]
         children = children or []
+        thread_counts = self.thread_counts_map.get(topic_id, {"discussion": 0, "question": 0})
         node = {
             "id": topic_id,
             "name": name,
             "children": children,
-            "thread_list_url": self.get_thread_list_url(topic_id_list)
+            "thread_list_url": self.get_thread_list_url(topic_id_list),
+            "thread_counts": thread_counts if not children else None
         }
 
         return node
 
     def test_nonexistent_course(self):
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             get_course_topics(self.request, CourseLocator.from_string("non/existent/course"))
 
     def test_not_enrolled(self):
         unenrolled_user = UserFactory.create()
         self.request.user = unenrolled_user
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             self.get_course_topics()
 
     def test_discussions_disabled(self):
         _remove_discussion_tab(self.course, self.user.id)
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             self.get_course_topics()
 
     def test_without_courseware(self):
@@ -293,7 +354,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-topic-id", "Test Topic")
             ],
         }
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_with_courseware(self):
         self.make_discussion_xblock("courseware-topic-id", "Foo", "Bar")
@@ -310,7 +371,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-topic-id", "Test Topic")
             ],
         }
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_many(self):
         with self.store.bulk_operations(self.course.id, emit_signals=False):
@@ -354,7 +415,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-2", "B"),
             ],
         }
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_sort_key(self):
         with self.store.bulk_operations(self.course.id, emit_signals=False):
@@ -403,7 +464,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-1", "W"),
             ],
         }
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
     def test_access_control(self):
         """
@@ -470,7 +531,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-topic-id", "Test Topic"),
             ],
         }
-        self.assertEqual(student_actual, student_expected)
+        assert student_actual == student_expected
         self.request.user = beta_tester
         beta_actual = self.get_course_topics()
         beta_expected = {
@@ -493,7 +554,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-topic-id", "Test Topic"),
             ],
         }
-        self.assertEqual(beta_actual, beta_expected)
+        assert beta_actual == beta_expected
 
         self.request.user = staff
         staff_actual = self.get_course_topics()
@@ -521,7 +582,7 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
                 self.make_expected_tree("non-courseware-topic-id", "Test Topic"),
             ],
         }
-        self.assertEqual(staff_actual, staff_expected)
+        assert staff_actual == staff_expected
 
     def test_discussion_topic(self):
         """
@@ -532,41 +593,45 @@ class GetCourseTopicsTest(ForumsEnableMixin, UrlResetMixin, ModuleStoreTestCase)
         self.make_discussion_xblock(topic_id_1, "test_category_1", "test_target_1")
         self.make_discussion_xblock(topic_id_2, "test_category_2", "test_target_2")
         actual = get_course_topics(self.request, self.course.id, {"topic_id_1", "topic_id_2"})
-        self.assertEqual(
-            actual,
-            {
-                "non_courseware_topics": [],
-                "courseware_topics": [
-                    {
-                        "children": [{
-                            "children": [],
-                            "id": "topic_id_1",
-                            "thread_list_url": "http://testserver/api/discussion/v1/threads/?"
-                                               "course_id=x%2Fy%2Fz&topic_id=topic_id_1",
-                            "name": "test_target_1"
-                        }],
-                        "id": None,
-                        "thread_list_url": "http://testserver/api/discussion/v1/threads/?"
-                                           "course_id=x%2Fy%2Fz&topic_id=topic_id_1",
-                        "name": "test_category_1"
-                    },
-                    {
-                        "children":
-                            [{
-                                "children": [],
-                                "id": "topic_id_2",
-                                "thread_list_url": "http://testserver/api/discussion/v1/threads/?"
-                                                   "course_id=x%2Fy%2Fz&topic_id=topic_id_2",
-                                "name": "test_target_2"
-                            }],
-                        "id": None,
-                        "thread_list_url": "http://testserver/api/discussion/v1/threads/?"
-                                           "course_id=x%2Fy%2Fz&topic_id=topic_id_2",
-                        "name": "test_category_2"
-                    }
-                ]
-            }
-        )
+        assert actual == {
+            'non_courseware_topics': [],
+            'courseware_topics': [
+                {
+                    'children': [
+                        {
+                            'children': [],
+                            'id': 'topic_id_1',
+                            'thread_list_url':
+                                'http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&topic_id=topic_id_1',
+                            'name': 'test_target_1',
+                            'thread_counts': {'discussion': 0, 'question': 0},
+                        },
+                    ],
+                    'id': None,
+                    'thread_list_url':
+                        'http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&topic_id=topic_id_1',
+                    'name': 'test_category_1',
+                    'thread_counts': None,
+                },
+                {
+                    'children': [
+                        {
+                            'children': [],
+                            'id': 'topic_id_2',
+                            'thread_list_url':
+                                'http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&topic_id=topic_id_2',
+                            'name': 'test_target_2',
+                            'thread_counts': {'discussion': 0, 'question': 0},
+                        }
+                    ],
+                    'id': None,
+                    'thread_list_url':
+                        'http://testserver/api/discussion/v1/threads/?course_id=x%2Fy%2Fz&topic_id=topic_id_2',
+                    'name': 'test_category_2',
+                    'thread_counts': None,
+                }
+            ]
+        }
 
 
 @ddt.ddt
@@ -576,12 +641,12 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
 
     @classmethod
     def setUpClass(cls):
-        super(GetThreadListTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(GetThreadListTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -616,39 +681,38 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
         return ret
 
     def test_nonexistent_course(self):
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             get_thread_list(self.request, CourseLocator.from_string("non/existent/course"), 1, 1)
 
     def test_not_enrolled(self):
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             self.get_thread_list([])
 
     def test_discussions_disabled(self):
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             self.get_thread_list([], course=_discussion_disabled_course_for(self.user))
 
     def test_empty(self):
-        self.assertEqual(
-            self.get_thread_list([], num_pages=0).data,
-            {
-                "pagination": {
-                    "next": None,
-                    "previous": None,
-                    "num_pages": 0,
-                    "count": 0
-                },
-                "results": [],
-                "text_search_rewrite": None,
-            }
-        )
+        assert self.get_thread_list(
+            [], num_pages=0
+        ).data == {
+            'pagination': {
+                'next': None,
+                'previous': None,
+                'num_pages': 0,
+                'count': 0
+            },
+            'results': [],
+            'text_search_rewrite': None
+        }
 
     def test_get_threads_by_topic_id(self):
         self.get_thread_list([], topic_id_list=["topic_x", "topic_meow"])
-        self.assertEqual(urlparse(httpretty.last_request().path).path, "/api/v1/threads")
+        assert urlparse(httpretty.last_request().path).path == '/api/v1/threads'  # lint-amnesty, pylint: disable=no-member
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": ["activity"],
             "page": ["1"],
             "per_page": ["1"],
@@ -658,8 +722,8 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
     def test_basic_query_params(self):
         self.get_thread_list([], page=6, page_size=14)
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": ["activity"],
             "page": ["6"],
             "per_page": ["14"],
@@ -671,7 +735,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
         source_threads = [
             make_minimal_cs_thread({
                 "id": "test_thread_id_0",
-                "course_id": six.text_type(self.course.id),
+                "course_id": str(self.course.id),
                 "commentable_id": "topic_x",
                 "username": self.author.username,
                 "user_id": str(self.author.id),
@@ -687,7 +751,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             }),
             make_minimal_cs_thread({
                 "id": "test_thread_id_1",
-                "course_id": six.text_type(self.course.id),
+                "course_id": str(self.course.id),
                 "commentable_id": "topic_y",
                 "group_id": self.cohort.id,
                 "username": self.author.username,
@@ -715,6 +779,8 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
                 "read": True,
                 "created_at": "2015-04-28T00:00:00Z",
                 "updated_at": "2015-04-28T11:11:11Z",
+                "abuse_flagged_count": None,
+                "can_delete": False,
             }),
             self.expected_thread_data({
                 "id": "test_thread_id_1",
@@ -725,6 +791,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
                 "type": "question",
                 "title": "Another Test Title",
                 "raw_body": "More content",
+                "preview_body": "More content",
                 "rendered_body": "<p>More content</p>",
                 "vote_count": 9,
                 "comment_count": 19,
@@ -738,6 +805,8 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
                     "http://testserver/api/discussion/v1/comments/?thread_id=test_thread_id_1&endorsed=False"
                 ),
                 "editable_fields": ["abuse_flagged", "following", "read", "voted"],
+                "abuse_flagged_count": None,
+                "can_delete": False,
             }),
         ]
 
@@ -745,10 +814,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             results=expected_threads, count=2, num_pages=1, next_link=None, previous_link=None
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(
-            self.get_thread_list(source_threads).data,
-            expected_result
-        )
+        assert self.get_thread_list(source_threads).data == expected_result
 
     @ddt.data(
         *itertools.product(
@@ -766,12 +832,11 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
         cohort_course = CourseFactory.create(cohort_config={"cohorted": course_is_cohorted})
         CourseEnrollmentFactory.create(user=self.user, course_id=cohort_course.id)
         CohortFactory.create(course_id=cohort_course.id, users=[self.user])
-        role = Role.objects.create(name=role_name, course_id=cohort_course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=cohort_course.id, role=role_name)
         self.get_thread_list([], course=cohort_course)
-        actual_has_group = "group_id" in httpretty.last_request().querystring
+        actual_has_group = "group_id" in httpretty.last_request().querystring  # lint-amnesty, pylint: disable=no-member
         expected_has_group = (course_is_cohorted and role_name == FORUM_ROLE_STUDENT)
-        self.assertEqual(actual_has_group, expected_has_group)
+        assert actual_has_group == expected_has_group
 
     def test_pagination(self):
         # N.B. Empty thread list is not realistic but convenient for this test
@@ -779,10 +844,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             results=[], count=0, num_pages=3, next_link="http://testserver/test_path?page=2", previous_link=None
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(
-            self.get_thread_list([], page=1, num_pages=3).data,
-            expected_result
-        )
+        assert self.get_thread_list([], page=1, num_pages=3).data == expected_result
 
         expected_result = make_paginated_api_response(
             results=[],
@@ -792,23 +854,17 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             previous_link="http://testserver/test_path?page=1"
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(
-            self.get_thread_list([], page=2, num_pages=3).data,
-            expected_result
-        )
+        assert self.get_thread_list([], page=2, num_pages=3).data == expected_result
 
         expected_result = make_paginated_api_response(
             results=[], count=0, num_pages=3, next_link=None, previous_link="http://testserver/test_path?page=2"
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(
-            self.get_thread_list([], page=3, num_pages=3).data,
-            expected_result
-        )
+        assert self.get_thread_list([], page=3, num_pages=3).data == expected_result
 
         # Test page past the last one
         self.register_get_threads_response([], page=3, num_pages=3)
-        with self.assertRaises(PageNotFoundError):
+        with pytest.raises(PageNotFoundError):
             get_thread_list(self.request, self.course.id, page=4, page_size=10)
 
     @ddt.data(None, "rewritten search string")
@@ -818,24 +874,167 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
         )
         expected_result.update({"text_search_rewrite": text_search_rewrite})
         self.register_get_threads_search_response([], text_search_rewrite, num_pages=0)
-        self.assertEqual(
-            get_thread_list(
-                self.request,
-                self.course.id,
-                page=1,
-                page_size=10,
-                text_search="test search string"
-            ).data,
-            expected_result
-        )
+        assert get_thread_list(
+            self.request,
+            self.course.id,
+            page=1,
+            page_size=10,
+            text_search='test search string'
+        ).data == expected_result
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": ["activity"],
             "page": ["1"],
             "per_page": ["10"],
             "text": ["test search string"],
         })
+
+    def test_filter_threads_by_author(self):
+        thread = make_minimal_cs_thread()
+        self.register_get_threads_response([thread], page=1, num_pages=10)
+        thread_results = get_thread_list(
+            self.request,
+            self.course.id,
+            page=1,
+            page_size=10,
+            author=self.user.username,
+        ).data.get('results')
+        assert len(thread_results) == 1
+
+        expected_last_query_params = {
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
+            "sort_key": ["activity"],
+            "page": ["1"],
+            "per_page": ["10"],
+            "author_id": [str(self.user.id)],
+        }
+
+        self.assert_last_query_params(expected_last_query_params)
+
+    def test_filter_threads_by_missing_author(self):
+        self.register_get_threads_response([make_minimal_cs_thread()], page=1, num_pages=10)
+        results = get_thread_list(
+            self.request,
+            self.course.id,
+            page=1,
+            page_size=10,
+            author="a fake and missing username",
+        ).data.get('results')
+        assert len(results) == 0
+
+    @ddt.data('question', 'discussion', None)
+    def test_thread_type(self, thread_type):
+        expected_result = make_paginated_api_response(
+            results=[], count=0, num_pages=0, next_link=None, previous_link=None
+        )
+        expected_result.update({"text_search_rewrite": None})
+
+        self.register_get_threads_response([], page=1, num_pages=0)
+        assert get_thread_list(
+            self.request,
+            self.course.id,
+            page=1,
+            page_size=10,
+            thread_type=thread_type,
+        ).data == expected_result
+
+        expected_last_query_params = {
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
+            "sort_key": ["activity"],
+            "page": ["1"],
+            "per_page": ["10"],
+            "thread_type": [thread_type],
+        }
+
+        if thread_type is None:
+            del expected_last_query_params["thread_type"]
+
+        self.assert_last_query_params(expected_last_query_params)
+
+    @ddt.data(True, False, None)
+    def test_flagged(self, flagged_boolean):
+        expected_result = make_paginated_api_response(
+            results=[], count=0, num_pages=0, next_link=None, previous_link=None
+        )
+        expected_result.update({"text_search_rewrite": None})
+
+        self.register_get_threads_response([], page=1, num_pages=0)
+        assert get_thread_list(
+            self.request,
+            self.course.id,
+            page=1,
+            page_size=10,
+            flagged=flagged_boolean,
+        ).data == expected_result
+
+        expected_last_query_params = {
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
+            "sort_key": ["activity"],
+            "page": ["1"],
+            "per_page": ["10"],
+            "flagged": [str(flagged_boolean)],
+        }
+
+        if flagged_boolean is None:
+            del expected_last_query_params["flagged"]
+
+        self.assert_last_query_params(expected_last_query_params)
+
+    @ddt.data(
+        FORUM_ROLE_ADMINISTRATOR,
+        FORUM_ROLE_MODERATOR,
+        FORUM_ROLE_COMMUNITY_TA,
+    )
+    def test_flagged_count(self, role):
+        expected_result = make_paginated_api_response(
+            results=[], count=0, num_pages=0, next_link=None, previous_link=None
+        )
+        expected_result.update({"text_search_rewrite": None})
+
+        _assign_role_to_user(self.user, self.course.id, role=role)
+
+        self.register_get_threads_response([], page=1, num_pages=0)
+        get_thread_list(
+            self.request,
+            self.course.id,
+            page=1,
+            page_size=10,
+            count_flagged=True,
+        )
+
+        expected_last_query_params = {
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
+            "sort_key": ["activity"],
+            "count_flagged": ["True"],
+            "page": ["1"],
+            "per_page": ["10"],
+        }
+
+        self.assert_last_query_params(expected_last_query_params)
+
+    def test_flagged_count_denied(self):
+        expected_result = make_paginated_api_response(
+            results=[], count=0, num_pages=0, next_link=None, previous_link=None
+        )
+        expected_result.update({"text_search_rewrite": None})
+
+        _assign_role_to_user(self.user, self.course.id, role=FORUM_ROLE_STUDENT)
+
+        self.register_get_threads_response([], page=1, num_pages=0)
+
+        with pytest.raises(PermissionDenied):
+            get_thread_list(
+                self.request,
+                self.course.id,
+                page=1,
+                page_size=10,
+                count_flagged=True,
+            )
 
     def test_following(self):
         self.register_subscribed_threads_response(self.user, [], page=1, num_pages=0)
@@ -851,17 +1050,13 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             results=[], count=0, num_pages=0, next_link=None, previous_link=None
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(
-            result,
-            expected_result
-        )
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            "/api/v1/users/{}/subscribed_threads".format(self.user.id)
-        )
+        assert result == expected_result
+        assert urlparse(
+            httpretty.last_request().path  # lint-amnesty, pylint: disable=no-member
+        ).path == f"/api/v1/users/{self.user.id}/subscribed_threads"
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": ["activity"],
             "page": ["1"],
             "per_page": ["11"],
@@ -882,17 +1077,11 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             results=[], count=0, num_pages=0, next_link=None, previous_link=None
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(
-            result,
-            expected_result
-        )
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            "/api/v1/threads"
-        )
+        assert result == expected_result
+        assert urlparse(httpretty.last_request().path).path == '/api/v1/threads'  # lint-amnesty, pylint: disable=no-member
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": ["activity"],
             "page": ["1"],
             "per_page": ["11"],
@@ -926,14 +1115,11 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             results=[], count=0, num_pages=0, next_link=None, previous_link=None
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(result, expected_result)
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            "/api/v1/threads"
-        )
+        assert result == expected_result
+        assert urlparse(httpretty.last_request().path).path == '/api/v1/threads'  # lint-amnesty, pylint: disable=no-member
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": [cc_query],
             "page": ["1"],
             "per_page": ["11"],
@@ -957,14 +1143,11 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
             results=[], count=0, num_pages=0, next_link=None, previous_link=None
         )
         expected_result.update({"text_search_rewrite": None})
-        self.assertEqual(result, expected_result)
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            "/api/v1/threads"
-        )
+        assert result == expected_result
+        assert urlparse(httpretty.last_request().path).path == '/api/v1/threads'  # lint-amnesty, pylint: disable=no-member
         self.assert_last_query_params({
-            "user_id": [six.text_type(self.user.id)],
-            "course_id": [six.text_type(self.course.id)],
+            "user_id": [str(self.user.id)],
+            "course_id": [str(self.course.id)],
             "sort_key": ["activity"],
             "page": ["1"],
             "per_page": ["11"],
@@ -974,7 +1157,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
         """
         Test with invalid order_direction (e.g. "asc")
         """
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             self.register_get_threads_response([], page=1, num_pages=0)
             get_thread_list(           # pylint: disable=expression-not-assigned
                 self.request,
@@ -983,7 +1166,7 @@ class GetThreadListTest(ForumsEnableMixin, CommentsServiceMockMixin, UrlResetMix
                 page_size=11,
                 order_direction="asc",
             ).data
-        self.assertIn("order_direction", assertion.exception.message_dict)
+        assert 'order_direction' in assertion.value.message_dict
 
 
 @ddt.ddt
@@ -993,12 +1176,12 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
 
     @classmethod
     def setUpClass(cls):
-        super(GetCommentListTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(GetCommentListTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -1017,7 +1200,7 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
         already in overrides.
         """
         overrides = overrides.copy() if overrides else {}
-        overrides.setdefault("course_id", six.text_type(self.course.id))
+        overrides.setdefault("course_id", str(self.course.id))
         return make_minimal_cs_thread(overrides)
 
     def get_comment_list(self, thread, endorsed=None, page=1, page_size=1):
@@ -1031,24 +1214,24 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
     def test_nonexistent_thread(self):
         thread_id = "nonexistent_thread"
         self.register_get_thread_error_response(thread_id, 404)
-        with self.assertRaises(ThreadNotFoundError):
+        with pytest.raises(ThreadNotFoundError):
             get_comment_list(self.request, thread_id, endorsed=False, page=1, page_size=1)
 
     def test_nonexistent_course(self):
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             self.get_comment_list(self.make_minimal_cs_thread({"course_id": "non/existent/course"}))
 
     def test_not_enrolled(self):
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             self.get_comment_list(self.make_minimal_cs_thread())
 
     def test_discussions_disabled(self):
         disabled_course = _discussion_disabled_course_for(self.user)
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             self.get_comment_list(
                 self.make_minimal_cs_thread(
-                    overrides={"course_id": six.text_type(disabled_course.id)}
+                    overrides={"course_id": str(disabled_course.id)}
                 )
             )
 
@@ -1082,10 +1265,9 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
         )
         CourseEnrollmentFactory.create(user=self.user, course_id=cohort_course.id)
         cohort = CohortFactory.create(course_id=cohort_course.id, users=[self.user])
-        role = Role.objects.create(name=role_name, course_id=cohort_course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=cohort_course.id, role=role_name)
         thread = self.make_minimal_cs_thread({
-            "course_id": six.text_type(cohort_course.id),
+            "course_id": str(cohort_course.id),
             "commentable_id": "test_topic",
             "group_id": (
                 None if thread_group_state == "no_group" else
@@ -1101,41 +1283,33 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
         )
         try:
             self.get_comment_list(thread)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     @ddt.data(True, False)
     def test_discussion_endorsed(self, endorsed_value):
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             self.get_comment_list(
                 self.make_minimal_cs_thread({"thread_type": "discussion"}),
                 endorsed=endorsed_value
             )
-        self.assertEqual(
-            assertion.exception.message_dict,
-            {"endorsed": ["This field may not be specified for discussion threads."]}
-        )
+        assert assertion.value.message_dict == {'endorsed': ['This field may not be specified for discussion threads.']}
 
     def test_question_without_endorsed(self):
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             self.get_comment_list(
                 self.make_minimal_cs_thread({"thread_type": "question"}),
                 endorsed=None
             )
-        self.assertEqual(
-            assertion.exception.message_dict,
-            {"endorsed": ["This field is required for question threads."]}
-        )
+        assert assertion.value.message_dict == {'endorsed': ['This field is required for question threads.']}
 
     def test_empty(self):
         discussion_thread = self.make_minimal_cs_thread(
             {"thread_type": "discussion", "children": [], "resp_total": 0}
         )
-        self.assertEqual(
-            self.get_comment_list(discussion_thread).data,
-            make_paginated_api_response(results=[], count=0, num_pages=1, next_link=None, previous_link=None)
-        )
+        assert self.get_comment_list(discussion_thread).data == make_paginated_api_response(
+            results=[], count=0, num_pages=1, next_link=None, previous_link=None)
 
         question_thread = self.make_minimal_cs_thread({
             "thread_type": "question",
@@ -1143,14 +1317,10 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
             "non_endorsed_responses": [],
             "non_endorsed_resp_total": 0
         })
-        self.assertEqual(
-            self.get_comment_list(question_thread, endorsed=False).data,
-            make_paginated_api_response(results=[], count=0, num_pages=1, next_link=None, previous_link=None)
-        )
-        self.assertEqual(
-            self.get_comment_list(question_thread, endorsed=True).data,
-            make_paginated_api_response(results=[], count=0, num_pages=1, next_link=None, previous_link=None)
-        )
+        assert self.get_comment_list(question_thread, endorsed=False).data == make_paginated_api_response(
+            results=[], count=0, num_pages=1, next_link=None, previous_link=None)
+        assert self.get_comment_list(question_thread, endorsed=True).data == make_paginated_api_response(
+            results=[], count=0, num_pages=1, next_link=None, previous_link=None)
 
     def test_basic_query_params(self):
         self.get_comment_list(
@@ -1226,11 +1396,15 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
                 "endorsed_by_label": None,
                 "endorsed_at": None,
                 "abuse_flagged": False,
+                "abuse_flagged_any_user": None,
                 "voted": False,
                 "vote_count": 4,
                 "editable_fields": ["abuse_flagged", "voted"],
                 "child_count": 0,
                 "children": [],
+                "can_delete": False,
+                "anonymous": False,
+                "anonymous_to_peers": False,
             },
             {
                 "id": "test_comment_2",
@@ -1247,17 +1421,21 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
                 "endorsed_by_label": None,
                 "endorsed_at": None,
                 "abuse_flagged": True,
+                "abuse_flagged_any_user": None,
                 "voted": False,
                 "vote_count": 7,
                 "editable_fields": ["abuse_flagged", "voted"],
                 "child_count": 0,
                 "children": [],
+                "can_delete": False,
+                "anonymous": True,
+                "anonymous_to_peers": False,
             },
         ]
         actual_comments = self.get_comment_list(
             self.make_minimal_cs_thread({"children": source_comments})
         ).data["results"]
-        self.assertEqual(actual_comments, expected_comments)
+        assert actual_comments == expected_comments
 
     def test_question_content(self):
         thread = self.make_minimal_cs_thread({
@@ -1270,10 +1448,10 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
         })
 
         endorsed_actual = self.get_comment_list(thread, endorsed=True).data
-        self.assertEqual(endorsed_actual["results"][0]["id"], "endorsed_comment")
+        assert endorsed_actual['results'][0]['id'] == 'endorsed_comment'
 
         non_endorsed_actual = self.get_comment_list(thread, endorsed=False).data
-        self.assertEqual(non_endorsed_actual["results"][0]["id"], "non_endorsed_comment")
+        assert non_endorsed_actual['results'][0]['id'] == 'non_endorsed_comment'
 
     def test_endorsed_by_anonymity(self):
         """
@@ -1290,7 +1468,7 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
             ]
         })
         actual_comments = self.get_comment_list(thread).data["results"]
-        self.assertIsNone(actual_comments[0]["endorsed_by"])
+        assert actual_comments[0]['endorsed_by'] is None
 
     @ddt.data(
         ("discussion", None, "children", "resp_total"),
@@ -1318,23 +1496,23 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
 
         # Only page
         actual = self.get_comment_list(thread, endorsed=endorsed_arg, page=1, page_size=5).data
-        self.assertIsNone(actual["pagination"]["next"])
-        self.assertIsNone(actual["pagination"]["previous"])
+        assert actual['pagination']['next'] is None
+        assert actual['pagination']['previous'] is None
 
         # First page of many
         actual = self.get_comment_list(thread, endorsed=endorsed_arg, page=1, page_size=2).data
-        self.assertEqual(actual["pagination"]["next"], "http://testserver/test_path?page=2")
-        self.assertIsNone(actual["pagination"]["previous"])
+        assert actual['pagination']['next'] == 'http://testserver/test_path?page=2'
+        assert actual['pagination']['previous'] is None
 
         # Middle page of many
         actual = self.get_comment_list(thread, endorsed=endorsed_arg, page=2, page_size=2).data
-        self.assertEqual(actual["pagination"]["next"], "http://testserver/test_path?page=3")
-        self.assertEqual(actual["pagination"]["previous"], "http://testserver/test_path?page=1")
+        assert actual['pagination']['next'] == 'http://testserver/test_path?page=3'
+        assert actual['pagination']['previous'] == 'http://testserver/test_path?page=1'
 
         # Last page of many
         actual = self.get_comment_list(thread, endorsed=endorsed_arg, page=3, page_size=2).data
-        self.assertIsNone(actual["pagination"]["next"])
-        self.assertEqual(actual["pagination"]["previous"], "http://testserver/test_path?page=2")
+        assert actual['pagination']['next'] is None
+        assert actual['pagination']['previous'] == 'http://testserver/test_path?page=2'
 
         # Page past the end
         thread = self.make_minimal_cs_thread({
@@ -1342,14 +1520,14 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
             response_field: [],
             response_total_field: 5
         })
-        with self.assertRaises(PageNotFoundError):
+        with pytest.raises(PageNotFoundError):
             self.get_comment_list(thread, endorsed=endorsed_arg, page=2, page_size=5)
 
     def test_question_endorsed_pagination(self):
         thread = self.make_minimal_cs_thread({
             "thread_type": "question",
             "endorsed_responses": [make_minimal_cs_comment({
-                "id": "comment_{}".format(i),
+                "id": f"comment_{i}",
                 "username": self.user.username
             }) for i in range(10)]
         })
@@ -1361,17 +1539,12 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
             """
             actual = self.get_comment_list(thread, endorsed=True, page=page, page_size=page_size).data
             result_ids = [result["id"] for result in actual["results"]]
-            self.assertEqual(
-                result_ids,
-                ["comment_{}".format(i) for i in range(expected_start, expected_stop)]
+            assert result_ids == [f"comment_{i}" for i in range(expected_start, expected_stop)]
+            assert actual['pagination']['next'] == (
+                f"http://testserver/test_path?page={expected_next}" if expected_next else None
             )
-            self.assertEqual(
-                actual["pagination"]["next"],
-                "http://testserver/test_path?page={}".format(expected_next) if expected_next else None
-            )
-            self.assertEqual(
-                actual["pagination"]["previous"],
-                "http://testserver/test_path?page={}".format(expected_prev) if expected_prev else None
+            assert actual['pagination']['previous'] == (
+                f"http://testserver/test_path?page={expected_prev}" if expected_prev else None
             )
 
         # Only page
@@ -1415,8 +1588,121 @@ class GetCommentListTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModu
         )
 
         # Page past the end
-        with self.assertRaises(PageNotFoundError):
+        with pytest.raises(PageNotFoundError):
             self.get_comment_list(thread, endorsed=True, page=2, page_size=10)
+
+
+@ddt.ddt
+@mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
+class GetUserCommentsTest(ForumsEnableMixin, CommentsServiceMockMixin, SharedModuleStoreTestCase):
+    """
+    Tests for get_user_comments.
+    """
+
+    @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
+    def setUp(self):
+        super().setUp()
+
+        httpretty.reset()
+        httpretty.enable()
+        self.addCleanup(httpretty.reset)
+        self.addCleanup(httpretty.disable)
+
+        self.course = CourseFactory.create()
+
+        # create staff user so that we don't need to worry about
+        # permissions here
+        self.user = UserFactory.create(is_staff=True)
+        self.register_get_user_response(self.user)
+
+        self.request = RequestFactory().get(f'/api/discussion/v1/users/{self.user.username}/{self.course.id}')
+        self.request.user = self.user
+
+    def test_call_with_single_results_page(self):
+        """
+        Assert that a minimal call with valid inputs, and single result,
+        returns the expected response structure.
+        """
+        self.register_get_comments_response(
+            [make_minimal_cs_comment()],
+            page=1,
+            num_pages=1,
+        )
+        response = get_user_comments(
+            request=self.request,
+            author=self.user,
+            course_key=self.course.id,
+        )
+        assert "results" in response.data
+        assert "pagination" in response.data
+        assert response.data["pagination"]["count"] == 1
+        assert response.data["pagination"]["num_pages"] == 1
+        assert response.data["pagination"]["next"] is None
+        assert response.data["pagination"]["previous"] is None
+
+    @ddt.data(1, 2, 3)
+    def test_call_with_paginated_results(self, page):
+        """
+        Assert that paginated results return the correct pagination
+        information at the pagination boundaries.
+        """
+        self.register_get_comments_response(
+            [make_minimal_cs_comment() for _ in range(30)],
+            page=page,
+            num_pages=3,
+        )
+        response = get_user_comments(
+            request=self.request,
+            author=self.user,
+            course_key=self.course.id,
+            page=page,
+        )
+        assert "pagination" in response.data
+        assert response.data["pagination"]["count"] == 30
+        assert response.data["pagination"]["num_pages"] == 3
+
+        if page in (1, 2):
+            assert response.data["pagination"]["next"] is not None
+            assert f"page={page+1}" in response.data["pagination"]["next"]
+        if page in (2, 3):
+            assert response.data["pagination"]["previous"] is not None
+            assert f"page={page-1}" in response.data["pagination"]["previous"]
+        if page == 1:
+            assert response.data["pagination"]["previous"] is None
+        if page == 3:
+            assert response.data["pagination"]["next"] is None
+
+    def test_call_with_invalid_page(self):
+        """
+        Assert that calls for pages that exceed the existing number of
+        results pages raise PageNotFoundError.
+        """
+        self.register_get_comments_response([], page=2, num_pages=1)
+        with pytest.raises(PageNotFoundError):
+            get_user_comments(
+                request=self.request,
+                author=self.user,
+                course_key=self.course.id,
+                page=2,
+            )
+
+    def test_call_with_non_existent_course(self):
+        """
+        Assert that calls for comments in a course that doesn't exist
+        result in a CourseNotFoundError error.
+        """
+        self.register_get_comments_response(
+            [make_minimal_cs_comment()],
+            page=1,
+            num_pages=1,
+        )
+        with pytest.raises(CourseNotFoundError):
+            get_user_comments(
+                request=self.request,
+                author=self.user,
+                course_key=CourseKey.from_string("x/y/z"),
+                page=2,
+            )
 
 
 @ddt.ddt
@@ -1470,14 +1756,10 @@ class CreateThreadTest(
         'nonummy metus.'
     )
 
-    @classmethod
-    def setUpClass(cls):
-        super(CreateThreadTest, cls).setUpClass()
-        cls.course = CourseFactory.create()
-
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(CreateThreadTest, self).setUp()
+        super().setUp()
+        self.course = CourseFactory.create()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -1488,7 +1770,7 @@ class CreateThreadTest(
         self.request.user = self.user
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
         self.minimal_data = {
-            "course_id": six.text_type(self.course.id),
+            "course_id": str(self.course.id),
             "topic_id": "test_topic",
             "type": "discussion",
             "title": "Test Title",
@@ -1507,20 +1789,92 @@ class CreateThreadTest(
             actual = create_thread(self.request, self.minimal_data)
         expected = self.expected_thread_data({
             "id": "test_id",
-            "course_id": six.text_type(self.course.id),
+            "course_id": str(self.course.id),
             "comment_list_url": "http://testserver/api/discussion/v1/comments/?thread_id=test_id",
             "read": True,
         })
-        self.assertEqual(actual, expected)
+        assert actual == expected
+        assert httpretty.last_request().parsed_body == {   # lint-amnesty, pylint: disable=no-member
+            'course_id': [str(self.course.id)],
+            'commentable_id': ['test_topic'],
+            'thread_type': ['discussion'],
+            'title': ['Test Title'],
+            'body': ['Test body'],
+            'user_id': [str(self.user.id)],
+            'anonymous': ['False'],
+            'anonymous_to_peers': ['False'],
+        }
+        event_name, event_data = mock_emit.call_args[0]
+        assert event_name == 'edx.forum.thread.created'
+        assert event_data == {
+            'commentable_id': 'test_topic',
+            'group_id': None,
+            'thread_type': 'discussion',
+            'title': 'Test Title',
+            'title_truncated': False,
+            'anonymous': False,
+            'anonymous_to_peers': False,
+            'options': {'followed': False},
+            'id': 'test_id',
+            'truncated': False,
+            'body': 'Test body',
+            'url': '',
+            'user_forums_roles': [FORUM_ROLE_STUDENT],
+            'user_course_roles': []
+        }
+
+    def test_basic_in_blackout_period(self):
+        """
+        Test case when course is in blackout period and user does not have special privileges.
+        """
+        _set_course_discussion_blackout(course=self.course, user_id=self.user.id)
+
+        with self.assertRaises(DiscussionBlackOutException) as assertion:
+            create_thread(self.request, self.minimal_data)
+        self.assertEqual(assertion.exception.status_code, 403)
+        self.assertEqual(assertion.exception.detail, "Discussions are in blackout period.")
+
+    @mock.patch("eventtracking.tracker.emit")
+    def test_basic_in_blackout_period_with_user_access(self, mock_emit):
+        """
+        Test case when course is in blackout period and user has special privileges.
+        """
+        cs_thread = make_minimal_cs_thread({
+            "id": "test_id",
+            "username": self.user.username,
+            "read": True,
+        })
+        self.register_post_thread_response(cs_thread)
+
+        _set_course_discussion_blackout(course=self.course, user_id=self.user.id)
+
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=FORUM_ROLE_MODERATOR)
+
+        with self.assert_signal_sent(api, 'thread_created', sender=None, user=self.user, exclude_args=('post',)):
+            actual = create_thread(self.request, self.minimal_data)
+        expected = self.expected_thread_data({
+            "author_label": "Staff",
+            "id": "test_id",
+            "course_id": str(self.course.id),
+            "comment_list_url": "http://testserver/api/discussion/v1/comments/?thread_id=test_id",
+            "read": True,
+            "editable_fields": [
+                "abuse_flagged", "anonymous", "closed", "following", "pinned",
+                "raw_body", "read", "title", "topic_id", "type", "voted"
+            ],
+        })
+        assert actual == expected
         self.assertEqual(
-            httpretty.last_request().parsed_body,
+            httpretty.last_request().parsed_body,   # lint-amnesty, pylint: disable=no-member
             {
-                "course_id": [six.text_type(self.course.id)],
+                "course_id": [str(self.course.id)],
                 "commentable_id": ["test_topic"],
                 "thread_type": ["discussion"],
                 "title": ["Test Title"],
                 "body": ["Test body"],
                 "user_id": [str(self.user.id)],
+                "anonymous": ["False"],
+                "anonymous_to_peers": ["False"],
             }
         )
         event_name, event_data = mock_emit.call_args[0]
@@ -1540,7 +1894,7 @@ class CreateThreadTest(
                 "truncated": False,
                 "body": "Test body",
                 "url": "",
-                "user_forums_roles": [FORUM_ROLE_STUDENT],
+                "user_forums_roles": [FORUM_ROLE_STUDENT, FORUM_ROLE_MODERATOR],
                 "user_course_roles": [],
             }
         )
@@ -1559,26 +1913,23 @@ class CreateThreadTest(
         with self.assert_signal_sent(api, 'thread_created', sender=None, user=self.user, exclude_args=('post',)):
             create_thread(self.request, data)
         event_name, event_data = mock_emit.call_args[0]
-        self.assertEqual(event_name, "edx.forum.thread.created")
-        self.assertEqual(
-            event_data,
-            {
-                "commentable_id": "test_topic",
-                "group_id": None,
-                "thread_type": "discussion",
-                "title": self.LONG_TITLE[:1000],
-                "title_truncated": True,
-                "anonymous": False,
-                "anonymous_to_peers": False,
-                "options": {"followed": False},
-                "id": "test_id",
-                "truncated": False,
-                "body": "Test body",
-                "url": "",
-                "user_forums_roles": [FORUM_ROLE_STUDENT],
-                "user_course_roles": [],
-            }
-        )
+        assert event_name == 'edx.forum.thread.created'
+        assert event_data == {
+            'commentable_id': 'test_topic',
+            'group_id': None,
+            'thread_type': 'discussion',
+            'title': self.LONG_TITLE[:1000],
+            'title_truncated': True,
+            'anonymous': False,
+            'anonymous_to_peers': False,
+            'options': {'followed': False},
+            'id': 'test_id',
+            'truncated': False,
+            'body': 'Test body',
+            'url': '',
+            'user_forums_roles': [FORUM_ROLE_STUDENT],
+            'user_course_roles': []
+        }
 
     @ddt.data(
         *itertools.product(
@@ -1614,11 +1965,10 @@ class CreateThreadTest(
         CourseEnrollmentFactory.create(user=self.user, course_id=cohort_course.id)
         if course_is_cohorted:
             cohort = CohortFactory.create(course_id=cohort_course.id, users=[self.user])
-        role = Role.objects.create(name=role_name, course_id=cohort_course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=cohort_course.id, role=role_name)
         self.register_post_thread_response({"username": self.user.username})
         data = self.minimal_data.copy()
-        data["course_id"] = six.text_type(cohort_course.id)
+        data["course_id"] = str(cohort_course.id)
         if data_group_state == "group_is_none":
             data["group_id"] = None
         elif data_group_state == "group_is_set":
@@ -1632,17 +1982,17 @@ class CreateThreadTest(
         )
         try:
             create_thread(self.request, data)
-            self.assertFalse(expected_error)
-            actual_post_data = httpretty.last_request().parsed_body
+            assert not expected_error
+            actual_post_data = httpretty.last_request().parsed_body  # lint-amnesty, pylint: disable=no-member
             if data_group_state == "group_is_set":
-                self.assertEqual(actual_post_data["group_id"], [str(data["group_id"])])
+                assert actual_post_data['group_id'] == [str(data['group_id'])]
             elif data_group_state == "no_group_set" and course_is_cohorted and topic_is_cohorted:
-                self.assertEqual(actual_post_data["group_id"], [str(cohort.id)])
+                assert actual_post_data['group_id'] == [str(cohort.id)]
             else:
-                self.assertNotIn("group_id", actual_post_data)
+                assert 'group_id' not in actual_post_data
         except ValidationError as ex:
             if not expected_error:
-                self.fail(u"Unexpected validation error: {}".format(ex))
+                self.fail(f"Unexpected validation error: {ex}")
 
     def test_following(self):
         self.register_post_thread_response({"id": "test_id", "username": self.user.username})
@@ -1650,17 +2000,11 @@ class CreateThreadTest(
         data = self.minimal_data.copy()
         data["following"] = "True"
         result = create_thread(self.request, data)
-        self.assertEqual(result["following"], True)
+        assert result['following'] is True
         cs_request = httpretty.last_request()
-        self.assertEqual(
-            urlparse(cs_request.path).path,
-            "/api/v1/users/{}/subscriptions".format(self.user.id)
-        )
-        self.assertEqual(cs_request.method, "POST")
-        self.assertEqual(
-            cs_request.parsed_body,
-            {"source_type": ["thread"], "source_id": ["test_id"]}
-        )
+        assert urlparse(cs_request.path).path == f"/api/v1/users/{self.user.id}/subscriptions"  # lint-amnesty, pylint: disable=no-member
+        assert cs_request.method == 'POST'
+        assert cs_request.parsed_body == {'source_type': ['thread'], 'source_id': ['test_id']}  # lint-amnesty, pylint: disable=no-member
 
     def test_voted(self):
         self.register_post_thread_response({"id": "test_id", "username": self.user.username})
@@ -1669,14 +2013,11 @@ class CreateThreadTest(
         data["voted"] = "True"
         with self.assert_signal_sent(api, 'thread_voted', sender=None, user=self.user, exclude_args=('post',)):
             result = create_thread(self.request, data)
-        self.assertEqual(result["voted"], True)
+        assert result['voted'] is True
         cs_request = httpretty.last_request()
-        self.assertEqual(urlparse(cs_request.path).path, "/api/v1/threads/test_id/votes")
-        self.assertEqual(cs_request.method, "PUT")
-        self.assertEqual(
-            cs_request.parsed_body,
-            {"user_id": [str(self.user.id)], "value": ["up"]}
-        )
+        assert urlparse(cs_request.path).path == '/api/v1/threads/test_id/votes'  # lint-amnesty, pylint: disable=no-member
+        assert cs_request.method == 'PUT'
+        assert cs_request.parsed_body == {'user_id': [str(self.user.id)], 'value': ['up']}  # lint-amnesty, pylint: disable=no-member
 
     def test_abuse_flagged(self):
         self.register_post_thread_response({"id": "test_id", "username": self.user.username})
@@ -1684,41 +2025,41 @@ class CreateThreadTest(
         data = self.minimal_data.copy()
         data["abuse_flagged"] = "True"
         result = create_thread(self.request, data)
-        self.assertEqual(result["abuse_flagged"], True)
+        assert result['abuse_flagged'] is True
         cs_request = httpretty.last_request()
-        self.assertEqual(urlparse(cs_request.path).path, "/api/v1/threads/test_id/abuse_flag")
-        self.assertEqual(cs_request.method, "PUT")
-        self.assertEqual(cs_request.parsed_body, {"user_id": [str(self.user.id)]})
+        assert urlparse(cs_request.path).path == '/api/v1/threads/test_id/abuse_flag'  # lint-amnesty, pylint: disable=no-member
+        assert cs_request.method == 'PUT'
+        assert cs_request.parsed_body == {'user_id': [str(self.user.id)]}  # lint-amnesty, pylint: disable=no-member
 
     def test_course_id_missing(self):
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             create_thread(self.request, {})
-        self.assertEqual(assertion.exception.message_dict, {"course_id": ["This field is required."]})
+        assert assertion.value.message_dict == {'course_id': ['This field is required.']}
 
     def test_course_id_invalid(self):
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             create_thread(self.request, {"course_id": "invalid!"})
-        self.assertEqual(assertion.exception.message_dict, {"course_id": ["Invalid value."]})
+        assert assertion.value.message_dict == {'course_id': ['Invalid value.']}
 
     def test_nonexistent_course(self):
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             create_thread(self.request, {"course_id": "non/existent/course"})
 
     def test_not_enrolled(self):
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             create_thread(self.request, self.minimal_data)
 
     def test_discussions_disabled(self):
         disabled_course = _discussion_disabled_course_for(self.user)
-        self.minimal_data["course_id"] = six.text_type(disabled_course.id)
-        with self.assertRaises(DiscussionDisabledError):
+        self.minimal_data["course_id"] = str(disabled_course.id)
+        with pytest.raises(DiscussionDisabledError):
             create_thread(self.request, self.minimal_data)
 
     def test_invalid_field(self):
         data = self.minimal_data.copy()
         data["type"] = "invalid_type"
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             create_thread(self.request, data)
 
 
@@ -1736,14 +2077,15 @@ class CreateCommentTest(
     """Tests for create_comment"""
     @classmethod
     def setUpClass(cls):
-        super(CreateCommentTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(CreateCommentTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
+        self.course = CourseFactory.create()
         self.addCleanup(httpretty.reset)
         self.addCleanup(httpretty.disable)
         self.user = UserFactory.create()
@@ -1754,7 +2096,7 @@ class CreateCommentTest(
         self.register_get_thread_response(
             make_minimal_cs_thread({
                 "id": "test_thread",
-                "course_id": six.text_type(self.course.id),
+                "course_id": str(self.course.id),
                 "commentable_id": "test_topic",
             })
         )
@@ -1798,29 +2140,29 @@ class CreateCommentTest(
             "endorsed_by_label": None,
             "endorsed_at": None,
             "abuse_flagged": False,
+            "abuse_flagged_any_user": None,
             "voted": False,
             "vote_count": 0,
             "children": [],
-            "editable_fields": ["abuse_flagged", "raw_body", "voted"],
+            "editable_fields": ["abuse_flagged", "anonymous", "raw_body", "voted"],
             "child_count": 0,
+            "can_delete": True,
+            "anonymous": False,
+            "anonymous_to_peers": False,
         }
-        self.assertEqual(actual, expected)
+        assert actual == expected
         expected_url = (
-            "/api/v1/comments/{}".format(parent_id) if parent_id else
+            f"/api/v1/comments/{parent_id}" if parent_id else
             "/api/v1/threads/test_thread/comments"
         )
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            expected_url
-        )
-        self.assertEqual(
-            httpretty.last_request().parsed_body,
-            {
-                "course_id": [six.text_type(self.course.id)],
-                "body": ["Test body"],
-                "user_id": [str(self.user.id)]
-            }
-        )
+        assert urlparse(httpretty.last_request().path).path == expected_url  # lint-amnesty, pylint: disable=no-member
+        assert httpretty.last_request().parsed_body == {   # lint-amnesty, pylint: disable=no-member
+            'course_id': [str(self.course.id)],
+            'body': ['Test body'],
+            'user_id': [str(self.user.id)],
+            'anonymous': ['False'],
+            'anonymous_to_peers': ['False'],
+        }
         expected_event_name = (
             "edx.forum.comment.created" if parent_id else
             "edx.forum.response.created"
@@ -1839,8 +2181,106 @@ class CreateCommentTest(
         if parent_id:
             expected_event_data["response"] = {"id": parent_id}
         actual_event_name, actual_event_data = mock_emit.call_args[0]
+        assert actual_event_name == expected_event_name
+        assert actual_event_data == expected_event_data
+
+    @ddt.data(None, "test_parent")
+    @mock.patch("eventtracking.tracker.emit")
+    def test_success_in_black_out_with_user_access(self, parent_id, mock_emit):
+        """
+        Test case when course is in blackout period and user has special privileges.
+        """
+        if parent_id:
+            self.register_get_comment_response({"id": parent_id, "thread_id": "test_thread"})
+        self.register_post_comment_response(
+            {
+                "id": "test_comment",
+                "username": self.user.username,
+                "created_at": "2015-05-27T00:00:00Z",
+                "updated_at": "2015-05-27T00:00:00Z",
+            },
+            thread_id="test_thread",
+            parent_id=parent_id
+        )
+        data = self.minimal_data.copy()
+        if parent_id:
+            data["parent_id"] = parent_id
+
+        _set_course_discussion_blackout(course=self.course, user_id=self.user.id)
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=FORUM_ROLE_MODERATOR)
+
+        with self.assert_signal_sent(api, 'comment_created', sender=None, user=self.user, exclude_args=('post',)):
+            actual = create_comment(self.request, data)
+        expected = {
+            "id": "test_comment",
+            "thread_id": "test_thread",
+            "parent_id": parent_id,
+            "author": self.user.username,
+            "author_label": "Staff",
+            "created_at": "2015-05-27T00:00:00Z",
+            "updated_at": "2015-05-27T00:00:00Z",
+            "raw_body": "Test body",
+            "rendered_body": "<p>Test body</p>",
+            "endorsed": False,
+            "endorsed_by": None,
+            "endorsed_by_label": None,
+            "endorsed_at": None,
+            "abuse_flagged": False,
+            "abuse_flagged_any_user": False,
+            "voted": False,
+            "vote_count": 0,
+            "children": [],
+            "editable_fields": ["abuse_flagged", "anonymous", "endorsed", "raw_body", "voted"],
+            "child_count": 0,
+            "can_delete": True,
+            "anonymous": False,
+            "anonymous_to_peers": False,
+        }
+        assert actual == expected
+        expected_url = (
+            f"/api/v1/comments/{parent_id}" if parent_id else
+            "/api/v1/threads/test_thread/comments"
+        )
+        assert urlparse(httpretty.last_request().path).path == expected_url  # pylint: disable=no-member
+        assert httpretty.last_request().parsed_body == {  # pylint: disable=no-member
+            "course_id": [str(self.course.id)],
+            "body": ["Test body"],
+            "user_id": [str(self.user.id)],
+            "anonymous": ['False'],
+            "anonymous_to_peers": ['False'],
+        }
+
+        expected_event_name = (
+            "edx.forum.comment.created" if parent_id else
+            "edx.forum.response.created"
+        )
+        expected_event_data = {
+            "discussion": {"id": "test_thread"},
+            "commentable_id": "test_topic",
+            "options": {"followed": False},
+            "id": "test_comment",
+            "truncated": False,
+            "body": "Test body",
+            "url": "",
+            "user_forums_roles": [FORUM_ROLE_STUDENT, FORUM_ROLE_MODERATOR],
+            "user_course_roles": [],
+        }
+        if parent_id:
+            expected_event_data["response"] = {"id": parent_id}
+        actual_event_name, actual_event_data = mock_emit.call_args[0]
         self.assertEqual(actual_event_name, expected_event_name)
         self.assertEqual(actual_event_data, expected_event_data)
+
+    def test_error_in_black_out(self):
+        """
+        Test case when course is in blackout period and user does not have special privileges.
+        """
+        _set_course_discussion_blackout(course=self.course, user_id=self.user.id)
+
+        with self.assertRaises(DiscussionBlackOutException) as assertion:
+            create_comment(self.request, self.minimal_data)
+        self.assertEqual(assertion.exception.status_code, 403)
+        self.assertEqual(assertion.exception.detail, "Discussions are in blackout period.")
 
     @ddt.data(
         *itertools.product(
@@ -1856,12 +2296,11 @@ class CreateCommentTest(
     )
     @ddt.unpack
     def test_endorsed(self, role_name, is_thread_author, thread_type):
-        role = Role.objects.create(name=role_name, course_id=self.course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role_name)
         self.register_get_thread_response(
             make_minimal_cs_thread({
                 "id": "test_thread",
-                "course_id": six.text_type(self.course.id),
+                "course_id": str(self.course.id),
                 "thread_type": thread_type,
                 "user_id": str(self.user.id) if is_thread_author else str(self.user.id + 1),
             })
@@ -1875,10 +2314,10 @@ class CreateCommentTest(
         )
         try:
             create_comment(self.request, data)
-            self.assertEqual(httpretty.last_request().parsed_body["endorsed"], ["True"])
-            self.assertFalse(expected_error)
+            assert httpretty.last_request().parsed_body['endorsed'] == ['True']  # lint-amnesty, pylint: disable=no-member
+            assert not expected_error
         except ValidationError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     def test_voted(self):
         self.register_post_comment_response({"id": "test_comment", "username": self.user.username}, "test_thread")
@@ -1887,14 +2326,11 @@ class CreateCommentTest(
         data["voted"] = "True"
         with self.assert_signal_sent(api, 'comment_voted', sender=None, user=self.user, exclude_args=('post',)):
             result = create_comment(self.request, data)
-        self.assertEqual(result["voted"], True)
+        assert result['voted'] is True
         cs_request = httpretty.last_request()
-        self.assertEqual(urlparse(cs_request.path).path, "/api/v1/comments/test_comment/votes")
-        self.assertEqual(cs_request.method, "PUT")
-        self.assertEqual(
-            cs_request.parsed_body,
-            {"user_id": [str(self.user.id)], "value": ["up"]}
-        )
+        assert urlparse(cs_request.path).path == '/api/v1/comments/test_comment/votes'  # lint-amnesty, pylint: disable=no-member
+        assert cs_request.method == 'PUT'
+        assert cs_request.parsed_body == {'user_id': [str(self.user.id)], 'value': ['up']}  # lint-amnesty, pylint: disable=no-member
 
     def test_abuse_flagged(self):
         self.register_post_comment_response({"id": "test_comment", "username": self.user.username}, "test_thread")
@@ -1902,32 +2338,32 @@ class CreateCommentTest(
         data = self.minimal_data.copy()
         data["abuse_flagged"] = "True"
         result = create_comment(self.request, data)
-        self.assertEqual(result["abuse_flagged"], True)
+        assert result['abuse_flagged'] is True
         cs_request = httpretty.last_request()
-        self.assertEqual(urlparse(cs_request.path).path, "/api/v1/comments/test_comment/abuse_flag")
-        self.assertEqual(cs_request.method, "PUT")
-        self.assertEqual(cs_request.parsed_body, {"user_id": [str(self.user.id)]})
+        assert urlparse(cs_request.path).path == '/api/v1/comments/test_comment/abuse_flag'  # lint-amnesty, pylint: disable=no-member
+        assert cs_request.method == 'PUT'
+        assert cs_request.parsed_body == {'user_id': [str(self.user.id)]}  # lint-amnesty, pylint: disable=no-member
 
     def test_thread_id_missing(self):
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             create_comment(self.request, {})
-        self.assertEqual(assertion.exception.message_dict, {"thread_id": ["This field is required."]})
+        assert assertion.value.message_dict == {'thread_id': ['This field is required.']}
 
     def test_thread_id_not_found(self):
         self.register_get_thread_error_response("test_thread", 404)
-        with self.assertRaises(ThreadNotFoundError):
+        with pytest.raises(ThreadNotFoundError):
             create_comment(self.request, self.minimal_data)
 
     def test_nonexistent_course(self):
         self.register_get_thread_response(
             make_minimal_cs_thread({"id": "test_thread", "course_id": "non/existent/course"})
         )
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             create_comment(self.request, self.minimal_data)
 
     def test_not_enrolled(self):
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             create_comment(self.request, self.minimal_data)
 
     def test_discussions_disabled(self):
@@ -1935,11 +2371,11 @@ class CreateCommentTest(
         self.register_get_thread_response(
             make_minimal_cs_thread({
                 "id": "test_thread",
-                "course_id": six.text_type(disabled_course.id),
+                "course_id": str(disabled_course.id),
                 "commentable_id": "test_topic",
             })
         )
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             create_comment(self.request, self.minimal_data)
 
     @ddt.data(
@@ -1959,7 +2395,7 @@ class CreateCommentTest(
         cohort_course, cohort = _create_course_and_cohort_with_user_role(course_is_cohorted, self.user, role_name)
         self.register_get_thread_response(make_minimal_cs_thread({
             "id": "cohort_thread",
-            "course_id": six.text_type(cohort_course.id),
+            "course_id": str(cohort_course.id),
             "group_id": (
                 None if thread_group_state == "no_group" else
                 cohort.id if thread_group_state == "match_group" else
@@ -1976,14 +2412,14 @@ class CreateCommentTest(
         )
         try:
             create_comment(self.request, data)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     def test_invalid_field(self):
         data = self.minimal_data.copy()
         del data["raw_body"]
-        with self.assertRaises(ValidationError):
+        with pytest.raises(ValidationError):
             create_comment(self.request, data)
 
 
@@ -2001,12 +2437,12 @@ class UpdateThreadTest(
     """Tests for update_thread"""
     @classmethod
     def setUpClass(cls):
-        super(UpdateThreadTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(UpdateThreadTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -2026,7 +2462,7 @@ class UpdateThreadTest(
         """
         cs_data = make_minimal_cs_thread({
             "id": "test_thread",
-            "course_id": six.text_type(self.course.id),
+            "course_id": str(self.course.id),
             "commentable_id": "original_topic",
             "username": self.user.username,
             "user_id": str(self.user.id),
@@ -2045,57 +2481,55 @@ class UpdateThreadTest(
         self.register_thread()
         update_thread(self.request, "test_thread", {})
         for request in httpretty.httpretty.latest_requests:
-            self.assertEqual(request.method, "GET")
+            assert request.method == 'GET'
 
     def test_basic(self):
         self.register_thread()
         with self.assert_signal_sent(api, 'thread_edited', sender=None, user=self.user, exclude_args=('post',)):
             actual = update_thread(self.request, "test_thread", {"raw_body": "Edited body"})
 
-        self.assertEqual(actual, self.expected_thread_data({
-            "raw_body": "Edited body",
-            "rendered_body": "<p>Edited body</p>",
-            "topic_id": "original_topic",
-            "read": True,
-            "title": "Original Title",
-        }))
-        self.assertEqual(
-            httpretty.last_request().parsed_body,
-            {
-                "course_id": [six.text_type(self.course.id)],
-                "commentable_id": ["original_topic"],
-                "thread_type": ["discussion"],
-                "title": ["Original Title"],
-                "body": ["Edited body"],
-                "user_id": [str(self.user.id)],
-                "anonymous": ["False"],
-                "anonymous_to_peers": ["False"],
-                "closed": ["False"],
-                "pinned": ["False"],
-                "read": ["False"],
-            }
-        )
+        assert actual == self.expected_thread_data({
+            'raw_body': 'Edited body',
+            'rendered_body': '<p>Edited body</p>',
+            'preview_body': 'Edited body',
+            'topic_id': 'original_topic',
+            'read': True,
+            'title': 'Original Title'
+        })
+        assert httpretty.last_request().parsed_body == {  # lint-amnesty, pylint: disable=no-member
+            'course_id': [str(self.course.id)],
+            'commentable_id': ['original_topic'],
+            'thread_type': ['discussion'],
+            'title': ['Original Title'],
+            'body': ['Edited body'],
+            'user_id': [str(self.user.id)],
+            'anonymous': ['False'],
+            'anonymous_to_peers': ['False'],
+            'closed': ['False'],
+            'pinned': ['False'],
+            'read': ['False']
+        }
 
     def test_nonexistent_thread(self):
         self.register_get_thread_error_response("test_thread", 404)
-        with self.assertRaises(ThreadNotFoundError):
+        with pytest.raises(ThreadNotFoundError):
             update_thread(self.request, "test_thread", {})
 
     def test_nonexistent_course(self):
         self.register_thread({"course_id": "non/existent/course"})
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             update_thread(self.request, "test_thread", {})
 
     def test_not_enrolled(self):
         self.register_thread()
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             update_thread(self.request, "test_thread", {})
 
     def test_discussions_disabled(self):
         disabled_course = _discussion_disabled_course_for(self.user)
-        self.register_thread(overrides={"course_id": six.text_type(disabled_course.id)})
-        with self.assertRaises(DiscussionDisabledError):
+        self.register_thread(overrides={"course_id": str(disabled_course.id)})
+        with pytest.raises(DiscussionDisabledError):
             update_thread(self.request, "test_thread", {})
 
     @ddt.data(
@@ -2114,7 +2548,7 @@ class UpdateThreadTest(
     def test_group_access(self, role_name, course_is_cohorted, thread_group_state):
         cohort_course, cohort = _create_course_and_cohort_with_user_role(course_is_cohorted, self.user, role_name)
         self.register_thread({
-            "course_id": six.text_type(cohort_course.id),
+            "course_id": str(cohort_course.id),
             "group_id": (
                 None if thread_group_state == "no_group" else
                 cohort.id if thread_group_state == "match_group" else
@@ -2128,9 +2562,9 @@ class UpdateThreadTest(
         )
         try:
             update_thread(self.request, "test_thread", {})
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     @ddt.data(
         FORUM_ROLE_ADMINISTRATOR,
@@ -2139,21 +2573,17 @@ class UpdateThreadTest(
         FORUM_ROLE_STUDENT,
     )
     def test_author_only_fields(self, role_name):
-        role = Role.objects.create(name=role_name, course_id=self.course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role_name)
         self.register_thread({"user_id": str(self.user.id + 1)})
         data = {field: "edited" for field in ["topic_id", "title", "raw_body"]}
         data["type"] = "question"
         expected_error = role_name == FORUM_ROLE_STUDENT
         try:
             update_thread(self.request, "test_thread", data)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ValidationError as err:
-            self.assertTrue(expected_error)
-            self.assertEqual(
-                err.message_dict,
-                {field: ["This field is not editable."] for field in data.keys()}
-            )
+            assert expected_error
+            assert err.message_dict == {field: ['This field is not editable.'] for field in data.keys()}
 
     @ddt.data(*itertools.product([True, False], [True, False]))
     @ddt.unpack
@@ -2173,26 +2603,20 @@ class UpdateThreadTest(
         self.register_thread()
         data = {"following": new_following}
         result = update_thread(self.request, "test_thread", data)
-        self.assertEqual(result["following"], new_following)
-        last_request_path = urlparse(httpretty.last_request().path).path
-        subscription_url = "/api/v1/users/{}/subscriptions".format(self.user.id)
+        assert result['following'] == new_following
+        last_request_path = urlparse(httpretty.last_request().path).path  # lint-amnesty, pylint: disable=no-member
+        subscription_url = f"/api/v1/users/{self.user.id}/subscriptions"
         if old_following == new_following:
-            self.assertNotEqual(last_request_path, subscription_url)
+            assert last_request_path != subscription_url
         else:
-            self.assertEqual(last_request_path, subscription_url)
-            self.assertEqual(
-                httpretty.last_request().method,
-                "POST" if new_following else "DELETE"
-            )
+            assert last_request_path == subscription_url
+            assert httpretty.last_request().method == ('POST' if new_following else 'DELETE')
             request_data = (
-                httpretty.last_request().parsed_body if new_following else
-                parse_qs(urlparse(httpretty.last_request().path).query)
+                httpretty.last_request().parsed_body if new_following else  # lint-amnesty, pylint: disable=no-member
+                parse_qs(urlparse(httpretty.last_request().path).query)  # lint-amnesty, pylint: disable=no-member
             )
             request_data.pop("request_id", None)
-            self.assertEqual(
-                request_data,
-                {"source_type": ["thread"], "source_id": ["test_thread"]}
-            )
+            assert request_data == {'source_type': ['thread'], 'source_id': ['test_thread']}
 
     @ddt.data(*itertools.product([True, False], [True, False]))
     @ddt.unpack
@@ -2213,42 +2637,36 @@ class UpdateThreadTest(
         self.register_thread()
         data = {"voted": new_vote_status}
         result = update_thread(self.request, "test_thread", data)
-        self.assertEqual(result["voted"], new_vote_status)
-        last_request_path = urlparse(httpretty.last_request().path).path
+        assert result['voted'] == new_vote_status
+        last_request_path = urlparse(httpretty.last_request().path).path  # lint-amnesty, pylint: disable=no-member
         votes_url = "/api/v1/threads/test_thread/votes"
         if current_vote_status == new_vote_status:
-            self.assertNotEqual(last_request_path, votes_url)
+            assert last_request_path != votes_url
         else:
-            self.assertEqual(last_request_path, votes_url)
-            self.assertEqual(
-                httpretty.last_request().method,
-                "PUT" if new_vote_status else "DELETE"
-            )
+            assert last_request_path == votes_url
+            assert httpretty.last_request().method == ('PUT' if new_vote_status else 'DELETE')
             actual_request_data = (
-                httpretty.last_request().parsed_body if new_vote_status else
-                parse_qs(urlparse(httpretty.last_request().path).query)
+                httpretty.last_request().parsed_body if new_vote_status else  # lint-amnesty, pylint: disable=no-member
+                parse_qs(urlparse(httpretty.last_request().path).query)  # lint-amnesty, pylint: disable=no-member
             )
             actual_request_data.pop("request_id", None)
             expected_request_data = {"user_id": [str(self.user.id)]}
             if new_vote_status:
                 expected_request_data["value"] = ["up"]
-            self.assertEqual(actual_request_data, expected_request_data)
+            assert actual_request_data == expected_request_data
 
             event_name, event_data = mock_emit.call_args[0]
-            self.assertEqual(event_name, "edx.forum.thread.voted")
-            self.assertEqual(
-                event_data,
-                {
-                    'undo_vote': not new_vote_status,
-                    'url': '',
-                    'target_username': self.user.username,
-                    'vote_value': 'up',
-                    'user_forums_roles': [FORUM_ROLE_STUDENT],
-                    'user_course_roles': [],
-                    'commentable_id': 'original_topic',
-                    'id': 'test_thread'
-                }
-            )
+            assert event_name == 'edx.forum.thread.voted'
+            assert event_data == {
+                'undo_vote': (not new_vote_status),
+                'url': '',
+                'target_username': self.user.username,
+                'vote_value': 'up',
+                'user_forums_roles': [FORUM_ROLE_STUDENT],
+                'user_course_roles': [],
+                'commentable_id': 'original_topic',
+                'id': 'test_thread'
+            }
 
     @ddt.data(*itertools.product([True, False], [True, False], [True, False]))
     @ddt.unpack
@@ -2268,12 +2686,12 @@ class UpdateThreadTest(
         data = {"voted": first_vote}
         result = update_thread(self.request, "test_thread", data)
         self.register_thread(overrides={"voted": first_vote})
-        self.assertEqual(result["vote_count"], 1 if first_vote else 0)
+        assert result['vote_count'] == (1 if first_vote else 0)
 
         #second vote
         data = {"voted": second_vote}
         result = update_thread(self.request, "test_thread", data)
-        self.assertEqual(result["vote_count"], 1 if second_vote else 0)
+        assert result['vote_count'] == (1 if second_vote else 0)
 
     @ddt.data(*itertools.product([True, False], [True, False], [True, False], [True, False]))
     @ddt.unpack
@@ -2312,14 +2730,14 @@ class UpdateThreadTest(
             data = {"voted": user_vote}
             result = update_thread(request, "test_thread", data)
             if current_vote == user_vote:
-                self.assertEqual(result["vote_count"], vote_count)
+                assert result['vote_count'] == vote_count
             elif user_vote:
                 vote_count += 1
-                self.assertEqual(result["vote_count"], vote_count)
+                assert result['vote_count'] == vote_count
                 self.register_get_user_response(self.user, upvoted_ids=["test_thread"])
             else:
                 vote_count -= 1
-                self.assertEqual(result["vote_count"], vote_count)
+                assert result['vote_count'] == vote_count
                 self.register_get_user_response(self.user, upvoted_ids=[])
 
     @ddt.data(*itertools.product([True, False], [True, False]))
@@ -2339,32 +2757,23 @@ class UpdateThreadTest(
         self.register_thread({"abuse_flaggers": [str(self.user.id)] if old_flagged else []})
         data = {"abuse_flagged": new_flagged}
         result = update_thread(self.request, "test_thread", data)
-        self.assertEqual(result["abuse_flagged"], new_flagged)
-        last_request_path = urlparse(httpretty.last_request().path).path
+        assert result['abuse_flagged'] == new_flagged
+        last_request_path = urlparse(httpretty.last_request().path).path  # lint-amnesty, pylint: disable=no-member
         flag_url = "/api/v1/threads/test_thread/abuse_flag"
         unflag_url = "/api/v1/threads/test_thread/abuse_unflag"
         if old_flagged == new_flagged:
-            self.assertNotEqual(last_request_path, flag_url)
-            self.assertNotEqual(last_request_path, unflag_url)
+            assert last_request_path != flag_url
+            assert last_request_path != unflag_url
         else:
-            self.assertEqual(
-                last_request_path,
-                flag_url if new_flagged else unflag_url
-            )
-            self.assertEqual(httpretty.last_request().method, "PUT")
-            self.assertEqual(
-                httpretty.last_request().parsed_body,
-                {"user_id": [str(self.user.id)]}
-            )
+            assert last_request_path == (flag_url if new_flagged else unflag_url)
+            assert httpretty.last_request().method == 'PUT'
+            assert httpretty.last_request().parsed_body == {'user_id': [str(self.user.id)]}  # lint-amnesty, pylint: disable=no-member
 
     def test_invalid_field(self):
         self.register_thread()
-        with self.assertRaises(ValidationError) as assertion:
+        with pytest.raises(ValidationError) as assertion:
             update_thread(self.request, "test_thread", {"raw_body": ""})
-        self.assertEqual(
-            assertion.exception.message_dict,
-            {"raw_body": ["This field may not be blank."]}
-        )
+        assert assertion.value.message_dict == {'raw_body': ['This field may not be blank.']}
 
 
 @ddt.ddt
@@ -2382,12 +2791,12 @@ class UpdateCommentTest(
 
     @classmethod
     def setUpClass(cls):
-        super(UpdateCommentTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(UpdateCommentTest, self).setUp()
+        super().setUp()
 
         httpretty.reset()
         httpretty.enable()
@@ -2411,7 +2820,7 @@ class UpdateCommentTest(
 
         cs_thread_data = make_minimal_cs_thread({
             "id": "test_thread",
-            "course_id": six.text_type(course.id)
+            "course_id": str(course.id)
         })
         cs_thread_data.update(thread_overrides or {})
         self.register_get_thread_response(cs_thread_data)
@@ -2434,7 +2843,7 @@ class UpdateCommentTest(
         self.register_comment()
         update_comment(self.request, "test_comment", {})
         for request in httpretty.httpretty.latest_requests:
-            self.assertEqual(request.method, "GET")
+            assert request.method == 'GET'
 
     @ddt.data(None, "test_parent")
     def test_basic(self, parent_id):
@@ -2442,6 +2851,8 @@ class UpdateCommentTest(
         with self.assert_signal_sent(api, 'comment_edited', sender=None, user=self.user, exclude_args=('post',)):
             actual = update_comment(self.request, "test_comment", {"raw_body": "Edited body"})
         expected = {
+            "anonymous": False,
+            "anonymous_to_peers": False,
             "id": "test_comment",
             "thread_id": "test_thread",
             "parent_id": parent_id,
@@ -2456,44 +2867,43 @@ class UpdateCommentTest(
             "endorsed_by_label": None,
             "endorsed_at": None,
             "abuse_flagged": False,
+            "abuse_flagged_any_user": None,
             "voted": False,
             "vote_count": 0,
             "children": [],
-            "editable_fields": ["abuse_flagged", "raw_body", "voted"],
+            "editable_fields": ["abuse_flagged", "anonymous", "raw_body", "voted"],
             "child_count": 0,
+            "can_delete": True,
         }
-        self.assertEqual(actual, expected)
-        self.assertEqual(
-            httpretty.last_request().parsed_body,
-            {
-                "body": ["Edited body"],
-                "course_id": [six.text_type(self.course.id)],
-                "user_id": [str(self.user.id)],
-                "anonymous": ["False"],
-                "anonymous_to_peers": ["False"],
-                "endorsed": ["False"],
-            }
-        )
+        assert actual == expected
+        assert httpretty.last_request().parsed_body == {  # lint-amnesty, pylint: disable=no-member
+            'body': ['Edited body'],
+            'course_id': [str(self.course.id)],
+            'user_id': [str(self.user.id)],
+            'anonymous': ['False'],
+            'anonymous_to_peers': ['False'],
+            'endorsed': ['False']
+        }
 
     def test_nonexistent_comment(self):
         self.register_get_comment_error_response("test_comment", 404)
-        with self.assertRaises(CommentNotFoundError):
+        with pytest.raises(CommentNotFoundError):
             update_comment(self.request, "test_comment", {})
 
     def test_nonexistent_course(self):
         self.register_comment(thread_overrides={"course_id": "non/existent/course"})
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             update_comment(self.request, "test_comment", {})
 
     def test_unenrolled(self):
         self.register_comment()
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             update_comment(self.request, "test_comment", {})
 
     def test_discussions_disabled(self):
         self.register_comment(course=_discussion_disabled_course_for(self.user))
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             update_comment(self.request, "test_comment", {})
 
     @ddt.data(
@@ -2516,7 +2926,7 @@ class UpdateCommentTest(
             {"thread_id": "test_thread"},
             thread_overrides={
                 "id": "test_thread",
-                "course_id": six.text_type(cohort_course.id),
+                "course_id": str(cohort_course.id),
                 "group_id": (
                     None if thread_group_state == "no_group" else
                     cohort.id if thread_group_state == "match_group" else
@@ -2531,9 +2941,9 @@ class UpdateCommentTest(
         )
         try:
             update_comment(self.request, "test_comment", {})
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     @ddt.data(*itertools.product(
         [
@@ -2547,8 +2957,7 @@ class UpdateCommentTest(
     ))
     @ddt.unpack
     def test_raw_body_access(self, role_name, is_thread_author, is_comment_author):
-        role = Role.objects.create(name=role_name, course_id=self.course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role_name)
         self.register_comment(
             {"user_id": str(self.user.id if is_comment_author else (self.user.id + 1))},
             thread_overrides={
@@ -2558,13 +2967,10 @@ class UpdateCommentTest(
         expected_error = role_name == FORUM_ROLE_STUDENT and not is_comment_author
         try:
             update_comment(self.request, "test_comment", {"raw_body": "edited"})
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ValidationError as err:
-            self.assertTrue(expected_error)
-            self.assertEqual(
-                err.message_dict,
-                {"raw_body": ["This field is not editable."]}
-            )
+            assert expected_error
+            assert err.message_dict == {'raw_body': ['This field is not editable.']}
 
     @ddt.data(*itertools.product(
         [
@@ -2579,8 +2985,7 @@ class UpdateCommentTest(
     ))
     @ddt.unpack
     def test_endorsed_access(self, role_name, is_thread_author, thread_type, is_comment_author):
-        role = Role.objects.create(name=role_name, course_id=self.course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role_name)
         self.register_comment(
             {"user_id": str(self.user.id if is_comment_author else (self.user.id + 1))},
             thread_overrides={
@@ -2594,13 +2999,10 @@ class UpdateCommentTest(
         )
         try:
             update_comment(self.request, "test_comment", {"endorsed": True})
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ValidationError as err:
-            self.assertTrue(expected_error)
-            self.assertEqual(
-                err.message_dict,
-                {"endorsed": ["This field is not editable."]}
-            )
+            assert expected_error
+            assert err.message_dict == {'endorsed': ['This field is not editable.']}
 
     @ddt.data(*itertools.product([True, False], [True, False]))
     @ddt.unpack
@@ -2623,44 +3025,38 @@ class UpdateCommentTest(
         self.register_comment(overrides={"votes": {"up_count": vote_count}})
         data = {"voted": new_vote_status}
         result = update_comment(self.request, "test_comment", data)
-        self.assertEqual(result["vote_count"], 1 if new_vote_status else 0)
-        self.assertEqual(result["voted"], new_vote_status)
-        last_request_path = urlparse(httpretty.last_request().path).path
+        assert result['vote_count'] == (1 if new_vote_status else 0)
+        assert result['voted'] == new_vote_status
+        last_request_path = urlparse(httpretty.last_request().path).path  # lint-amnesty, pylint: disable=no-member
         votes_url = "/api/v1/comments/test_comment/votes"
         if current_vote_status == new_vote_status:
-            self.assertNotEqual(last_request_path, votes_url)
+            assert last_request_path != votes_url
         else:
-            self.assertEqual(last_request_path, votes_url)
-            self.assertEqual(
-                httpretty.last_request().method,
-                "PUT" if new_vote_status else "DELETE"
-            )
+            assert last_request_path == votes_url
+            assert httpretty.last_request().method == ('PUT' if new_vote_status else 'DELETE')
             actual_request_data = (
-                httpretty.last_request().parsed_body if new_vote_status else
-                parse_qs(urlparse(httpretty.last_request().path).query)
+                httpretty.last_request().parsed_body if new_vote_status else  # lint-amnesty, pylint: disable=no-member
+                parse_qs(urlparse(httpretty.last_request().path).query)  # lint-amnesty, pylint: disable=no-member
             )
             actual_request_data.pop("request_id", None)
             expected_request_data = {"user_id": [str(self.user.id)]}
             if new_vote_status:
                 expected_request_data["value"] = ["up"]
-            self.assertEqual(actual_request_data, expected_request_data)
+            assert actual_request_data == expected_request_data
 
             event_name, event_data = mock_emit.call_args[0]
-            self.assertEqual(event_name, "edx.forum.response.voted")
+            assert event_name == 'edx.forum.response.voted'
 
-            self.assertEqual(
-                event_data,
-                {
-                    'undo_vote': not new_vote_status,
-                    'url': '',
-                    'target_username': self.user.username,
-                    'vote_value': 'up',
-                    'user_forums_roles': [FORUM_ROLE_STUDENT],
-                    'user_course_roles': [],
-                    'commentable_id': 'dummy',
-                    'id': 'test_comment'
-                }
-            )
+            assert event_data == {
+                'undo_vote': (not new_vote_status),
+                'url': '',
+                'target_username': self.user.username,
+                'vote_value': 'up',
+                'user_forums_roles': [FORUM_ROLE_STUDENT],
+                'user_course_roles': [],
+                'commentable_id': 'dummy',
+                'id': 'test_comment'
+            }
 
     @ddt.data(*itertools.product([True, False], [True, False], [True, False]))
     @ddt.unpack
@@ -2680,12 +3076,12 @@ class UpdateCommentTest(
         data = {"voted": first_vote}
         result = update_comment(self.request, "test_comment", data)
         self.register_comment(overrides={"voted": first_vote})
-        self.assertEqual(result["vote_count"], 1 if first_vote else 0)
+        assert result['vote_count'] == (1 if first_vote else 0)
 
         #second vote
         data = {"voted": second_vote}
         result = update_comment(self.request, "test_comment", data)
-        self.assertEqual(result["vote_count"], 1 if second_vote else 0)
+        assert result['vote_count'] == (1 if second_vote else 0)
 
     @ddt.data(*itertools.product([True, False], [True, False], [True, False], [True, False]))
     @ddt.unpack
@@ -2723,14 +3119,14 @@ class UpdateCommentTest(
             data = {"voted": user_vote}
             result = update_comment(request, "test_comment", data)
             if current_vote == user_vote:
-                self.assertEqual(result["vote_count"], vote_count)
+                assert result['vote_count'] == vote_count
             elif user_vote:
                 vote_count += 1
-                self.assertEqual(result["vote_count"], vote_count)
+                assert result['vote_count'] == vote_count
                 self.register_get_user_response(self.user, upvoted_ids=["test_comment"])
             else:
                 vote_count -= 1
-                self.assertEqual(result["vote_count"], vote_count)
+                assert result['vote_count'] == vote_count
                 self.register_get_user_response(self.user, upvoted_ids=[])
 
     @ddt.data(*itertools.product([True, False], [True, False]))
@@ -2750,23 +3146,17 @@ class UpdateCommentTest(
         self.register_comment({"abuse_flaggers": [str(self.user.id)] if old_flagged else []})
         data = {"abuse_flagged": new_flagged}
         result = update_comment(self.request, "test_comment", data)
-        self.assertEqual(result["abuse_flagged"], new_flagged)
-        last_request_path = urlparse(httpretty.last_request().path).path
+        assert result['abuse_flagged'] == new_flagged
+        last_request_path = urlparse(httpretty.last_request().path).path  # lint-amnesty, pylint: disable=no-member
         flag_url = "/api/v1/comments/test_comment/abuse_flag"
         unflag_url = "/api/v1/comments/test_comment/abuse_unflag"
         if old_flagged == new_flagged:
-            self.assertNotEqual(last_request_path, flag_url)
-            self.assertNotEqual(last_request_path, unflag_url)
+            assert last_request_path != flag_url
+            assert last_request_path != unflag_url
         else:
-            self.assertEqual(
-                last_request_path,
-                flag_url if new_flagged else unflag_url
-            )
-            self.assertEqual(httpretty.last_request().method, "PUT")
-            self.assertEqual(
-                httpretty.last_request().parsed_body,
-                {"user_id": [str(self.user.id)]}
-            )
+            assert last_request_path == (flag_url if new_flagged else unflag_url)
+            assert httpretty.last_request().method == 'PUT'
+            assert httpretty.last_request().parsed_body == {'user_id': [str(self.user.id)]}  # lint-amnesty, pylint: disable=no-member
 
 
 @ddt.ddt
@@ -2782,12 +3172,12 @@ class DeleteThreadTest(
     """Tests for delete_thread"""
     @classmethod
     def setUpClass(cls):
-        super(DeleteThreadTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(DeleteThreadTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -2807,7 +3197,7 @@ class DeleteThreadTest(
         """
         cs_data = make_minimal_cs_thread({
             "id": self.thread_id,
-            "course_id": six.text_type(self.course.id),
+            "course_id": str(self.course.id),
             "user_id": str(self.user.id),
         })
         cs_data.update(overrides or {})
@@ -2817,33 +3207,30 @@ class DeleteThreadTest(
     def test_basic(self):
         self.register_thread()
         with self.assert_signal_sent(api, 'thread_deleted', sender=None, user=self.user, exclude_args=('post',)):
-            self.assertIsNone(delete_thread(self.request, self.thread_id))
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            "/api/v1/threads/{}".format(self.thread_id)
-        )
-        self.assertEqual(httpretty.last_request().method, "DELETE")
+            assert delete_thread(self.request, self.thread_id) is None
+        assert urlparse(httpretty.last_request().path).path == f"/api/v1/threads/{self.thread_id}"  # lint-amnesty, pylint: disable=no-member
+        assert httpretty.last_request().method == 'DELETE'
 
     def test_thread_id_not_found(self):
         self.register_get_thread_error_response("missing_thread", 404)
-        with self.assertRaises(ThreadNotFoundError):
+        with pytest.raises(ThreadNotFoundError):
             delete_thread(self.request, "missing_thread")
 
     def test_nonexistent_course(self):
         self.register_thread({"course_id": "non/existent/course"})
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             delete_thread(self.request, self.thread_id)
 
     def test_not_enrolled(self):
         self.register_thread()
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             delete_thread(self.request, self.thread_id)
 
     def test_discussions_disabled(self):
         disabled_course = _discussion_disabled_course_for(self.user)
-        self.register_thread(overrides={"course_id": six.text_type(disabled_course.id)})
-        with self.assertRaises(DiscussionDisabledError):
+        self.register_thread(overrides={"course_id": str(disabled_course.id)})
+        with pytest.raises(DiscussionDisabledError):
             delete_thread(self.request, self.thread_id)
 
     @ddt.data(
@@ -2853,15 +3240,14 @@ class DeleteThreadTest(
         FORUM_ROLE_STUDENT,
     )
     def test_non_author_delete_allowed(self, role_name):
-        role = Role.objects.create(name=role_name, course_id=self.course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role_name)
         self.register_thread({"user_id": str(self.user.id + 1)})
         expected_error = role_name == FORUM_ROLE_STUDENT
         try:
             delete_thread(self.request, self.thread_id)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except PermissionDenied:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     @ddt.data(
         *itertools.product(
@@ -2887,7 +3273,7 @@ class DeleteThreadTest(
         """
         cohort_course, cohort = _create_course_and_cohort_with_user_role(course_is_cohorted, self.user, role_name)
         self.register_thread({
-            "course_id": six.text_type(cohort_course.id),
+            "course_id": str(cohort_course.id),
             "group_id": (
                 None if thread_group_state == "no_group" else
                 cohort.id if thread_group_state == "match_group" else
@@ -2901,9 +3287,9 @@ class DeleteThreadTest(
         )
         try:
             delete_thread(self.request, self.thread_id)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
 
 @ddt.ddt
@@ -2919,12 +3305,12 @@ class DeleteCommentTest(
     """Tests for delete_comment"""
     @classmethod
     def setUpClass(cls):
-        super(DeleteCommentTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(DeleteCommentTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -2945,7 +3331,7 @@ class DeleteCommentTest(
         """
         cs_thread_data = make_minimal_cs_thread({
             "id": self.thread_id,
-            "course_id": six.text_type(self.course.id)
+            "course_id": str(self.course.id)
         })
         cs_thread_data.update(thread_overrides or {})
         self.register_get_thread_response(cs_thread_data)
@@ -2963,38 +3349,35 @@ class DeleteCommentTest(
     def test_basic(self):
         self.register_comment_and_thread()
         with self.assert_signal_sent(api, 'comment_deleted', sender=None, user=self.user, exclude_args=('post',)):
-            self.assertIsNone(delete_comment(self.request, self.comment_id))
-        self.assertEqual(
-            urlparse(httpretty.last_request().path).path,
-            "/api/v1/comments/{}".format(self.comment_id)
-        )
-        self.assertEqual(httpretty.last_request().method, "DELETE")
+            assert delete_comment(self.request, self.comment_id) is None
+        assert urlparse(httpretty.last_request().path).path == f"/api/v1/comments/{self.comment_id}"  # lint-amnesty, pylint: disable=no-member
+        assert httpretty.last_request().method == 'DELETE'
 
     def test_comment_id_not_found(self):
         self.register_get_comment_error_response("missing_comment", 404)
-        with self.assertRaises(CommentNotFoundError):
+        with pytest.raises(CommentNotFoundError):
             delete_comment(self.request, "missing_comment")
 
     def test_nonexistent_course(self):
         self.register_comment_and_thread(
             thread_overrides={"course_id": "non/existent/course"}
         )
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             delete_comment(self.request, self.comment_id)
 
     def test_not_enrolled(self):
         self.register_comment_and_thread()
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             delete_comment(self.request, self.comment_id)
 
     def test_discussions_disabled(self):
         disabled_course = _discussion_disabled_course_for(self.user)
         self.register_comment_and_thread(
-            thread_overrides={"course_id": six.text_type(disabled_course.id)},
-            overrides={"course_id": six.text_type(disabled_course.id)}
+            thread_overrides={"course_id": str(disabled_course.id)},
+            overrides={"course_id": str(disabled_course.id)}
         )
-        with self.assertRaises(DiscussionDisabledError):
+        with pytest.raises(DiscussionDisabledError):
             delete_comment(self.request, self.comment_id)
 
     @ddt.data(
@@ -3004,17 +3387,16 @@ class DeleteCommentTest(
         FORUM_ROLE_STUDENT,
     )
     def test_non_author_delete_allowed(self, role_name):
-        role = Role.objects.create(name=role_name, course_id=self.course.id)
-        role.users.set([self.user])
+        _assign_role_to_user(user=self.user, course_id=self.course.id, role=role_name)
         self.register_comment_and_thread(
             overrides={"user_id": str(self.user.id + 1)}
         )
         expected_error = role_name == FORUM_ROLE_STUDENT
         try:
             delete_comment(self.request, self.comment_id)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except PermissionDenied:
-            self.assertTrue(expected_error)
+            assert expected_error
 
     @ddt.data(
         *itertools.product(
@@ -3042,7 +3424,7 @@ class DeleteCommentTest(
         self.register_comment_and_thread(
             overrides={"thread_id": "test_thread"},
             thread_overrides={
-                "course_id": six.text_type(cohort_course.id),
+                "course_id": str(cohort_course.id),
                 "group_id": (
                     None if thread_group_state == "no_group" else
                     cohort.id if thread_group_state == "match_group" else
@@ -3057,9 +3439,9 @@ class DeleteCommentTest(
         )
         try:
             delete_comment(self.request, self.comment_id)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error
 
 
 @ddt.ddt
@@ -3073,12 +3455,12 @@ class RetrieveThreadTest(
     """Tests for get_thread"""
     @classmethod
     def setUpClass(cls):
-        super(RetrieveThreadTest, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create()
 
     @mock.patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(RetrieveThreadTest, self).setUp()
+        super().setUp()
         httpretty.reset()
         httpretty.enable()
         self.addCleanup(httpretty.reset)
@@ -3098,7 +3480,7 @@ class RetrieveThreadTest(
         """
         cs_data = make_minimal_cs_thread({
             "id": self.thread_id,
-            "course_id": six.text_type(self.course.id),
+            "course_id": str(self.course.id),
             "commentable_id": "test_topic",
             "username": self.user.username,
             "user_id": str(self.user.id),
@@ -3112,15 +3494,15 @@ class RetrieveThreadTest(
 
     def test_basic(self):
         self.register_thread({"resp_total": 2})
-        self.assertEqual(get_thread(self.request, self.thread_id), self.expected_thread_data({
-            "response_count": 2,
-            "unread_comment_count": 1,
-        }))
-        self.assertEqual(httpretty.last_request().method, "GET")
+        assert get_thread(self.request, self.thread_id) == self.expected_thread_data({
+            'response_count': 2,
+            'unread_comment_count': 1
+        })
+        assert httpretty.last_request().method == 'GET'
 
     def test_thread_id_not_found(self):
         self.register_get_thread_error_response("missing_thread", 404)
-        with self.assertRaises(ThreadNotFoundError):
+        with pytest.raises(ThreadNotFoundError):
             get_thread(self.request, "missing_thread")
 
     def test_nonauthor_enrolled_in_course(self):
@@ -3129,16 +3511,17 @@ class RetrieveThreadTest(
         CourseEnrollmentFactory.create(user=non_author_user, course_id=self.course.id)
         self.register_thread()
         self.request.user = non_author_user
-        self.assertEqual(get_thread(self.request, self.thread_id), self.expected_thread_data({
-            "editable_fields": ["abuse_flagged", "following", "read", "voted"],
-            "unread_comment_count": 1,
-        }))
-        self.assertEqual(httpretty.last_request().method, "GET")
+        assert get_thread(self.request, self.thread_id) == self.expected_thread_data({
+            'can_delete': False,
+            'editable_fields': ['abuse_flagged', 'following', 'read', 'voted'],
+            'unread_comment_count': 1
+        })
+        assert httpretty.last_request().method == 'GET'
 
     def test_not_enrolled_in_course(self):
         self.register_thread()
         self.request.user = UserFactory.create()
-        with self.assertRaises(CourseNotFoundError):
+        with pytest.raises(CourseNotFoundError):
             get_thread(self.request, self.thread_id)
 
     @ddt.data(
@@ -3165,7 +3548,7 @@ class RetrieveThreadTest(
         """
         cohort_course, cohort = _create_course_and_cohort_with_user_role(course_is_cohorted, self.user, role_name)
         self.register_thread({
-            "course_id": six.text_type(cohort_course.id),
+            "course_id": str(cohort_course.id),
             "group_id": (
                 None if thread_group_state == "no_group" else
                 cohort.id if thread_group_state == "match_group" else
@@ -3179,6 +3562,6 @@ class RetrieveThreadTest(
         )
         try:
             get_thread(self.request, self.thread_id)
-            self.assertFalse(expected_error)
+            assert not expected_error
         except ThreadNotFoundError:
-            self.assertTrue(expected_error)
+            assert expected_error

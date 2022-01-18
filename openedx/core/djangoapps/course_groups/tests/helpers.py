@@ -10,9 +10,8 @@ from factory.django import DjangoModelFactory
 from opaque_keys.edx.locator import CourseLocator
 
 from openedx.core.djangoapps.django_comment_common.models import CourseDiscussionSettings
-from openedx.core.djangoapps.django_comment_common.utils import set_course_discussion_settings
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 from ..cohorts import set_course_cohorted
 from ..models import CohortMembership, CourseCohort, CourseCohortsSettings, CourseUserGroup
@@ -22,7 +21,7 @@ class CohortFactory(DjangoModelFactory):
     """
     Factory for constructing mock cohorts.
     """
-    class Meta(object):
+    class Meta:
         model = CourseUserGroup
 
     name = Sequence("cohort{}".format)
@@ -35,8 +34,8 @@ class CohortFactory(DjangoModelFactory):
         Returns the users associated with the cohort.
         """
         if extracted:
-            self.users.add(*extracted)
-            for user in self.users.all():
+            self.users.add(*extracted)  # lint-amnesty, pylint: disable=no-member
+            for user in self.users.all():  # lint-amnesty, pylint: disable=no-member
                 CohortMembership.objects.create(
                     user=user,
                     course_user_group=self,
@@ -47,7 +46,7 @@ class CourseCohortFactory(DjangoModelFactory):
     """
     Factory for constructing mock course cohort.
     """
-    class Meta(object):
+    class Meta:
         model = CourseCohort
 
 
@@ -55,7 +54,7 @@ class CourseCohortSettingsFactory(DjangoModelFactory):
     """
     Factory for constructing mock course cohort settings.
     """
-    class Meta(object):
+    class Meta:
         model = CourseCohortsSettings
 
     is_cohorted = False
@@ -74,11 +73,11 @@ def config_course_cohorts_legacy(
     the cohort config on the course descriptor.
 
     Since cohort settings are now stored in models.CourseCohortSettings,
-    this is only used for testing data migration from the CourseDescriptor
+    this is only used for testing data migration from the CourseBlock
     to the table.
 
     Arguments:
-        course: CourseDescriptor
+        course: CourseBlock
         cohorted: bool.
         auto_cohort_groups: optional list of strings
                   (names of groups to put students into).
@@ -113,7 +112,7 @@ def config_course_cohorts(
     Set and configure cohorts for a course.
 
     Arguments:
-        course: CourseDescriptor
+        course: CourseBlock
         is_cohorted (bool): Is the course cohorted?
         discussion_division_scheme (String): the division scheme for discussions. Default is
             CourseDiscussionSettings.COHORT.
@@ -125,10 +124,10 @@ def config_course_cohorts(
     """
 
     set_course_cohorted(course.id, is_cohorted)
-    set_course_discussion_settings(
-        course.id,
-        division_scheme=discussion_division_scheme,
-    )
+    discussion_settings = CourseDiscussionSettings.get(course.id)
+    discussion_settings.update({
+        'division_scheme': discussion_division_scheme,
+    })
 
     for cohort_name in auto_cohorts:
         cohort = CohortFactory(course_id=course.id, name=cohort_name)

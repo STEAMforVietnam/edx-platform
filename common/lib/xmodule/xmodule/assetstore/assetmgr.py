@@ -13,42 +13,35 @@ Note: Hotfix (PLAT-734) No asset calls find_asset_metadata, and directly accesse
 
 """
 
-
-from contracts import contract, new_contract
-from opaque_keys.edx.keys import AssetKey
-
 from xmodule.contentstore.django import contentstore
-
-new_contract('AssetKey', AssetKey)
 
 
 class AssetException(Exception):
     """
     Base exception class for all exceptions related to assets.
     """
-    pass
+    pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
 
 class AssetMetadataNotFound(AssetException):
     """
     Thrown when no asset metadata is present in the course modulestore for the particular asset requested.
     """
-    pass
+    pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
 
 class AssetMetadataFoundTemporary(AssetException):
     """
     TEMPORARY: Thrown if asset metadata is actually found in the course modulestore.
     """
-    pass
+    pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
 
-class AssetManager(object):
+class AssetManager:
     """
     Manager for saving/loading course assets.
     """
     @staticmethod
-    @contract(asset_key='AssetKey', throw_on_not_found='bool', as_stream='bool')
     def find(asset_key, throw_on_not_found=True, as_stream=False):
         """
         Finds course asset in the deprecated contentstore.

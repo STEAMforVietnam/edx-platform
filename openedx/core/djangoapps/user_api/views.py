@@ -1,12 +1,9 @@
 """HTTP end-points for the User API. """
 
 
-from django.contrib.auth.models import User
-from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
-from django.db import transaction
-from django.http import HttpResponse, HttpResponseForbidden
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
+from django.http import HttpResponse
 from django.utils.decorators import method_decorator
-from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django_filters.rest_framework import DjangoFilterBackend
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
@@ -17,10 +14,8 @@ from rest_framework import authentication, generics, status, viewsets
 from rest_framework.exceptions import ParseError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from six import text_type
 
 from openedx.core.djangoapps.django_comment_common.models import Role
-from openedx.core.djangoapps.user_api import accounts
 from openedx.core.lib.api.view_utils import require_post_params
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import get_country_time_zones, update_email_opt_in
@@ -30,8 +25,6 @@ from openedx.core.djangoapps.user_api.serializers import (
     UserSerializer
 )
 from openedx.core.lib.api.permissions import ApiKeyHeaderPermission
-from student.helpers import AccountValidationError
-from util.json_request import JsonResponse
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -128,7 +121,7 @@ class UpdateEmailOptInPreference(APIView):
         except InvalidKeyError:
             return HttpResponse(
                 status=400,
-                content=u"No course '{course_id}' found".format(course_id=course_id),
+                content=f"No course '{course_id}' found",
                 content_type="text/plain"
             )
         # Only check for true. All other values are False.
@@ -148,9 +141,9 @@ class CountryTimeZoneListView(generics.ListAPIView):
 
     **Example Requests**
 
-        GET /user_api/v1/preferences/time_zones/
+        GET /api/user/v1/preferences/time_zones/
 
-        GET /user_api/v1/preferences/time_zones/?country_code=FR
+        GET /api/user/v1/preferences/time_zones/?country_code=FR
 
     **Example GET Response**
 

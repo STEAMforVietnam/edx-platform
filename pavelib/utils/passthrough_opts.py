@@ -9,10 +9,10 @@ Provides:
 """
 
 
-from optparse import BadOptionError, OptionParser
+from optparse import BadOptionError, OptionParser  # pylint: disable=deprecated-module
+from unittest.mock import patch
 
 import paver.tasks
-from mock import patch
 
 
 class PassthroughOptionParser(OptionParser):

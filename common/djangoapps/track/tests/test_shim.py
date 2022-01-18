@@ -2,26 +2,28 @@
 
 
 from collections import namedtuple
-
+from unittest.mock import sentinel
+import pytest
 import ddt
 from django.test.utils import override_settings
-from mock import sentinel
 
 from openedx.core.lib.tests.assertions.events import assert_events_equal
+from opaque_keys.edx.locator import CourseLocator  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .. import transformers
 from ..shim import PrefixedEventProcessor
 from . import FROZEN_TIME, EventTrackingTestCase
 
+
 LEGACY_SHIM_PROCESSOR = [
     {
-        'ENGINE': 'track.shim.LegacyFieldMappingProcessor'
+        'ENGINE': 'common.djangoapps.track.shim.LegacyFieldMappingProcessor'
     }
 ]
 
 GOOGLE_ANALYTICS_PROCESSOR = [
     {
-        'ENGINE': 'track.shim.GoogleAnalyticsProcessor'
+        'ENGINE': 'common.djangoapps.track.shim.GoogleAnalyticsProcessor'
     }
 ]
 
@@ -156,6 +158,33 @@ class GoogleAnalyticsProcessorTestCase(EventTrackingTestCase):
         }
         assert_events_equal(expected_event, emitted_event)
 
+    def test_valid_course_id(self):
+        """ Test that a courserun_key is added if course_id is a valid course key. """
+        data = {sentinel.key: sentinel.value}
+        courserun_key = str(CourseLocator(org='testx', course='test_course', run='test_run'))
+
+        context = {
+            'path': sentinel.path,
+            'user_id': sentinel.user_id,
+            'client_id': sentinel.client_id,
+            'course_id': courserun_key,
+        }
+        with self.tracker.context('test', context):
+            self.tracker.emit(sentinel.name, data)
+
+        emitted_event = self.get_event()
+
+        expected_event = {
+            'context': context,
+            'data': data,
+            'label': courserun_key,
+            'courserun_key': courserun_key,
+            'name': sentinel.name,
+            'nonInteraction': 1,
+            'timestamp': FROZEN_TIME,
+        }
+        assert_events_equal(expected_event, emitted_event)
+
 
 @override_settings(
     EVENT_TRACKING_BACKENDS={
@@ -163,11 +192,11 @@ class GoogleAnalyticsProcessorTestCase(EventTrackingTestCase):
             'ENGINE': 'eventtracking.backends.routing.RoutingBackend',
             'OPTIONS': {
                 'backends': {
-                    'first': {'ENGINE': 'track.tests.InMemoryBackend'}
+                    'first': {'ENGINE': 'common.djangoapps.track.tests.InMemoryBackend'}
                 },
                 'processors': [
                     {
-                        'ENGINE': 'track.shim.GoogleAnalyticsProcessor'
+                        'ENGINE': 'common.djangoapps.track.shim.GoogleAnalyticsProcessor'
                     }
                 ]
             }
@@ -177,7 +206,7 @@ class GoogleAnalyticsProcessorTestCase(EventTrackingTestCase):
             'OPTIONS': {
                 'backends': {
                     'second': {
-                        'ENGINE': 'track.tests.InMemoryBackend'
+                        'ENGINE': 'common.djangoapps.track.tests.InMemoryBackend'
                     }
                 }
             }
@@ -234,7 +263,7 @@ class EventTransformerRegistryTestCase(EventTrackingTestCase):
     """
 
     def setUp(self):
-        super(EventTransformerRegistryTestCase, self).setUp()
+        super().setUp()
         self.registry = transformers.EventTransformerRegistry()
 
     @ddt.data(
@@ -247,7 +276,7 @@ class EventTransformerRegistryTestCase(EventTrackingTestCase):
     def test_event_registry_dispatch(self, event_name, expected_transformer):
         event = {'name': event_name}
         transformer = self.registry.create_transformer(event)
-        self.assertIsInstance(transformer, expected_transformer)
+        assert isinstance(transformer, expected_transformer)
 
     @ddt.data(
         'edx.ui.lms.sequence.next_selected.what',
@@ -256,7 +285,7 @@ class EventTransformerRegistryTestCase(EventTrackingTestCase):
     )
     def test_dispatch_to_nonexistent_events(self, event_name):
         event = {'name': event_name}
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.registry.create_transformer(event)
 
 
@@ -267,20 +296,20 @@ class PrefixedEventProcessorTestCase(EventTrackingTestCase):
     """
 
     @ddt.data(
-        SequenceDDT(action=u'next', tab_count=5, current_tab=3, legacy_event_type=u'seq_next'),
-        SequenceDDT(action=u'next', tab_count=5, current_tab=5, legacy_event_type=None),
-        SequenceDDT(action=u'previous', tab_count=5, current_tab=3, legacy_event_type=u'seq_prev'),
-        SequenceDDT(action=u'previous', tab_count=5, current_tab=1, legacy_event_type=None),
+        SequenceDDT(action='next', tab_count=5, current_tab=3, legacy_event_type='seq_next'),
+        SequenceDDT(action='next', tab_count=5, current_tab=5, legacy_event_type=None),
+        SequenceDDT(action='previous', tab_count=5, current_tab=3, legacy_event_type='seq_prev'),
+        SequenceDDT(action='previous', tab_count=5, current_tab=1, legacy_event_type=None),
     )
     def test_sequence_linear_navigation(self, sequence_ddt):
-        event_name = u'edx.ui.lms.sequence.{}_selected'.format(sequence_ddt.action)
+        event_name = f'edx.ui.lms.sequence.{sequence_ddt.action}_selected'
 
         event = {
-            u'name': event_name,
-            u'event': {
-                u'current_tab': sequence_ddt.current_tab,
-                u'tab_count': sequence_ddt.tab_count,
-                u'id': u'ABCDEFG',
+            'name': event_name,
+            'event': {
+                'current_tab': sequence_ddt.current_tab,
+                'tab_count': sequence_ddt.tab_count,
+                'id': 'ABCDEFG',
             }
         }
 
@@ -288,34 +317,34 @@ class PrefixedEventProcessorTestCase(EventTrackingTestCase):
         result = process_event_shim(event)
 
         # Legacy fields get added when needed
-        if sequence_ddt.action == u'next':
+        if sequence_ddt.action == 'next':
             offset = 1
         else:
             offset = -1
         if sequence_ddt.legacy_event_type:
-            self.assertEqual(result[u'event_type'], sequence_ddt.legacy_event_type)
-            self.assertEqual(result[u'event'][u'old'], sequence_ddt.current_tab)
-            self.assertEqual(result[u'event'][u'new'], sequence_ddt.current_tab + offset)
+            assert result['event_type'] == sequence_ddt.legacy_event_type
+            assert result['event']['old'] == sequence_ddt.current_tab
+            assert result['event']['new'] == (sequence_ddt.current_tab + offset)
         else:
-            self.assertNotIn(u'event_type', result)
-            self.assertNotIn(u'old', result[u'event'])
-            self.assertNotIn(u'new', result[u'event'])
+            assert 'event_type' not in result
+            assert 'old' not in result['event']
+            assert 'new' not in result['event']
 
     def test_sequence_tab_navigation(self):
-        event_name = u'edx.ui.lms.sequence.tab_selected'
+        event_name = 'edx.ui.lms.sequence.tab_selected'
         event = {
-            u'name': event_name,
-            u'event': {
-                u'current_tab': 2,
-                u'target_tab': 5,
-                u'tab_count': 9,
-                u'id': u'block-v1:abc',
-                u'widget_placement': u'top',
+            'name': event_name,
+            'event': {
+                'current_tab': 2,
+                'target_tab': 5,
+                'tab_count': 9,
+                'id': 'block-v1:abc',
+                'widget_placement': 'top',
             }
         }
 
         process_event_shim = PrefixedEventProcessor()
         result = process_event_shim(event)
-        self.assertEqual(result[u'event_type'], u'seq_goto')
-        self.assertEqual(result[u'event'][u'old'], 2)
-        self.assertEqual(result[u'event'][u'new'], 5)
+        assert result['event_type'] == 'seq_goto'
+        assert result['event']['old'] == 2
+        assert result['event']['new'] == 5

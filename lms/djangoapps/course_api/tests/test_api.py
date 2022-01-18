@@ -4,21 +4,24 @@ Test for course API
 
 from datetime import datetime, timedelta
 from hashlib import md5
+from unittest import mock
 
+import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import Http404
-import mock
+from django.test import override_settings
 from opaque_keys.edx.keys import CourseKey
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from xmodule.modulestore.exceptions import ItemNotFoundError
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import ItemFactory, check_mongo_calls
+from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import ItemFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
 
-from ..api import UNKNOWN_BLOCK_DISPLAY_NAME, course_detail, get_due_dates, list_courses
+from ..api import UNKNOWN_BLOCK_DISPLAY_NAME, course_detail, get_due_dates, list_courses, get_course_members
+from ..exceptions import OverEnrollmentLimitException
 from .mixins import CourseApiFactoryMixin
 
 
@@ -29,15 +32,15 @@ class CourseApiTestMixin(CourseApiFactoryMixin):
 
     @classmethod
     def setUpClass(cls):
-        super(CourseApiTestMixin, cls).setUpClass()
+        super().setUpClass()
         cls.request_factory = APIRequestFactory()
         CourseOverview.get_all_courses()  # seed the CourseOverview table
 
-    def verify_course(self, course, course_id=u'edX/toy/2012_Fall'):
+    def verify_course(self, course, course_id='edX/toy/2012_Fall'):
         """
         Ensure that the returned course is the course we just created
         """
-        self.assertEqual(course_id, str(course.id))
+        assert course_id == str(course.id)
 
 
 class CourseDetailTestMixin(CourseApiTestMixin):
@@ -64,9 +67,9 @@ class TestGetCourseDetail(CourseDetailTestMixin, SharedModuleStoreTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestGetCourseDetail, cls).setUpClass()
+        super().setUpClass()
         cls.course = cls.create_course()
-        cls.hidden_course = cls.create_course(course=u'hidden', visible_to_staff_only=True)
+        cls.hidden_course = cls.create_course(course='hidden', visible_to_staff_only=True)
         cls.honor_user = cls.create_user('honor', is_staff=False)
         cls.staff_user = cls.create_user('staff', is_staff=True)
 
@@ -75,20 +78,20 @@ class TestGetCourseDetail(CourseDetailTestMixin, SharedModuleStoreTestCase):
         self.verify_course(course)
 
     def test_get_nonexistent_course(self):
-        course_key = CourseKey.from_string(u'edX/toy/nope')
-        with self.assertRaises(Http404):
+        course_key = CourseKey.from_string('edX/toy/nope')
+        with pytest.raises(Http404):
             self._make_api_call(self.honor_user, self.honor_user, course_key)
 
     def test_hidden_course_for_honor(self):
-        with self.assertRaises(Http404):
+        with pytest.raises(Http404):
             self._make_api_call(self.honor_user, self.honor_user, self.hidden_course.id)
 
     def test_hidden_course_for_staff(self):
         course = self._make_api_call(self.staff_user, self.staff_user, self.hidden_course.id)
-        self.verify_course(course, course_id=u'edX/hidden/2012_Fall')
+        self.verify_course(course, course_id='edX/hidden/2012_Fall')
 
     def test_hidden_course_for_staff_as_honor(self):
-        with self.assertRaises(Http404):
+        with pytest.raises(Http404):
             self._make_api_call(self.staff_user, self.honor_user, self.hidden_course.id)
 
 
@@ -97,7 +100,12 @@ class CourseListTestMixin(CourseApiTestMixin):
     Common behavior for list_courses tests
     """
 
-    def _make_api_call(self, requesting_user, specified_user, org=None, filter_=None):
+    def _make_api_call(self,
+                       requesting_user,
+                       specified_user,
+                       org=None,
+                       filter_=None,
+                       permissions=None):
         """
         Call the list_courses api endpoint to get information about
         `specified_user` on behalf of `requesting_user`.
@@ -105,13 +113,19 @@ class CourseListTestMixin(CourseApiTestMixin):
         request = Request(self.request_factory.get('/'))
         request.user = requesting_user
         with check_mongo_calls(0):
-            return list_courses(request, specified_user.username, org=org, filter_=filter_)
+            return list_courses(
+                request,
+                specified_user.username,
+                org=org,
+                filter_=filter_,
+                permissions=permissions,
+            )
 
     def verify_courses(self, courses):
         """
         Verify that there is one course, and that it has the expected format.
         """
-        self.assertEqual(len(courses), 1)
+        assert len(courses) == 1
         self.verify_course(courses[0])
 
 
@@ -123,14 +137,14 @@ class TestGetCourseList(CourseListTestMixin, SharedModuleStoreTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestGetCourseList, cls).setUpClass()
+        super().setUpClass()
         cls.course = cls.create_course()
         cls.staff_user = cls.create_user("staff", is_staff=True)
         cls.honor_user = cls.create_user("honor", is_staff=False)
 
     def test_as_staff(self):
         courses = self._make_api_call(self.staff_user, self.staff_user)
-        self.assertEqual(len(courses), 1)
+        assert len(courses) == 1
         self.verify_courses(courses)
 
     def test_for_honor_user_as_staff(self):
@@ -142,7 +156,7 @@ class TestGetCourseList(CourseListTestMixin, SharedModuleStoreTestCase):
         self.verify_courses(courses)
 
     def test_for_staff_user_as_honor(self):
-        with self.assertRaises(PermissionDenied):
+        with pytest.raises(PermissionDenied):
             self._make_api_call(self.honor_user, self.staff_user)
 
     def test_as_anonymous(self):
@@ -152,7 +166,7 @@ class TestGetCourseList(CourseListTestMixin, SharedModuleStoreTestCase):
 
     def test_for_honor_user_as_anonymous(self):
         anonuser = AnonymousUser()
-        with self.assertRaises(PermissionDenied):
+        with pytest.raises(PermissionDenied):
             self._make_api_call(anonuser, self.staff_user)
 
 
@@ -164,7 +178,7 @@ class TestGetCourseListMultipleCourses(CourseListTestMixin, ModuleStoreTestCase)
     ENABLED_SIGNALS = ['course_published']
 
     def setUp(self):
-        super(TestGetCourseListMultipleCourses, self).setUp()
+        super().setUp()
         self.course = self.create_course(mobile_available=False)
         self.staff_user = self.create_user("staff", is_staff=True)
         self.honor_user = self.create_user("honor", is_staff=False)
@@ -172,7 +186,7 @@ class TestGetCourseListMultipleCourses(CourseListTestMixin, ModuleStoreTestCase)
     def test_multiple_courses(self):
         self.create_course(course='second')
         courses = self._make_api_call(self.honor_user, self.honor_user)
-        self.assertEqual(len(courses), 2)
+        assert len(courses) == 2
 
     def test_filter_by_org(self):
         """Verify that courses are filtered by the provided org key."""
@@ -181,20 +195,16 @@ class TestGetCourseListMultipleCourses(CourseListTestMixin, ModuleStoreTestCase)
             org=md5(self.course.org.encode('utf-8')).hexdigest()
         )
 
-        self.assertNotEqual(alternate_course.org, self.course.org)
+        assert alternate_course.org != self.course.org
 
         # No filtering.
         unfiltered_courses = self._make_api_call(self.staff_user, self.staff_user)
         for org in [self.course.org, alternate_course.org]:
-            self.assertTrue(
-                any(course.org == org for course in unfiltered_courses)
-            )
+            assert any((course.org == org) for course in unfiltered_courses)
 
         # With filtering.
         filtered_courses = self._make_api_call(self.staff_user, self.staff_user, org=self.course.org)
-        self.assertTrue(
-            all(course.org == self.course.org for course in filtered_courses)
-        )
+        assert all((course.org == self.course.org) for course in filtered_courses)
 
     def test_filter(self):
         # Create a second course to be filtered out of queries.
@@ -207,11 +217,30 @@ class TestGetCourseListMultipleCourses(CourseListTestMixin, ModuleStoreTestCase)
         ]
         for filter_, expected_courses in test_cases:
             filtered_courses = self._make_api_call(self.staff_user, self.staff_user, filter_=filter_)
-            self.assertEqual(
-                {course.id for course in filtered_courses},
-                {course.id for course in expected_courses},
-                u"testing course_api.api.list_courses with filter_={}".format(filter_),
-            )
+            assert {course.id for course in filtered_courses} == {course.id for course in expected_courses},\
+                f'testing course_api.api.list_courses with filter_={filter_}'
+
+    def test_permissions(self):
+
+        # Create a second course to be filtered out of queries.
+        self.create_course(course='should-be-hidden-course')
+
+        # Create instructor (non-staff), and enroll him in the course.
+        instructor_user = self.create_user('the-instructor', is_staff=False)
+        self.create_enrollment(user=instructor_user, course_id=self.course.id)
+        self.create_courseaccessrole(
+            user=instructor_user,
+            course_id=self.course.id,
+            role='instructor',
+            org='edX',
+        )
+
+        filtered_courses = self._make_api_call(
+            instructor_user,
+            instructor_user,
+            permissions={'instructor'})
+
+        self.assertEqual({c.id for c in filtered_courses}, {self.course.id})
 
 
 class TestGetCourseListExtras(CourseListTestMixin, ModuleStoreTestCase):
@@ -223,18 +252,18 @@ class TestGetCourseListExtras(CourseListTestMixin, ModuleStoreTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(TestGetCourseListExtras, cls).setUpClass()
+        super().setUpClass()
         cls.staff_user = cls.create_user("staff", is_staff=True)
         cls.honor_user = cls.create_user("honor", is_staff=False)
 
     def test_no_courses(self):
         courses = self._make_api_call(self.honor_user, self.honor_user)
-        self.assertEqual(len(list(courses)), 0)
+        assert len(list(courses)) == 0
 
     def test_hidden_course_for_honor(self):
         self.create_course(visible_to_staff_only=True)
         courses = self._make_api_call(self.honor_user, self.honor_user)
-        self.assertEqual(len(list(courses)), 0)
+        assert len(list(courses)) == 0
 
     def test_hidden_course_for_staff(self):
         self.create_course(visible_to_staff_only=True)
@@ -311,3 +340,89 @@ class TestGetCourseDates(CourseDetailTestMixin, SharedModuleStoreTestCase):
                 ]
                 actual_due_dates = get_due_dates(request, self.course.id, self.staff_user)
                 assert expected_due_dates == actual_due_dates
+
+
+class TestGetCourseMembers(CourseApiTestMixin, SharedModuleStoreTestCase):
+    """
+    Test get_course_members function
+    """
+    @classmethod
+    def setUpClass(cls):
+        super(TestGetCourseMembers, cls).setUpClass()
+        cls.course = cls.create_course()
+        cls.honor = cls.create_user('honor', is_staff=False)
+        cls.staff = cls.create_user('staff', is_staff=True)
+        cls.instructor = cls.create_user('instructor', is_staff=True)
+
+        # Attach honor to course with enrollment
+        cls.create_enrollment(user=cls.honor, course_id=cls.course.id)
+        # Attach instructor to course with both enrollment and course access role
+        cls.create_enrollment(user=cls.instructor, course_id=cls.course.id)
+        cls.create_courseaccessrole(user=cls.instructor, course_id=cls.course.id, role='instructor')
+        # Attach staff to course using only course access role
+        cls.create_courseaccessrole(user=cls.staff, course_id=cls.course.id, role='staff')
+
+    def test_get_course_members(self):
+        """
+        Test all different possible filtering
+        """
+        with self.assertNumQueries(3):
+            members = get_course_members(self.course.id)
+
+        self.assertEqual(len(members), 3)
+
+        # Check parameters for all users
+        expected_properties = ['id', 'username', 'email', 'name', 'enrollment_mode', 'roles']
+        for user_id in members:
+            self.assertCountEqual(members[user_id], expected_properties)
+
+        # Check that users have correct roles
+        # Honor should be only a student and have the enrollment mode set
+        self.assertEqual(members[self.honor.id]['roles'], ['student'])
+        self.assertEqual(members[self.honor.id]['enrollment_mode'], 'audit')
+        # Instructor should have both roles and enrollment_mode set
+        self.assertEqual(members[self.instructor.id]['roles'], ['student', 'instructor'])
+        self.assertEqual(members[self.instructor.id]['enrollment_mode'], 'audit')
+        # Staff should only have the staff role
+        self.assertEqual(members[self.staff.id]['roles'], ['staff'])
+        self.assertEqual(members[self.staff.id]['enrollment_mode'], None)
+
+    def test_same_result_with_csa_or_enrollment(self):
+        """
+        Checks that the API returns the same result regardless if a user
+        comes from CourseAccessRoles or CourseEnrollments table.
+        """
+        # Create new user
+        user = TestGetCourseMembers.create_user('test_use', is_staff=True)
+
+        # Attach with course enrollment
+        enrollment = TestGetCourseMembers.create_enrollment(
+            user=user,
+            course_id=self.course.id
+        )
+        members_enrollments = get_course_members(self.course.id)
+        enrollment.delete()
+
+        # Attach with course enrollment
+        enrollment = TestGetCourseMembers.create_courseaccessrole(
+            user=user,
+            course_id=self.course.id,
+            role='staff',
+        )
+        members_courseaccessroles = get_course_members(self.course.id)
+
+        # Check properties (except the ones that change depending on role)
+        for item in ['id', 'username', 'email', 'name']:
+            self.assertEqual(
+                members_courseaccessroles[user.id][item],
+                members_enrollments[user.id][item]
+            )
+
+    @override_settings(COURSE_MEMBER_API_ENROLLMENT_LIMIT=1)
+    def test_course_members_fails_overlimit(self):
+        """
+        Check if trying to retrieve more than settings.COURSE_MEMBER_API_ENROLLMENT_LIMIT
+        fails.
+        """
+        with self.assertRaises(OverEnrollmentLimitException):
+            get_course_members(self.course.id)

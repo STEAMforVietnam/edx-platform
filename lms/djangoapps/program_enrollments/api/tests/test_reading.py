@@ -6,6 +6,7 @@ Tests for program enrollment reading Python API.
 from uuid import UUID
 
 import ddt
+import pytest
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
@@ -13,13 +14,15 @@ from opaque_keys.edx.keys import CourseKey
 from organizations.tests.factories import OrganizationFactory
 from social_django.models import UserSocialAuth
 
-from course_modes.models import CourseMode
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.student.roles import CourseStaffRole
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+from common.djangoapps.third_party_auth.tests.factories import SAMLProviderConfigFactory
 from lms.djangoapps.program_enrollments.constants import ProgramCourseEnrollmentStatuses as PCEStatuses
 from lms.djangoapps.program_enrollments.constants import ProgramEnrollmentStatuses as PEStatuses
 from lms.djangoapps.program_enrollments.exceptions import (
     OrganizationDoesNotExistException,
     ProgramDoesNotExistException,
-    ProviderConfigurationException,
     ProviderDoesNotExistException
 )
 from lms.djangoapps.program_enrollments.models import ProgramCourseEnrollment, ProgramEnrollment
@@ -33,15 +36,13 @@ from openedx.core.djangoapps.catalog.tests.factories import OrganizationFactory 
 from openedx.core.djangoapps.catalog.tests.factories import ProgramFactory
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
-from student.roles import CourseStaffRole
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from third_party_auth.tests.factories import SAMLProviderConfigFactory
 
 from ..reading import (
     fetch_program_course_enrollments,
     fetch_program_course_enrollments_by_students,
     fetch_program_enrollments,
     fetch_program_enrollments_by_student,
+    fetch_program_enrollments_by_students,
     get_external_key_by_user_and_course,
     get_program_course_enrollment,
     get_program_enrollment,
@@ -78,7 +79,7 @@ class ProgramEnrollmentReadingTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        super(ProgramEnrollmentReadingTests, cls).setUpTestData()
+        super().setUpTestData()
         cls.user_0 = UserFactory(username=cls.username_0)  # No enrollments
         cls.user_1 = UserFactory(username=cls.username_1)
         cls.user_2 = UserFactory(username=cls.username_2)
@@ -157,6 +158,10 @@ class ProgramEnrollmentReadingTests(TestCase):
         # enrollments in one curriculum, so it's not ambiguous).
         (program_uuid_y, None, None, ext_6, 6),
         (program_uuid_y, None, username_2, None, 10),
+        # use mixed casing for external_user_id
+        (program_uuid_x, curriculum_uuid_b, None, 'STUDENT-4', 4),
+        (program_uuid_x, curriculum_uuid_b, None, 'STUDent-5', 5),
+        (program_uuid_y, None, None, 'STudENT-6', 6),
     )
     @ddt.unpack
     def test_get_program_enrollment(
@@ -193,6 +198,10 @@ class ProgramEnrollmentReadingTests(TestCase):
         # because each user-course pairing can only have one
         # program-course enrollment.
         (program_uuid_y, curriculum_uuid_c, course_key_r, None, ext_6, 10),
+        # Use mixed casing for external_user_key
+        (program_uuid_x, None, course_key_p, username_3, 'stuDENT-3', 5),
+        (program_uuid_y, None, course_key_p, None, 'STudenT-4', 7),
+        (program_uuid_x, None, course_key_p, None, 'STUDENT-5', 6),
     )
     @ddt.unpack
     def test_get_program_course_enrollment(
@@ -253,6 +262,15 @@ class ProgramEnrollmentReadingTests(TestCase):
             {'program_uuid': program_uuid_x, 'waiting_only': True},
             {5},
         ),
+        # Use mixed casing on external_user_key
+        (
+            {
+                'program_uuid': program_uuid_x,
+                'usernames': {username_1, username_2, username_3, username_4},
+                'external_user_keys': {'studeNT-3', 'STUdent-4', 'STudenT-5'}
+            },
+            {3, 4},
+        ),
     )
     @ddt.unpack
     def test_fetch_program_enrollments(self, kwargs, expected_enrollment_ids):
@@ -312,6 +330,16 @@ class ProgramEnrollmentReadingTests(TestCase):
             },
             {10},
         ),
+        # Use mixed casing on external_user_key
+        (
+            {
+                'program_uuid': program_uuid_x,
+                'course_key': course_key_p,
+                'usernames': {username_2, username_3},
+                'external_user_keys': {'STudENt-3', 'stuDENt-5'}
+            },
+            {5},
+        ),
     )
     @ddt.unpack
     def test_fetch_program_course_enrollments(self, kwargs, expected_enrollment_ids):
@@ -363,11 +391,66 @@ class ProgramEnrollmentReadingTests(TestCase):
             {'external_user_key': ext_4, 'waiting_only': True},
             {8},
         ),
+        # Use mixed casing on external_user_key
+        (
+            {'external_user_key': 'STudeNT-4', 'realized_only': True},
+            {4},
+        ),
     )
     @ddt.unpack
     def test_fetch_program_enrollments_by_student(self, kwargs, expected_enrollment_ids):
         kwargs = self._username_to_user(kwargs)
         actual_enrollments = fetch_program_enrollments_by_student(**kwargs)
+        actual_enrollment_ids = {enrollment.id for enrollment in actual_enrollments}
+        assert actual_enrollment_ids == expected_enrollment_ids
+
+    @ddt.data(
+
+        # User with no enrollments
+        (
+            {'usernames': [username_0]},
+            set(),
+        ),
+
+        # Filters
+        (
+            {
+                'usernames': [username_3],
+            },
+            {3, 7},
+        ),
+
+        # More filters
+        (
+            {
+                'usernames': [username_3],
+                'external_user_keys': [ext_3],
+                'program_enrollment_statuses': {PEStatuses.SUSPENDED, PEStatuses.CANCELED},
+            },
+            {7},
+        ),
+
+        # Realized-only filter
+        (
+            {'usernames': [username_4], 'realized_only': True},
+            {4},
+        ),
+
+        # Waiting-only filter
+        (
+            {'external_user_keys': [ext_4], 'waiting_only': True},
+            {8},
+        ),
+        # Use mixed casing on external_user_key
+        (
+            {'external_user_keys': ['STUdenT-4'], 'waiting_only': True},
+            {8},
+        ),
+    )
+    @ddt.unpack
+    def test_fetch_program_enrollments_by_students(self, kwargs, expected_enrollment_ids):
+        kwargs = self._usernames_to_users(kwargs)
+        actual_enrollments = fetch_program_enrollments_by_students(**kwargs)
         actual_enrollment_ids = {enrollment.id for enrollment in actual_enrollments}
         assert actual_enrollment_ids == expected_enrollment_ids
 
@@ -415,6 +498,11 @@ class ProgramEnrollmentReadingTests(TestCase):
                 'inactive_only': True,
             },
             {8},
+        ),
+        # Use mixed casing on external_user_key
+        (
+            {'external_user_keys': ['STUDENT-4'], 'realized_only': True},
+            set(),
         ),
     )
     @ddt.unpack
@@ -495,7 +583,7 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        super(GetUsersByExternalKeysTests, cls).setUpTestData()
+        super().setUpTestData()
         cls.program_uuid = UUID('e7a82f8d-d485-486b-b733-a28222af92bf')
         cls.organization_key = 'ufo'
         cls.external_user_id = '1234'
@@ -504,7 +592,7 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
         cls.user_2 = UserFactory(username='user-2')
 
     def setUp(self):
-        super(GetUsersByExternalKeysTests, self).setUp()
+        super().setUp()
         catalog_org = CatalogOrganizationFactory.create(key=self.organization_key)
         program = ProgramFactory.create(
             uuid=self.program_uuid,
@@ -518,14 +606,15 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
         """
         UserSocialAuth.objects.create(
             user=user,
-            uid='{0}:{1}'.format(provider.slug, external_id),
+            uid=f'{provider.slug}:{external_id}',
             provider=provider.backend_name,
         )
 
-    def test_happy_path(self):
+    def test_single_saml_provider(self):
         """
         Test that get_users_by_external_keys returns the expected
-        mapping of external keys to users.
+        mapping of external keys to users when a single saml provider
+        is configured.
         """
         organization = OrganizationFactory.create(short_name=self.organization_key)
         provider = SAMLProviderConfigFactory.create(organization=organization)
@@ -535,6 +624,35 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
         requested_keys = {'ext-user-1', 'ext-user-2', 'ext-user-3'}
         actual = get_users_by_external_keys(self.program_uuid, requested_keys)
         # ext-user-0 not requested, ext-user-3 doesn't exist
+        expected = {
+            'ext-user-1': self.user_1,
+            'ext-user-2': self.user_2,
+            'ext-user-3': None,
+        }
+        assert actual == expected
+
+    def test_multiple_saml_providers(self):
+        """
+        Test that get_users_by_external_keys returns the expected
+        mapping of external keys to users when multiple saml providers
+        are configured.
+        """
+        organization = OrganizationFactory.create(short_name=self.organization_key)
+        provider_1 = SAMLProviderConfigFactory.create(organization=organization)
+        provider_2 = SAMLProviderConfigFactory.create(
+            organization=organization,
+            slug='test-shib-2',
+            enabled=True
+        )
+        self.create_social_auth_entry(self.user_0, provider_1, 'ext-user-0')
+        self.create_social_auth_entry(self.user_1, provider_1, 'ext-user-1')
+        self.create_social_auth_entry(self.user_1, provider_2, 'ext-user-1')
+        self.create_social_auth_entry(self.user_2, provider_2, 'ext-user-2')
+        requested_keys = {'ext-user-1', 'ext-user-2', 'ext-user-3'}
+        actual = get_users_by_external_keys(self.program_uuid, requested_keys)
+        # ext-user-0 not requested, ext-user-3 doesn't exist,
+        # ext-user-2 is authorized with secondary provider
+        # ext-user-1 has an entry in both providers
         expected = {
             'ext-user-1': self.user_1,
             'ext-user-2': self.user_2,
@@ -557,7 +675,7 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
         not include the requested program uuid.
         """
         fake_program_uuid = UUID('80cc59e5-003e-4664-a582-48da44bc7e12')
-        with self.assertRaises(ProgramDoesNotExistException):
+        with pytest.raises(ProgramDoesNotExistException):
             get_users_by_external_keys(fake_program_uuid, [])
 
     def test_catalog_program_missing_org(self):
@@ -570,7 +688,7 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
             authoring_organizations=[]
         )
         cache.set(PROGRAM_CACHE_KEY_TPL.format(uuid=self.program_uuid), program, None)
-        with self.assertRaises(OrganizationDoesNotExistException):
+        with pytest.raises(OrganizationDoesNotExistException):
             get_users_by_external_keys(self.program_uuid, [])
 
     def test_lms_organization_not_found(self):
@@ -580,7 +698,7 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
         """
         organization = OrganizationFactory.create(short_name='some_other_org')
         SAMLProviderConfigFactory.create(organization=organization)
-        with self.assertRaises(OrganizationDoesNotExistException):
+        with pytest.raises(OrganizationDoesNotExistException):
             get_users_by_external_keys(self.program_uuid, [])
 
     def test_saml_provider_not_found(self):
@@ -589,7 +707,7 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
         program's organization.
         """
         OrganizationFactory.create(short_name=self.organization_key)
-        with self.assertRaises(ProviderDoesNotExistException):
+        with pytest.raises(ProviderDoesNotExistException):
             get_users_by_external_keys(self.program_uuid, [])
 
     def test_extra_saml_provider_disabled(self):
@@ -604,20 +722,6 @@ class GetUsersByExternalKeysTests(CacheIsolationTestCase):
             organization=organization, slug='foox', enabled=False
         )
         get_users_by_external_keys(self.program_uuid, [])
-
-    def test_extra_saml_provider_enabled(self):
-        """
-        If multiple enabled samlprovider records exist with the same organization
-        an exception is raised.
-        """
-        organization = OrganizationFactory.create(short_name=self.organization_key)
-        SAMLProviderConfigFactory.create(organization=organization)
-        # create a second active config for the same organizationm, IS enabled
-        SAMLProviderConfigFactory.create(
-            organization=organization, slug='foox', enabled=True
-        )
-        with self.assertRaises(ProviderConfigurationException):
-            get_users_by_external_keys(self.program_uuid, [])
 
 
 @ddt.ddt
@@ -637,7 +741,7 @@ class IsCourseStaffEnrollmentTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        super(IsCourseStaffEnrollmentTest, cls).setUpTestData()
+        super().setUpTestData()
         cls.user_0 = UserFactory(username=cls.username_0)  # No enrollments
         CourseOverviewFactory(id=cls.course_key_p)
         CourseOverviewFactory(id=cls.course_key_q)

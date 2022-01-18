@@ -1,13 +1,13 @@
 <%page expression_filter="h"/>
 
 <%!
-    from django.utils.translation import ugettext as _
+    from django.utils.translation import gettext as _
     from openedx.core.djangolib.markup import HTML, Text
 %>
 
 <%
 split_test = context.get('split_test')
-user_partition = split_test.descriptor.get_selected_partition()
+user_partition = split_test.get_selected_partition()
 show_link = group_configuration_url is not None
 %>
 

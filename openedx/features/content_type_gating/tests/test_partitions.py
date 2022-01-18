@@ -1,25 +1,21 @@
-
-
+# pylint: disable=missing-module-docstring
 from datetime import datetime
-
-from django.conf import settings
 from django.test import RequestFactory
-from mock import Mock, patch
+from unittest.mock import Mock, patch  # lint-amnesty, pylint: disable=wrong-import-order
 from opaque_keys.edx.keys import CourseKey
 
-from course_modes.tests.factories import CourseModeFactory
-from lms.djangoapps.courseware.tests.factories import GlobalStaffFactory
+from common.djangoapps.course_modes.tests.factories import CourseModeFactory
+from common.djangoapps.student.tests.factories import GlobalStaffFactory
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from openedx.features.content_type_gating.helpers import CONTENT_GATING_PARTITION_ID, FULL_ACCESS, LIMITED_ACCESS
 from openedx.features.content_type_gating.models import ContentTypeGatingConfig
-from openedx.features.content_type_gating.partitions import ContentTypeGatingPartition, create_content_gating_partition
+from openedx.features.content_type_gating.partitions import create_content_gating_partition
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
-from student.tests.factories import GroupFactory
-from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID, UserPartitionError
+from xmodule.partitions.partitions import UserPartitionError  # lint-amnesty, pylint: disable=wrong-import-order
 
 
-class TestContentTypeGatingPartition(CacheIsolationTestCase):
-    def setUp(self):
+class TestContentTypeGatingPartition(CacheIsolationTestCase):  # pylint: disable=missing-class-docstring
+    def setUp(self):  # pylint: disable=super-method-not-called
         self.course_key = CourseKey.from_string('course-v1:test+course+key')
         CourseOverviewFactory.create(id=self.course_key)
 
@@ -30,41 +26,47 @@ class TestContentTypeGatingPartition(CacheIsolationTestCase):
         CourseModeFactory.create(course_id=mock_course.id, mode_slug='verified')
         ContentTypeGatingConfig.objects.create(enabled=True, enabled_as_of=datetime(2018, 1, 1))
 
-        with patch('openedx.features.content_type_gating.partitions.ContentTypeGatingPartitionScheme.create_user_partition') as mock_create:
+        with patch(
+            'openedx.features.content_type_gating.partitions.ContentTypeGatingPartitionScheme.create_user_partition'
+        ) as mock_create:
             partition = create_content_gating_partition(mock_course)
-            self.assertEqual(partition, mock_create.return_value)
+            assert partition == mock_create.return_value
 
     def test_create_content_gating_partition_override_only(self):
         mock_course = Mock(id=self.course_key, user_partitions={})
         ContentTypeGatingConfig.objects.create(enabled=False, studio_override_enabled=True)
 
         partition = create_content_gating_partition(mock_course)
-        self.assertIsNotNone(partition)
+        assert partition is not None
 
     def test_create_content_gating_partition_disabled(self):
         mock_course = Mock(id=self.course_key, user_partitions={})
         ContentTypeGatingConfig.objects.create(enabled=False, studio_override_enabled=False)
 
         partition = create_content_gating_partition(mock_course)
-        self.assertIsNone(partition)
+        assert partition is None
 
     def test_create_content_gating_partition_no_scheme_installed(self):
         mock_course = Mock(id=self.course_key, user_partitions={})
         ContentTypeGatingConfig.objects.create(enabled=True, enabled_as_of=datetime(2018, 1, 1))
 
-        with patch('openedx.features.content_type_gating.partitions.UserPartition.get_scheme', side_effect=UserPartitionError):
+        with patch(
+            'openedx.features.content_type_gating.partitions.UserPartition.get_scheme', side_effect=UserPartitionError
+        ):
             partition = create_content_gating_partition(mock_course)
 
-        self.assertIsNone(partition)
+        assert partition is None
 
     def test_create_content_gating_partition_partition_id_used(self):
-        mock_course = Mock(id=self.course_key, user_partitions={Mock(name='partition', id=CONTENT_GATING_PARTITION_ID): object()})
+        mock_course = Mock(
+            id=self.course_key, user_partitions={Mock(name='partition', id=CONTENT_GATING_PARTITION_ID): object()}
+        )
         ContentTypeGatingConfig.objects.create(enabled=True, enabled_as_of=datetime(2018, 1, 1))
 
         with patch('openedx.features.content_type_gating.partitions.LOG') as mock_log:
             partition = create_content_gating_partition(mock_course)
             mock_log.warning.assert_called()
-        self.assertIsNone(partition)
+        assert partition is None
 
     def test_access_denied_fragment_for_masquerading(self):
         """
@@ -93,7 +95,7 @@ class TestContentTypeGatingPartition(CacheIsolationTestCase):
         ):
             fragment = partition.access_denied_fragment(mock_block, global_staff, LIMITED_ACCESS, [FULL_ACCESS])
 
-        self.assertIsNotNone(fragment)
+        assert fragment is not None
 
     def test_access_denied_fragment_for_full_access_users(self):
         """
@@ -115,9 +117,11 @@ class TestContentTypeGatingPartition(CacheIsolationTestCase):
             return_value=mock_request
         ):
             fragment = partition.access_denied_fragment(mock_block, global_staff, FULL_ACCESS, 'test_allowed_group')
-            self.assertIsNone(fragment)
-            message = partition.access_denied_message(mock_block.scope_ids.usage_id, global_staff, FULL_ACCESS, 'test_allowed_group')
-            self.assertIsNone(message)
+            assert fragment is None
+            message = partition.access_denied_message(
+                mock_block.scope_ids.usage_id, global_staff, FULL_ACCESS, 'test_allowed_group'
+            )
+            assert message is None
 
     def test_access_denied_fragment_for_null_request(self):
         """
@@ -142,4 +146,4 @@ class TestContentTypeGatingPartition(CacheIsolationTestCase):
         ):
             fragment = partition.access_denied_fragment(mock_block, global_staff, LIMITED_ACCESS, [FULL_ACCESS])
 
-        self.assertIsNotNone(fragment)
+        assert fragment is not None

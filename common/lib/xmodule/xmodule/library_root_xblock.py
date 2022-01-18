@@ -4,9 +4,7 @@
 
 
 import logging
-import six
 
-from django.utils.encoding import python_2_unicode_compatible
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.fields import Boolean, List, Scope, String
@@ -19,7 +17,7 @@ log = logging.getLogger(__name__)
 _ = lambda text: text
 
 
-@python_2_unicode_compatible
+@XBlock.needs('mako')
 class LibraryRoot(XBlock):
     """
     The LibraryRoot is the root XBlock of a content library. All other blocks in
@@ -50,7 +48,7 @@ class LibraryRoot(XBlock):
     has_author_view = True
 
     def __str__(self):
-        return u"Library: {}".format(self.display_name)
+        return f"Library: {self.display_name}"
 
     def author_view(self, context):
         """
@@ -91,7 +89,7 @@ class LibraryRoot(XBlock):
             child = self.runtime.get_block(child_key)
             child_view_name = StudioEditableModule.get_preview_view_name(child)
 
-            if six.text_type(child.location) == force_render:
+            if str(child.location) == force_render:
                 child_context['show_preview'] = True
 
             if child_context['show_preview']:
@@ -101,12 +99,12 @@ class LibraryRoot(XBlock):
             fragment.add_fragment_resources(rendered_child)
 
             contents.append({
-                'id': six.text_type(child.location),
+                'id': str(child.location),
                 'content': rendered_child.content,
             })
 
         fragment.add_content(
-            self.runtime.render_template("studio_render_paged_children_view.html", {
+            self.runtime.service(self, 'mako').render_template("studio_render_paged_children_view.html", {
                 'items': contents,
                 'xblock_context': context,
                 'can_add': can_add,
@@ -120,7 +118,7 @@ class LibraryRoot(XBlock):
     @property
     def display_org_with_default(self):
         """
-        Org display names are not implemented. This just provides API compatibility with CourseDescriptor.
+        Org display names are not implemented. This just provides API compatibility with CourseBlock.
         Always returns the raw 'org' field from the key.
         """
         return self.scope_ids.usage_id.course_key.org
@@ -128,7 +126,7 @@ class LibraryRoot(XBlock):
     @property
     def display_number_with_default(self):
         """
-        Display numbers are not implemented. This just provides API compatibility with CourseDescriptor.
+        Display numbers are not implemented. This just provides API compatibility with CourseBlock.
         Always returns the raw 'library' field from the key.
         """
         return self.scope_ids.usage_id.course_key.library

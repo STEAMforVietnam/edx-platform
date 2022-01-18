@@ -55,6 +55,7 @@
                     };
 
                     this.thirdPartyAuthHint = options.third_party_auth_hint || null;
+                    this.edxUserInfoCookieName = options.edx_user_info_cookie_name || 'edx-user-info';
 
                     // Account activation messages
                     this.accountActivationMessages = options.account_activation_messages || [];
@@ -79,9 +80,10 @@
                     this.pipelineUserDetails = options.third_party_auth.pipeline_user_details;
                     this.enterpriseName = options.enterprise_name || '';
                     this.enterpriseSlugLoginURL = options.enterprise_slug_login_url || '';
+                    this.isEnterpriseEnable = options.is_enterprise_enable || false;
                     this.isAccountRecoveryFeatureEnabled = options.is_account_recovery_feature_enabled || false;
-                    this.isMultipleUserEnterprisesFeatureEnabled =
-                        options.is_multiple_user_enterprises_feature_enabled || false;
+                    this.is_require_third_party_auth_enabled = options.is_require_third_party_auth_enabled || false;
+                    this.enable_coppa_compliance = options.enable_coppa_compliance;
 
                 // The login view listens for 'sync' events from the reset model
                     this.resetModel = new PasswordResetModel({}, {
@@ -162,14 +164,16 @@
                             hideAuthWarnings: this.hideAuthWarnings,
                             pipelineUserDetails: this.pipelineUserDetails,
                             enterpriseName: this.enterpriseName,
-                            enterpriseSlugLoginURL: this.enterpriseSlugLoginURL
+                            enterpriseSlugLoginURL: this.enterpriseSlugLoginURL,
+                            isEnterpriseEnable: this.isEnterpriseEnable,
+                            is_require_third_party_auth_enabled: this.is_require_third_party_auth_enabled
                         });
 
                     // Listen for 'password-help' event to toggle sub-views
                         this.listenTo(this.subview.login, 'password-help', this.resetPassword);
 
                     // Listen for 'auth-complete' event so we can enroll/redirect the user appropriately.
-                        if (this.isMultipleUserEnterprisesFeatureEnabled === true && !isTpaSaml) {
+                        if (!isTpaSaml) {
                             this.listenTo(this.subview.login, 'auth-complete', this.loginComplete);
                         } else {
                             this.listenTo(this.subview.login, 'auth-complete', this.authComplete);
@@ -195,7 +199,8 @@
                     register: function(data) {
                         var model = new RegisterModel({}, {
                             method: data.method,
-                            url: data.submit_url
+                            url: data.submit_url,
+                            nextUrl: this.nextUrl
                         });
 
                         this.subview.register = new RegisterView({
@@ -203,7 +208,9 @@
                             model: model,
                             thirdPartyAuth: this.thirdPartyAuth,
                             platformName: this.platformName,
-                            hideAuthWarnings: this.hideAuthWarnings
+                            hideAuthWarnings: this.hideAuthWarnings,
+                            is_require_third_party_auth_enabled: this.is_require_third_party_auth_enabled,
+                            enableCoppaCompliance: this.enable_coppa_compliance,
                         });
 
                     // Listen for 'auth-complete' event so we can enroll/redirect the user appropriately.
@@ -279,7 +286,7 @@
                     this.element.show($form);
 
                 // Update url without reloading page
-                    if (type != 'institution_login') {
+                    if (type != 'institution_login' && type != 'reset') {
                         History.pushState(null, document.title, '/' + type + queryStr);
                     }
                     analytics.page('login_and_registration', type);
@@ -314,10 +321,13 @@
              */
                 loginComplete: function() {
                     if (this.thirdPartyAuth && this.thirdPartyAuth.finishAuthUrl) {
-                        multipleEnterpriseInterface.check(this.thirdPartyAuth.finishAuthUrl);
+                        multipleEnterpriseInterface.check(
+                            this.thirdPartyAuth.finishAuthUrl,
+                            this.edxUserInfoCookieName
+                        );
                     // Note: the third party auth URL likely contains another redirect URL embedded inside
                     } else {
-                        multipleEnterpriseInterface.check(this.nextUrl);
+                        multipleEnterpriseInterface.check(this.nextUrl, this.edxUserInfoCookieName);
                     }
                 },
 

@@ -1,13 +1,14 @@
 
 
-(function(globals) {
-
-  var django = globals.django || (globals.django = {});
+'use strict';
+{
+  const globals = this;
+  const django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    var v=(n % 1 == 0 && n == 1 ? 0 : n % 1 == 0 && n >= 2 && n <= 4 ? 1 : n % 1 != 0 ? 2: 3);
-    if (typeof(v) == 'boolean') {
+    const v = (n % 1 == 0 && n == 1 ? 0 : n % 1 == 0 && n >= 2 && n <= 4 ? 1 : n % 1 != 0 ? 2: 3);
+    if (typeof v === 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -19,7 +20,7 @@
 
   django.catalog = django.catalog || {};
   
-  var newcatalog = {
+  const newcatalog = {
     "%(sel)s of %(cnt)s selected": [
       "%(sel)s z %(cnt)s vybran\u00e9",
       "%(sel)s z %(cnt)s vybran\u00e9",
@@ -51,7 +52,6 @@
     "Already a library team member": "U\u017e ste \u010dlenom t\u00edmu spravuj\u00faceho kni\u017enicu",
     "Already a member": "U\u017e ste \u010dlenom",
     "Alternative source": "Alternat\u00edvny zdroj",
-    "Amount": "\u010ciastka",
     "Anchor": "Ukotvi\u0165",
     "Anchors": "Ukotvenia",
     "April": "apr\u00edl",
@@ -66,7 +66,6 @@
     "Available %s": "Dostupn\u00e9 %s",
     "Average": "Priemern\u00fd",
     "Background color": "Farba pozadia",
-    "Billed to": "Fakt\u00fara pre",
     "Blockquote": "Blok cit\u00e1cie",
     "Blockquote (Ctrl+Q)": "Blokov\u00e1 cit\u00e1cia (Ctrl+Q)",
     "Blocks": "Bloky",
@@ -122,7 +121,6 @@
     "Could not find the specified string.": "Nie je mo\u017en\u00e9 n\u00e1js\u0165 \u0161pecifikovan\u00fd re\u0165azec.",
     "Could not retrieve download url.": "Nebolo mo\u017en\u00e9 z\u00edska\u0165 adresu pre prevzatie obsahu.",
     "Could not retrieve upload url.": "Nebolo mo\u017en\u00e9 z\u00edska\u0165 url adresu pre odovzdanie obsahu.",
-    "Couldn't Save This Assignment": "Toto zadanie nie je mo\u017en\u00e9 ulo\u017ei\u0165",
     "Country": "Krajina",
     "Course Credit Requirements": "Po\u017eiadavky pre z\u00edskanie kreditu z kurzu",
     "Course Index": "Register kurzu",
@@ -136,19 +134,16 @@
     "Creating missing groups": "Vytvorenie ch\u00fdbaj\u00facej skupiny",
     "Criterion Added": "Pridan\u00e9 krit\u00e9rium",
     "Criterion Deleted": "Krit\u00e9rium odstr\u00e1nen\u00e9",
-    "Crossed out items have been refunded.": "Vy\u0161krtnut\u00e9 polo\u017eky boli refundovan\u00e9.",
     "Current conversation": "Aktu\u00e1lna konverz\u00e1cia",
     "Custom color": "Vlastn\u00e1 farba",
     "Custom...": "Vlastn\u00fd",
     "Cut": "Vystrihn\u00fa\u0165",
     "Cut row": "Vystrihn\u00fa\u0165 riadok",
-    "Date": "D\u00e1tum",
     "Date Added": "Doplnen\u00fd d\u00e1tum",
     "December": "december",
     "Decrease indent": "Zmen\u0161i\u0165 odsadenie",
     "Default": "Predvolen\u00e9",
     "Delete": "Odstr\u00e1ni\u0165",
-    "Delete \"<%= signatoryName %>\" from the list of signatories?": "Odstr\u00e1ni\u0165 \"<%= signatoryName %>\" zo zoznamu signat\u00e1rov?",
     "Delete File Confirmation": "Potvrdenie odstr\u00e1nenia s\u00faboru",
     "Delete column": "Vymaza\u0165 st\u013apec",
     "Delete row": "Vymaza\u0165 riadok",
@@ -164,7 +159,6 @@
     "Discard Changes": "Zahodi\u0165 zmeny",
     "Div": "Rozdelenie",
     "Do not show again": "Neukazuj znova",
-    "Do you want to upload your file before submitting?": "Chcete pred odoslan\u00edm odovzda\u0165 v\u00e1\u0161 s\u00fabor?",
     "Document properties": "Vlastnosti dokumentu",
     "Donate": "Darova\u0165",
     "Download": "Prevzia\u0165",
@@ -188,7 +182,6 @@
     "Expand Instructions": "Roz\u0161\u00edri\u0165 in\u0161trukcie",
     "February": "febru\u00e1r",
     "File": "S\u00fabor",
-    "File type is not allowed.": "Typ s\u00faboru nie je povolen\u00fd.",
     "File types can not be empty.": "Typy s\u00faborov nem\u00f4\u017eu by\u0165 pr\u00e1zdne.",
     "File {filename} exceeds maximum size of {maxFileSizeInMBs} MB": "S\u00fabor {filename} presahuje maxim\u00e1lnu ve\u013ekos\u0165 {maxFileSizeInMBs} MB",
     "Files must be in JPEG or PNG format.": "S\u00fabory musia by\u0165 vo form\u00e1te JPEG alebo PNG.",
@@ -240,7 +233,6 @@
     "Horizontal space": "Horizont\u00e1lna medzera",
     "Hyperlink (Ctrl+L)": "Hypertextov\u00fd odkaz (Ctrl+L)",
     "ID": "ID",
-    "If you don't verify your identity now, you can still explore your course from your dashboard. You will receive periodic reminders from %(platformName)s to verify your identity.": "Pokia\u013e teraz neover\u00edte va\u0161u identitu, st\u00e1le m\u00f4\u017eete sk\u00fama\u0165 v\u00e1\u0161 kurz priamo z va\u0161ej palubnej dosky. Periodicky budete dost\u00e1va\u0165 pripomienky z %(platformName)s na overenie va\u0161ej identity.",
     "Ignore": "Ignorova\u0165",
     "Ignore all": "Ignorova\u0165 v\u0161etky",
     "Image": "Obr\u00e1zok",
@@ -298,13 +290,11 @@
     "More": "Viac",
     "Mute": "Vypn\u00fa\u0165 zvuk",
     "Muted": "Vypnut\u00fdm zvukom",
-    "My Team": "M\u00f4j t\u00edm",
     "Name": "N\u00e1zov",
     "New document": "Nov\u00fd dokument",
     "New window": "Nov\u00e9 okno",
     "Next": "\u010ealej",
     "No color": "Bez farby",
-    "No receipt available": "K dispoz\u00edcii nie je \u017eiadna \u00fa\u010dtenka",
     "Nonbreaking space": "Pevn\u00fa medzeru",
     "None": "\u017diadne",
     "Noon": "Poludnie",
@@ -328,7 +318,6 @@
     "Noted in:": "Pridan\u00e1 pozn\u00e1mka v:",
     "November": "november",
     "Now": "Teraz",
-    "Number of Students": "Po\u010det \u0161tudentov",
     "Numbered List (Ctrl+O)": "\u010c\u00edslovan\u00fd zoznam (Ctrl+O)",
     "Numbered list": "\u010c\u00edslovan\u00fd zoznam",
     "OK": "OK",
@@ -339,7 +328,6 @@
     "Open language menu": "Otvori\u0165 menu jazyk",
     "Option Deleted": "Vo\u013eba odstr\u00e1nen\u00e1",
     "Order History": "Hist\u00f3ria objedn\u00e1vok",
-    "Order No.": "\u010c\u00edslo objedn\u00e1vky",
     "Organization": "Organiz\u00e1cia",
     "Other": "In\u00e9",
     "Page break": "Koniec str\u00e1nky",
@@ -352,9 +340,7 @@
     "Pause": "Pozastavi\u0165",
     "Play": "Prehra\u0165",
     "Play video": "Prehra\u0165 video",
-    "Please Note": "V\u0161imnite si, pros\u00edm",
     "Please address the errors on this page first, and then save your progress.": "Vyrie\u0161te, pros\u00edm, najsk\u00f4r chyby na tejto str\u00e1nke a n\u00e1sledne ulo\u017ete tento stav.",
-    "Please correct the outlined fields.": "Opravte, pros\u00edm, zv\u00fdraznen\u00e9 polia.",
     "Please do not use any spaces in this field.": "V tomto poli nepou\u017e\u00edvajte, pros\u00edm, \u017eiadne medzery.",
     "Please do not use any spaces or special characters in this field.": "V tomto poli nepou\u017e\u00edvajte, pros\u00edm, \u017eiadne medzery alebo \u0161peci\u00e1lne znaky.",
     "Please enter an integer between %(min)s and %(max)s.": "Zadajte, pros\u00edm, cel\u00e9 \u010d\u00edslo v rozsahu %(min)s a %(max)s.",
@@ -362,7 +348,6 @@
     "Please enter an integer greater than 0.": "Zadajte, pros\u00edm, cel\u00e9 \u010d\u00edslo v\u00e4\u010d\u0161ie ako 0.",
     "Please enter non-negative integer.": "Zadajte, pros\u00edm, nez\u00e1porn\u00e9 cel\u00e9 \u010d\u00edslo.",
     "Please follow the instructions here to upload a file elsewhere and link to it: {maxFileSizeRedirectUrl}": "Ria\u010fte sa, pros\u00edm, in\u0161trukciami o tom, ako odovzda\u0165 s\u00fabor niekam inam a prilo\u017ei\u0165 odkaz na\u0148: {maxFileSizeRedirectUrl}",
-    "Please print this page for your records; it serves as your receipt. You will also receive an email with the same information.": "Vytla\u010dte si, pros\u00edm, t\u00fato str\u00e1nku pre svoju potrebu; sl\u00fa\u017ei ako va\u0161a \u00fa\u010dtenka. Taktie\u017e dostanete email s tou istou inform\u00e1ciou.",
     "Poster": "Plag\u00e1t",
     "Pre": "Pre",
     "Preferred Language": "Preferovan\u00fd jazyk",
@@ -462,8 +447,6 @@
     "Templates": "\u0160abl\u00f3ny",
     "Text color": "Farba textu",
     "Text to display": "Text, ktor\u00fd sa zobraz\u00ed",
-    "The combined length of the organization and library code fields cannot be more than <%=limit%> characters.": "Celkov\u00e1 d\u013a\u017eka pol\u00ed pre organiz\u00e1ciu a k\u00f3du kni\u017enice nem\u00f4\u017ee by\u0165 dlh\u0161ia ako <%=limit%> znakov.",
-    "The combined length of the organization, course number, and course run fields cannot be more than <%=limit%> characters.": "Celkov\u00e1 d\u013a\u017eka pol\u00ed pre organiz\u00e1ciu, \u010d\u00edslo kurzu a d\u013a\u017eku kurzu nem\u00f4\u017ee by\u0165 dlh\u0161ia ako <%=limit%> znakov.",
     "The course end date must be later than the course start date.": "D\u00e1tum konca kurzu mus\u00ed by\u0165 nesk\u00f4r ako d\u00e1tum za\u010diatku kurzu.",
     "The course must have an assigned start date.": "Kurz mus\u00ed ma\u0165 priraden\u00fd d\u00e1tum za\u010diatku.",
     "The course start date must be later than the enrollment start date.": "D\u00e1tum za\u010diatku kurzu mus\u00ed by\u0165 nesk\u00f4r ako d\u00e1tum za\u010diatku z\u00e1pisu.",
@@ -488,7 +471,6 @@
     "This is the list of available %s. You may choose some by selecting them in the box below and then clicking the \"Choose\" arrow between the two boxes.": "Toto je zoznam dostupn\u00fdch %s. Pre v\u00fdber je potrebn\u00e9 ozna\u010di\u0165 ich v poli a n\u00e1sledne kliknut\u00edm na \u0161\u00edpku \"Vybra\u0165\" presun\u00fa\u0165.",
     "This is the list of chosen %s. You may remove some by selecting them in the box below and then clicking the \"Remove\" arrow between the two boxes.": "Toto je zoznam dostupn\u00fdch %s. Pre vymazanie je potrebn\u00e9 ozna\u010di\u0165 ich v poli a n\u00e1sledne kliknut\u00edm na \u0161\u00edpku \"Vymaza\u0165\" vymaza\u0165.",
     "This problem could not be saved.": "T\u00fato \u00falohu nebolo mo\u017en\u00e9 ulo\u017ei\u0165.",
-    "This problem has already been released. Any changes will apply only to future assessments.": "T\u00e1to \u00faloha u\u017e bola vydan\u00e1. Ak\u00e1ko\u013evek zmena sa t\u00fdka len bud\u00facich hodnoten\u00ed.",
     "This response could not be saved.": "T\u00fato odpove\u010f nie je mo\u017en\u00e9 ulo\u017ei\u0165.",
     "This response could not be submitted.": "T\u00fato odpove\u010f nie je mo\u017en\u00e9 odosla\u0165.",
     "This response has been saved but not submitted.": "T\u00e1to odpove\u010f bola ulo\u017een\u00e1, ale nebola odoslan\u00e1.",
@@ -532,7 +514,6 @@
     "Username": "Meno pou\u017e\u00edvate\u013ea",
     "Validation Error While Saving": "Chyba valid\u00e1cie po\u010das ukladania",
     "Verified Certificate": "Overen\u00fd certifik\u00e1t",
-    "Verify Now": "Overi\u0165 teraz",
     "Vertical space": "Vertik\u00e1lna medzera",
     "Very loud": "Ve\u013emi hlasn\u00fd",
     "Very low": "Ve\u013emi n\u00edzko",
@@ -542,19 +523,15 @@
     "View Live": "Zobrazi\u0165 aktu\u00e1lne \u00fadaje",
     "Visual aids": "Vizu\u00e1lne pom\u00f4cky",
     "Volume": "Hlasitos\u0165",
-    "Want to confirm your identity later?": "Chcete va\u0161u identitu potvrdi\u0165 nesk\u00f4r?",
     "Warning": "Upozornenie",
     "Warnings": "Upozornenia",
-    "We have received your information and are verifying your identity. You will see a message on your dashboard when the verification process is complete (usually within 1-2 days). In the meantime, you can still access all available course content.": "Obdr\u017eali sme va\u0161e inform\u00e1cie a overujeme va\u0161u identitu. Po skon\u010den\u00ed verifika\u010dn\u00e9ho procesu uvid\u00edte na va\u0161ej palubnej doske spr\u00e1vu (zvy\u010dajne do 1-2 dn\u00ed). Dovtedy v\u0161ak m\u00f4\u017eete st\u00e1le pristupova\u0165 ku kompletn\u00e9mu obsahu kurzu.",
     "Whole words": "Cel\u00e9 slov\u00e1",
     "Width": "\u0160\u00edrka",
     "Words: {0}": "Slov\u00e1: {0}",
     "Yes, allow edits to the active Certificate": "\u00c1no, umo\u017eni\u0165 \u00fapravy akt\u00edvneho certifik\u00e1tu",
     "Yesterday": "V\u010dera",
     "You are not currently a member of any team.": "Moment\u00e1lne nie ste \u010dlenom \u017eiadneho t\u00edmu.",
-    "You can upload files with these file types: ": "M\u00f4\u017eete odovzd\u00e1va\u0165 s\u00fabory t\u00fdchto typov:",
     "You commented...": "Pridali ste koment\u00e1r...",
-    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "Pridali ste krit\u00e9rium. Pre toto krit\u00e9rium si mus\u00edte zvoli\u0165 vo\u013ebu v kroku V\u00fdcvik \u0161tudentov. Aby ste tak mohli spravi\u0165, kliknite na kartu Nastavenia.",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "Odstr\u00e1nili ste krit\u00e9rium. Toto krit\u00e9rium bolo vymazan\u00e9 zo v\u0161etk\u00fdch vzorov\u00fdch odpoved\u00ed v kroku V\u00fdcvik \u0161tudentov.",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "Odstr\u00e1nili ste v\u0161etky vo\u013eby pre toto krit\u00e9rium. Toto krit\u00e9rium bolo vymazan\u00e9 zo v\u0161etk\u00fdch vzorov\u00fdch odpoved\u00ed v kroku V\u00fdcvik \u0161tudentov.",
     "You have deleted an option. That option has been removed from its criterion in the sample responses in the Learner Training step. You might have to select a new option for the criterion.": "Odstr\u00e1nili ste vo\u013ebu. T\u00e1to vo\u013eba bola vymazan\u00e1 z pridru\u017een\u00e9ho krit\u00e9ria vo vzorov\u00fdch odpovediach v koku V\u00fdcvik \u0161tudentov. Pravdepodobne budete musie\u0165 pre toto krit\u00e9rium zvoli\u0165 nov\u00fa vo\u013ebu.",
@@ -607,24 +584,24 @@
     "{email} is already on the {container} team. Recheck the email address if you want to add a new member.": "{email} je u\u017e v t\u00edme pre {container}. Znovu si overte e-mailov\u00fa adresu, ak chcete prida\u0165 nov\u00e9ho \u010dlena.",
     "\u2026": "..."
   };
-  for (var key in newcatalog) {
+  for (const key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      var value = django.catalog[msgid];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[msgid];
+      if (typeof value === 'undefined') {
         return msgid;
       } else {
-        return (typeof(value) == 'string') ? value : value[0];
+        return (typeof value === 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      var value = django.catalog[singular];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[singular];
+      if (typeof value === 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -634,16 +611,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      var value = django.gettext(context + '\x04' + msgid);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.gettext(context + '\x04' + msgid);
+      if (value.includes('\x04')) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.includes('\x04')) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -666,7 +643,6 @@
       "%d.%m.%Y %H:%M:%S",
       "%d.%m.%Y %H:%M:%S.%f",
       "%d.%m.%Y %H:%M",
-      "%d.%m.%Y",
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
@@ -696,8 +672,8 @@
   };
 
     django.get_format = function(format_type) {
-      var value = django.formats[format_type];
-      if (typeof(value) == 'undefined') {
+      const value = django.formats[format_type];
+      if (typeof value === 'undefined') {
         return format_type;
       } else {
         return value;
@@ -716,6 +692,5 @@
 
     django.jsi18n_initialized = true;
   }
-
-}(this));
+};
 

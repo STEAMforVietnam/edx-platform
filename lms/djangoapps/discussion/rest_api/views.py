@@ -4,25 +4,37 @@ Discussion API views
 
 
 import logging
+import uuid
 
-from django.conf import settings
-from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+import edx_api_doc_tools as apidocs
+from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
+from django.core.exceptions import BadRequest, ValidationError
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import permissions, status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import ParseError, UnsupportedMediaType
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSet
-from six import text_type
 
-from discussion.views import get_divided_discussions
+from common.djangoapps.util.file import store_uploaded_file
+from lms.djangoapps.course_goals.models import UserActivity
+from lms.djangoapps.discussion.django_comment_client import settings as cc_settings
 from lms.djangoapps.instructor.access import update_forum_role
-from lms.djangoapps.discussion.django_comment_client.utils import available_division_schemes
-from lms.djangoapps.discussion.rest_api.api import (
+from openedx.core.djangoapps.discussions.serializers import DiscussionSettingsSerializer
+from openedx.core.djangoapps.django_comment_common import comment_client
+from openedx.core.djangoapps.django_comment_common.models import CourseDiscussionSettings, Role
+from openedx.core.djangoapps.user_api.accounts.permissions import CanReplaceUsername, CanRetireUser
+from openedx.core.djangoapps.user_api.models import UserRetirementStatus
+from openedx.core.lib.api.authentication import BearerAuthentication, BearerAuthenticationAllowInactiveUser
+from openedx.core.lib.api.parsers import MergePatchParser
+from openedx.core.lib.api.view_utils import DeveloperErrorViewMixin, view_auth_classes
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from ..rest_api.api import (
     create_comment,
     create_thread,
     delete_comment,
@@ -33,69 +45,58 @@ from lms.djangoapps.discussion.rest_api.api import (
     get_response_comments,
     get_thread,
     get_thread_list,
+    get_user_comments,
     update_comment,
-    update_thread
+    update_thread,
 )
-from lms.djangoapps.discussion.rest_api.forms import (
+from ..rest_api.forms import (
     CommentGetForm,
     CommentListGetForm,
+    UserCommentListGetForm,
     CourseDiscussionRolesForm,
     CourseDiscussionSettingsForm,
-    ThreadListGetForm
+    ThreadListGetForm,
 )
-from lms.djangoapps.discussion.rest_api.serializers import (
+from ..rest_api.permissions import IsStaffOrCourseTeamOrEnrolled
+from ..rest_api.serializers import (
+    CourseMetadataSerailizer,
     DiscussionRolesListSerializer,
     DiscussionRolesSerializer,
-    DiscussionSettingsSerializer
 )
-from openedx.core.djangoapps.django_comment_common import comment_client
-from openedx.core.djangoapps.django_comment_common.models import Role
-from openedx.core.djangoapps.django_comment_common.utils import (
-    get_course_discussion_settings,
-    set_course_discussion_settings
-)
-from openedx.core.djangoapps.user_api.accounts.permissions import CanReplaceUsername, CanRetireUser
-from openedx.core.djangoapps.user_api.models import UserRetirementStatus
-from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
-
-from openedx.core.lib.api.parsers import MergePatchParser
-from openedx.core.lib.api.view_utils import DeveloperErrorViewMixin, view_auth_classes
-from util.json_request import JsonResponse
-from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)
+
+User = get_user_model()
 
 
 @view_auth_classes()
 class CourseView(DeveloperErrorViewMixin, APIView):
     """
-    **Use Cases**
+    General discussion metadata API.
+    """
 
+    @apidocs.schema(
+        parameters=[
+            apidocs.string_parameter("course_id", apidocs.ParameterLocation.PATH, description="Course ID")
+        ],
+        responses={
+            200: CourseMetadataSerailizer(read_only=True, required=False),
+            401: "The requester is not authenticated.",
+            403: "The requester cannot access the specified course.",
+            404: "The requested course does not exist.",
+        }
+    )
+    def get(self, request, course_id):
+        """
         Retrieve general discussion metadata for a course.
 
-    **Example Requests**:
+        **Example Requests**:
 
-        GET /api/discussion/v1/courses/course-v1:ExampleX+Subject101+2015
-
-    **Response Values**:
-
-        * id: The identifier of the course
-
-        * blackouts: A list of objects representing blackout periods (during
-            which discussions are read-only except for privileged users). Each
-            item in the list includes:
-
-            * start: The ISO 8601 timestamp for the start of the blackout period
-
-            * end: The ISO 8601 timestamp for the end of the blackout period
-
-        * thread_list_url: The URL of the list of all threads in the course.
-
-        * topics_url: The URL of the topic listing for the course.
-    """
-    def get(self, request, course_id):
-        """Implements the GET method as described in the class docstring."""
+            GET /api/discussion/v1/courses/course-v1:ExampleX+Subject101+2015
+        """
         course_key = CourseKey.from_string(course_id)  # TODO: which class is right?
+        # Record user activity for tracking progress towards a user's course goals (for mobile app)
+        UserActivity.record_user_activity(request.user, course_key, request=request, only_if_mobile_app=True)
         return Response(get_course(request, course_key))
 
 
@@ -126,6 +127,7 @@ class CourseTopicsView(DeveloperErrorViewMixin, APIView):
         * non_courseware_topics: The list of topic trees that are not linked to
               courseware. Items are of the same format as in courseware_topics.
     """
+
     def get(self, request, course_id):
         """
         Implements the GET method as described in the class docstring.
@@ -138,6 +140,8 @@ class CourseTopicsView(DeveloperErrorViewMixin, APIView):
                 course_key,
                 set(topic_ids.strip(',').split(',')) if topic_ids else None,
             )
+            # Record user activity for tracking progress towards a user's course goals (for mobile app)
+            UserActivity.record_user_activity(request.user, course_key, request=request, only_if_mobile_app=True)
         return Response(response)
 
 
@@ -181,6 +185,17 @@ class ThreadViewSet(DeveloperErrorViewMixin, ViewSet):
         * topic_id: The id of the topic to retrieve the threads. There can be
             multiple topic_id queries to retrieve threads from multiple topics
             at once.
+
+        * author: The username of an author. If provided, only threads by this
+            author will be returned.
+
+        * thread_type: Can be 'discussion' or 'question', only return threads of
+            the selected thread type.
+
+        * flagged: If True, only return threads that have been flagged (reported)
+
+        * count_flagged: If True, return the count of flagged comments for each thread.
+          (can only be used by moderators or above)
 
         * text_search: A search string to match. Any thread whose content
             (including the bodies of comments in the thread) matches the search
@@ -229,6 +244,12 @@ class ThreadViewSet(DeveloperErrorViewMixin, ViewSet):
         * following (optional): A boolean indicating whether the user should
             follow the thread upon its creation; defaults to false
 
+        * anonymous (optional): A boolean indicating whether the post is
+        anonymous; defaults to false
+
+        * anonymous_to_peers (optional): A boolean indicating whether the post
+        is anonymous to peers; defaults to false
+
     **PATCH Parameters**:
 
         * abuse_flagged (optional): A boolean to mark thread as abusive
@@ -237,8 +258,8 @@ class ThreadViewSet(DeveloperErrorViewMixin, ViewSet):
 
         * read (optional): A boolean to mark thread as read
 
-        * topic_id, type, title, and raw_body are accepted with the same meaning
-        as in a POST request
+        * topic_id, type, title, raw_body, anonymous, and anonymous_to_peers
+        are accepted with the same meaning as in a POST request
 
         If "application/merge-patch+json" is not the specified content type,
         a 415 error is returned.
@@ -298,6 +319,14 @@ class ThreadViewSet(DeveloperErrorViewMixin, ViewSet):
 
         * response_count: The number of direct responses for a thread
 
+        * abuse_flagged_count: The number of flags(reports) on and within the
+            thread. Returns null if requesting user is not a moderator
+
+        * anonymous: A boolean indicating whether the post is anonymous
+
+        * anonymous_to_peers: A boolean indicating whether the post is
+        anonymous to peers
+
     **DELETE response values:
 
         No content is returned for a DELETE request
@@ -314,6 +343,12 @@ class ThreadViewSet(DeveloperErrorViewMixin, ViewSet):
         form = ThreadListGetForm(request.GET)
         if not form.is_valid():
             raise ValidationError(form.errors)
+
+        # Record user activity for tracking progress towards a user's course goals (for mobile app)
+        UserActivity.record_user_activity(
+            request.user, form.cleaned_data["course_id"], request=request, only_if_mobile_app=True
+        )
+
         return get_thread_list(
             request,
             form.cleaned_data["course_id"],
@@ -322,10 +357,14 @@ class ThreadViewSet(DeveloperErrorViewMixin, ViewSet):
             form.cleaned_data["topic_id"],
             form.cleaned_data["text_search"],
             form.cleaned_data["following"],
+            form.cleaned_data["author"],
+            form.cleaned_data["thread_type"],
+            form.cleaned_data["flagged"],
             form.cleaned_data["view"],
             form.cleaned_data["order_by"],
             form.cleaned_data["order_direction"],
-            form.cleaned_data["requested_fields"]
+            form.cleaned_data["requested_fields"],
+            form.cleaned_data["count_flagged"],
         )
 
     def retrieve(self, request, thread_id=None):
@@ -366,10 +405,15 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
     **Use Cases**
 
         Retrieve the list of comments in a thread, retrieve the list of
-        child comments for a response comment, create a comment, or modify
-        or delete an existing comment.
+        comments from an user in a course, retrieve the list of child
+        comments for a response comment, create a comment, or modify or
+        delete an existing comment.
 
     **Example Requests**:
+
+        GET /api/discussion/v1/comments/?username=edx&course_id=course-v1:edX+DemoX+Demo_Course
+
+        GET /api/discussion/v1/comments/?username=edx&course_id=course-v1:edX+DemoX+Demo_Course&flagged=true
 
         GET /api/discussion/v1/comments/?thread_id=0123456789abcdef01234567
 
@@ -389,11 +433,20 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
 
     **GET Comment List Parameters**:
 
-        * thread_id (required): The thread to retrieve comments for
+        * thread_id (required when username is not provided): The thread to retrieve comments for
+
+        * username (required when thread_id is not provided): The user from whom to retrieve comments
+
+        * course_id (required when username is provided): The course from which to retrive the user's comments
 
         * endorsed: If specified, only retrieve the endorsed or non-endorsed
           comments accordingly. Required for a question thread, must be absent
           for a discussion thread.
+          This parameter has no effect when fetching comments by `username`.
+
+        * flagged: Only retrieve comments that were flagged for abuse.
+          This requires the requester to have elevated privileges, and
+          has no effect otherwise.
 
         * page: The (1-indexed) page to retrieve (default is 1)
 
@@ -423,9 +476,16 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
 
         * raw_body: The comment's raw body text
 
+        * anonymous (optional): A boolean indicating whether the comment is
+        anonymous; defaults to false
+
+        * anonymous_to_peers (optional): A boolean indicating whether the
+        comment is anonymous to peers; defaults to false
+
     **PATCH Parameters**:
 
-        raw_body is accepted with the same meaning as in a POST request
+        * raw_body, anonymous and anonymous_to_peers are accepted with the same
+        meaning as in a POST request
 
         If "application/merge-patch+json" is not the specified content type,
         a 415 error is returned.
@@ -476,6 +536,10 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
         * abuse_flagged: Boolean indicating whether the requesting user has
           flagged the comment for abuse
 
+        * abuse_flagged_any_user: Boolean indicating whether any user has
+            flagged the comment for abuse. Returns null if requesting user
+            is not a moderator.
+
         * voted: Boolean indicating whether the requesting user has voted
           for the comment
 
@@ -485,6 +549,11 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
 
         * editable_fields: The fields that the requesting user is allowed to
             modify with a PATCH request
+
+        * anonymous: A boolean indicating whether the comment is anonymous
+
+        * anonymous_to_peers: A boolean indicating whether the comment is
+        anonymous to peers
 
     **DELETE Response Value**
 
@@ -496,8 +565,31 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
 
     def list(self, request):
         """
-        Implements the GET method for the list endpoint as described in the
-        class docstring.
+        Implements the GET method for the list endpoint as described in
+        the class docstring.
+
+        This endpoint implements two distinct usage contexts.
+
+        When `username` is provided, the `course_id` parameter is
+        required, and `thread_id` is ignored.
+        The behavior is to retrieve all of the user's non-anonymous
+        comments from the specified course, outside of the context of a
+        forum thread. In this context, endorsement information is
+        unavailable.
+
+        When `username` is not provided, `thread_id` is required, and
+        `course_id` is ignored, since the thread already belongs to a course.
+        In this context, all information relevant to usage in the
+        discussions forum is available.
+        """
+        if "username" in request.GET:
+            return self.list_by_user(request)
+        else:
+            return self.list_by_thread(request)
+
+    def list_by_thread(self, request):
+        """
+        Handles the case of fetching a thread's comments.
         """
         form = CommentListGetForm(request.GET)
         if not form.is_valid():
@@ -506,6 +598,25 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
             request,
             form.cleaned_data["thread_id"],
             form.cleaned_data["endorsed"],
+            form.cleaned_data["page"],
+            form.cleaned_data["page_size"],
+            form.cleaned_data["flagged"],
+            form.cleaned_data["requested_fields"],
+        )
+
+    def list_by_user(self, request):
+        """
+        Handles the case of fetching an user's comments.
+        """
+        form = UserCommentListGetForm(request.GET)
+        if not form.is_valid():
+            raise ValidationError(form.errors)
+        author = get_object_or_404(User, username=request.GET["username"])
+        return get_user_comments(
+            request,
+            author,
+            form.cleaned_data["course_id"],
+            form.cleaned_data["flagged"],
             form.cleaned_data["page"],
             form.cleaned_data["page_size"],
             form.cleaned_data["requested_fields"],
@@ -551,6 +662,79 @@ class CommentViewSet(DeveloperErrorViewMixin, ViewSet):
         return Response(update_comment(request, comment_id, request.data))
 
 
+class UploadFileView(DeveloperErrorViewMixin, APIView):
+    """
+    **Use Cases**
+
+        Upload a file to be attached to a thread or comment.
+
+    **URL Parameters**
+
+        * course_id:
+            The ID of the course where this thread or comment belongs.
+
+    **POST Upload File Parameters**
+
+        * thread_key:
+            If the upload belongs to a comment, refer to the parent
+            `thread_id`, otherwise it should be `"root"`.
+
+    **Example Requests**:
+        POST /api/discussion/v1/courses/{course_id}/upload/
+        Content-Type: multipart/form-data; boundary=--Boundary
+
+        ----Boundary
+        Content-Disposition: form-data; name="thread_key"
+
+        <thread_key>
+        ----Boundary
+        Content-Disposition: form-data; name="uploaded_file"; filename="<filename>.<ext>"
+        Content-Type: <mimetype>
+
+        <file_content>
+        ----Boundary--
+
+    **Response Values**
+
+        * location: The URL to access the uploaded file.
+    """
+
+    authentication_classes = (
+        JwtAuthentication,
+        BearerAuthentication,
+        SessionAuthentication,
+    )
+    permission_classes = (
+        permissions.IsAuthenticated,
+        IsStaffOrCourseTeamOrEnrolled,
+    )
+
+    def post(self, request, course_id):
+        """
+        Handles a file upload.
+        """
+        thread_key = request.POST.get("thread_key", "root")
+        unique_file_name = f"{course_id}/{thread_key}/{uuid.uuid4()}"
+        try:
+            file_storage, stored_file_name = store_uploaded_file(
+                request, "uploaded_file", cc_settings.ALLOWED_UPLOAD_FILE_TYPES,
+                unique_file_name, max_file_size=cc_settings.MAX_UPLOAD_FILE_SIZE,
+            )
+        except ValueError:
+            raise BadRequest("no `uploaded_file` was provided")  # lint-amnesty, pylint: disable=raise-missing-from
+
+        file_absolute_url = file_storage.url(stored_file_name)
+
+        # this is a no-op in production, but is required in development,
+        # since the filesystem storage returns the path without a base_url
+        file_absolute_url = request.build_absolute_uri(file_absolute_url)
+
+        return Response(
+            {"location": file_absolute_url},
+            content_type="application/json",
+        )
+
+
 class RetireUserView(APIView):
     """
     **Use Cases**
@@ -594,7 +778,7 @@ class RetireUserView(APIView):
                 return Response(status=status.HTTP_404_NOT_FOUND)
             raise
         except Exception as exc:  # pylint: disable=broad-except
-            return Response(text_type(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(str(exc), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -661,7 +845,7 @@ class ReplaceUsernamesView(APIView):
             cc_user.replace_username(new_username)
         except User.DoesNotExist:
             log.warning(
-                u"Unable to change username from %s to %s in forums because %s doesn't exist in LMS DB.",
+                "Unable to change username from %s to %s in forums because %s doesn't exist in LMS DB.",
                 current_username,
                 new_username,
                 new_username,
@@ -670,14 +854,14 @@ class ReplaceUsernamesView(APIView):
         except comment_client.CommentClientRequestError as exc:
             if exc.status_code == 404:
                 log.info(
-                    u"Unable to change username from %s to %s in forums because user doesn't exist in forums",
+                    "Unable to change username from %s to %s in forums because user doesn't exist in forums",
                     current_username,
                     new_username,
                 )
                 return True
             else:
                 log.exception(
-                    u"Unable to change username from %s to %s in forums because forums API call failed with: %s.",
+                    "Unable to change username from %s to %s in forums because forums API call failed with: %s.",
                     current_username,
                     new_username,
                     exc,
@@ -685,7 +869,7 @@ class ReplaceUsernamesView(APIView):
             return False
 
         log.info(
-            u"Successfully changed username from %s to %s in forums.",
+            "Successfully changed username from %s to %s in forums.",
             current_username,
             new_username,
         )
@@ -760,22 +944,6 @@ class CourseDiscussionSettingsAPIView(DeveloperErrorViewMixin, APIView):
     parser_classes = (JSONParser, MergePatchParser,)
     permission_classes = (permissions.IsAuthenticated, permissions.IsAdminUser)
 
-    def _get_representation(self, course, course_key, discussion_settings):
-        """
-        Return a serialized representation of the course discussion settings.
-        """
-        divided_course_wide_discussions, divided_inline_discussions = get_divided_discussions(
-            course, discussion_settings
-        )
-        return JsonResponse({
-            'id': discussion_settings.id,
-            'divided_inline_discussions': divided_inline_discussions,
-            'divided_course_wide_discussions': divided_course_wide_discussions,
-            'always_divide_inline_discussions': discussion_settings.always_divide_inline_discussions,
-            'division_scheme': discussion_settings.division_scheme,
-            'available_division_schemes': available_division_schemes(course_key)
-        })
-
     def _get_request_kwargs(self, course_id):
         return dict(course_id=course_id)
 
@@ -791,8 +959,17 @@ class CourseDiscussionSettingsAPIView(DeveloperErrorViewMixin, APIView):
 
         course_key = form.cleaned_data['course_key']
         course = form.cleaned_data['course']
-        discussion_settings = get_course_discussion_settings(course_key)
-        return self._get_representation(course, course_key, discussion_settings)
+        discussion_settings = CourseDiscussionSettings.get(course_key)
+        serializer = DiscussionSettingsSerializer(
+            discussion_settings,
+            context={
+                'course': course,
+                'settings': discussion_settings,
+            },
+            partial=True,
+        )
+        response = Response(serializer.data)
+        return response
 
     def patch(self, request, course_id):
         """
@@ -808,24 +985,20 @@ class CourseDiscussionSettingsAPIView(DeveloperErrorViewMixin, APIView):
 
         course = form.cleaned_data['course']
         course_key = form.cleaned_data['course_key']
-        discussion_settings = get_course_discussion_settings(course_key)
+        discussion_settings = CourseDiscussionSettings.get(course_key)
 
         serializer = DiscussionSettingsSerializer(
+            discussion_settings,
+            context={
+                'course': course,
+                'settings': discussion_settings,
+            },
             data=request.data,
             partial=True,
-            course=course,
-            discussion_settings=discussion_settings
         )
         if not serializer.is_valid():
             raise ValidationError(serializer.errors)
-
-        settings_to_change = serializer.validated_data['settings_to_change']
-
-        try:
-            discussion_settings = set_course_discussion_settings(course_key, **settings_to_change)
-        except ValueError as e:
-            raise ValidationError(text_type(e))
-
+        serializer.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -911,7 +1084,7 @@ class CourseDiscussionRolesAPIView(DeveloperErrorViewMixin, APIView):
         role = form.cleaned_data['role']
 
         data = {'course_id': course_id, 'users': role.users.all()}
-        context = {'course_discussion_settings': get_course_discussion_settings(course_id)}
+        context = {'course_discussion_settings': CourseDiscussionSettings.get(course_id)}
 
         serializer = DiscussionRolesListSerializer(data, context=context)
         return Response(serializer.data)
@@ -937,10 +1110,10 @@ class CourseDiscussionRolesAPIView(DeveloperErrorViewMixin, APIView):
         try:
             update_forum_role(course_id, user, rolename, action)
         except Role.DoesNotExist:
-            raise ValidationError(u"Role '{}' does not exist".format(rolename))
+            raise ValidationError(f"Role '{rolename}' does not exist")  # lint-amnesty, pylint: disable=raise-missing-from
 
         role = form.cleaned_data['role']
         data = {'course_id': course_id, 'users': role.users.all()}
-        context = {'course_discussion_settings': get_course_discussion_settings(course_id)}
+        context = {'course_discussion_settings': CourseDiscussionSettings.get(course_id)}
         serializer = DiscussionRolesListSerializer(data, context=context)
         return Response(serializer.data)

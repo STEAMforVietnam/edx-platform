@@ -3,30 +3,27 @@ Utilities for tests within the django_comment_client module.
 """
 
 
-from mock import patch
+from unittest.mock import patch
 
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+from common.djangoapps.util.testing import UrlResetMixin
 from openedx.core.djangoapps.course_groups.tests.helpers import CohortFactory
+from openedx.core.djangoapps.django_comment_common.models import CourseDiscussionSettings
 from openedx.core.djangoapps.django_comment_common.models import ForumsConfig, Role
-from openedx.core.djangoapps.django_comment_common.utils import (
-    CourseDiscussionSettings,
-    seed_permissions_roles,
-    set_course_discussion_settings
-)
+from openedx.core.djangoapps.django_comment_common.utils import seed_permissions_roles
 from openedx.core.lib.teams_config import TeamsConfig
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from util.testing import UrlResetMixin
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
-class ForumsEnableMixin(object):
+class ForumsEnableMixin:
     """
     Ensures that the forums are enabled for a given test class.
     """
     def setUp(self):
-        super(ForumsEnableMixin, self).setUp()
+        super().setUp()
 
         config = ForumsConfig.current()
         config.enabled = True
@@ -40,7 +37,7 @@ class CohortedTestCase(ForumsEnableMixin, UrlResetMixin, SharedModuleStoreTestCa
     @classmethod
     @patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUpClass(cls):
-        super(CohortedTestCase, cls).setUpClass()
+        super().setUpClass()
         cls.course = CourseFactory.create(
             cohort_config={
                 "cohorted": True,
@@ -61,7 +58,7 @@ class CohortedTestCase(ForumsEnableMixin, UrlResetMixin, SharedModuleStoreTestCa
 
     @patch.dict("django.conf.settings.FEATURES", {"ENABLE_DISCUSSION_SERVICE": True})
     def setUp(self):
-        super(CohortedTestCase, self).setUp()
+        super().setUp()
 
         seed_permissions_roles(self.course.id)
         self.student = UserFactory.create()
@@ -92,7 +89,7 @@ def config_course_discussions(
     Set discussions and configure divided discussions for a course.
 
     Arguments:
-        course: CourseDescriptor
+        course: CourseBlock
         discussion_topics (Dict): Discussion topic names. Picks ids and
             sort_keys automatically.
         divided_discussions: Discussion topics to divide. Converts the
@@ -108,15 +105,18 @@ def config_course_discussions(
         """Convert name to id."""
         return topic_name_to_id(course, name)
 
-    set_course_discussion_settings(
-        course.id,
-        divided_discussions=[to_id(name) for name in divided_discussions],
-        always_divide_inline_discussions=always_divide_inline_discussions,
-        division_scheme=CourseDiscussionSettings.COHORT,
-    )
+    discussion_settings = CourseDiscussionSettings.get(course.id)
+    discussion_settings.update({
+        'divided_discussions': [
+            to_id(name)
+            for name in divided_discussions
+        ],
+        'always_divide_inline_discussions': always_divide_inline_discussions,
+        'division_scheme': CourseDiscussionSettings.COHORT,
+    })
 
-    course.discussion_topics = dict((name, {"sort_key": "A", "id": to_id(name)})
-                                    for name in discussion_topics)
+    course.discussion_topics = {name: {"sort_key": "A", "id": to_id(name)}
+                                for name in discussion_topics}
     try:
         # Not implemented for XMLModulestore, which is used by test_cohorts.
         modulestore().update_item(course, ModuleStoreEnum.UserID.test)

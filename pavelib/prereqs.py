@@ -10,7 +10,7 @@ import subprocess
 import sys
 from distutils import sysconfig
 
-from paver.easy import BuildFailure, sh, task
+from paver.easy import sh, task  # lint-amnesty, pylint: disable=unused-import
 
 from .utils.envs import Env
 from .utils.timer import timed
@@ -23,14 +23,17 @@ COVERAGE_REQ_FILE = 'requirements/edx/coverage.txt'
 # If you make any changes to this list you also need to make
 # a corresponding change to circle.yml, which is how the python
 # prerequisites are installed for builds on circleci.com
-if 'TOXENV' in os.environ:
+toxenv = os.environ.get('TOXENV')
+if toxenv and toxenv != 'quality-django32':
     PYTHON_REQ_FILES = ['requirements/edx/testing.txt']
+elif toxenv and toxenv == 'quality-django32':
+    PYTHON_REQ_FILES = ['requirements/edx/testing.txt', 'requirements/edx/django32.txt']
 else:
     PYTHON_REQ_FILES = ['requirements/edx/development.txt']
 
 # Developers can have private requirements, for local copies of github repos,
 # or favorite debugging tools, etc.
-PRIVATE_REQS = 'requirements/private.txt'
+PRIVATE_REQS = 'requirements/edx/private.txt'
 if os.path.exists(PRIVATE_REQS):
     PYTHON_REQ_FILES.append(PRIVATE_REQS)
 
@@ -97,10 +100,10 @@ def prereq_cache(cache_name, paths, install_func):
     """
     # Retrieve the old hash
     cache_filename = cache_name.replace(" ", "_")
-    cache_file_path = os.path.join(PREREQS_STATE_DIR, "{}.sha1".format(cache_filename))
+    cache_file_path = os.path.join(PREREQS_STATE_DIR, f"{cache_filename}.sha1")
     old_hash = None
     if os.path.isfile(cache_file_path):
-        with open(cache_file_path, "r") as cache_file:
+        with open(cache_file_path) as cache_file:
             old_hash = cache_file.read()
 
     # Compare the old hash to the new hash
@@ -120,7 +123,7 @@ def prereq_cache(cache_name, paths, install_func):
             post_install_hash = compute_fingerprint(paths)
             cache_file.write(post_install_hash.encode('utf-8'))
     else:
-        print('{cache} unchanged, skipping...'.format(cache=cache_name))
+        print(f'{cache_name} unchanged, skipping...')
 
 
 def node_prereqs_installation():
@@ -132,26 +135,26 @@ def node_prereqs_installation():
     # determine if any packages are chronic offenders.
     shard_str = os.getenv('SHARD', None)
     if shard_str:
-        npm_log_file_path = '{}/npm-install.{}.log'.format(Env.GEN_LOG_DIR, shard_str)
+        npm_log_file_path = f'{Env.GEN_LOG_DIR}/npm-install.{shard_str}.log'
     else:
-        npm_log_file_path = '{}/npm-install.log'.format(Env.GEN_LOG_DIR)
-    npm_log_file = open(npm_log_file_path, 'wb')
+        npm_log_file_path = f'{Env.GEN_LOG_DIR}/npm-install.log'
+    npm_log_file = open(npm_log_file_path, 'wb')  # lint-amnesty, pylint: disable=consider-using-with
     npm_command = 'npm install --verbose'.split()
 
     # The implementation of Paver's `sh` function returns before the forked
     # actually returns. Using a Popen object so that we can ensure that
     # the forked process has returned
-    proc = subprocess.Popen(npm_command, stderr=npm_log_file)
+    proc = subprocess.Popen(npm_command, stderr=npm_log_file)  # lint-amnesty, pylint: disable=consider-using-with
     retcode = proc.wait()
     if retcode == 1:
         # Error handling around a race condition that produces "cb() never called" error. This
         # evinces itself as `cb_error_text` and it ought to disappear when we upgrade
         # npm to 3 or higher. TODO: clean this up when we do that.
         print("npm install error detected. Retrying...")
-        proc = subprocess.Popen(npm_command, stderr=npm_log_file)
+        proc = subprocess.Popen(npm_command, stderr=npm_log_file)  # lint-amnesty, pylint: disable=consider-using-with
         retcode = proc.wait()
         if retcode == 1:
-            raise Exception("npm install failed: See {}".format(npm_log_file_path))
+            raise Exception(f"npm install failed: See {npm_log_file_path}")
     print("Successfully installed NPM packages. Log found at {}".format(
         npm_log_file_path
     ))
@@ -168,7 +171,11 @@ def python_prereqs_installation():
 def pip_install_req_file(req_file):
     """Pip install the requirements file."""
     pip_cmd = 'pip install -q --disable-pip-version-check --exists-action w'
-    sh("{pip_cmd} -r {req_file}".format(pip_cmd=pip_cmd, req_file=req_file))
+
+    if Env.PIP_SRC_DIR:
+        sh(f"{pip_cmd} -r {req_file} --src {Env.PIP_SRC_DIR}")
+    else:
+        sh(f"{pip_cmd} -r {req_file}")
 
 
 @task
@@ -197,7 +204,6 @@ PACKAGES_TO_UNINSTALL = [
     "i18n-tools",                   # Because now it's called edx-i18n-tools
     "moto",                         # Because we no longer use it and it conflicts with recent jsondiff versions
     "python-saml",                  # Because python3-saml shares the same directory name
-    "pdfminer",                     # Replaced by pdfminer.six, which shares the same directory name
     "pytest-faulthandler",          # Because it was bundled into pytest
     "djangorestframework-jwt",      # Because now its called drf-jwt.
 ]
@@ -244,7 +250,7 @@ def uninstall_python_packages():
         for package_name in PACKAGES_TO_UNINSTALL:
             if package_in_frozen(package_name, frozen):
                 # Uninstall the pacakge
-                sh("pip uninstall --disable-pip-version-check -y {}".format(package_name))
+                sh(f"pip uninstall --disable-pip-version-check -y {package_name}")
                 uninstalled = True
         if not uninstalled:
             break
@@ -305,7 +311,10 @@ def install_python_prereqs():
     files_to_fingerprint.append(sysconfig.get_python_lib())
 
     # In a virtualenv, "-e installs" get put in a src directory.
-    src_dir = os.path.join(sys.prefix, "src")
+    if Env.PIP_SRC_DIR:
+        src_dir = Env.PIP_SRC_DIR
+    else:
+        src_dir = os.path.join(sys.prefix, "src")
     if os.path.isdir(src_dir):
         files_to_fingerprint.append(src_dir)
 
@@ -341,7 +350,7 @@ def log_installed_python_prereqs():
     sh("pip freeze > {}".format(Env.GEN_LOG_DIR + "/pip_freeze.log"))
 
 
-def print_devstack_warning():
+def print_devstack_warning():  # lint-amnesty, pylint: disable=missing-function-docstring
     if Env.USING_DOCKER:  # pragma: no cover
         print("********************************************************************************")
         print("* WARNING: Mac users should run this from both the lms and studio shells")

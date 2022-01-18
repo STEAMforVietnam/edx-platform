@@ -2,26 +2,26 @@
 Utility methods for the account settings.
 """
 
-
+import random
 import re
+import string
+from urllib.parse import urlparse  # pylint: disable=import-error
 
-import waffle
-from completion import waffle as completion_waffle
+import waffle  # lint-amnesty, pylint: disable=invalid-django-waffle-import
+from completion.waffle import ENABLE_COMPLETION_TRACKING_SWITCH
 from completion.models import BlockCompletion
 from django.conf import settings
-from django.utils.translation import ugettext as _
-from six import text_type
-from six.moves import range
-from six.moves.urllib.parse import urlparse  # pylint: disable=import-error
+from django.utils.translation import gettext as _
+from social_django.models import UserSocialAuth
 
+from common.djangoapps.student.models import AccountRecovery, Registration, get_retired_email_by_email
+from openedx.core.djangolib.oauth2_retirement_utils import retire_dot_oauth2_models
 from openedx.core.djangoapps.site_configuration.models import SiteConfiguration
 from openedx.core.djangoapps.theming.helpers import get_config_value_from_site_or_settings, get_current_site
-from openedx.core.djangoapps.user_api.config.waffle import (
-    ENABLE_MULTIPLE_USER_ENTERPRISES_FEATURE,
-    waffle as user_api_waffle
-)
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+
+from ..models import UserRetirementStatus
 
 ENABLE_SECONDARY_EMAIL_FEATURE_SWITCH = 'enable_secondary_email_feature'
 
@@ -40,9 +40,10 @@ def validate_social_link(platform_name, new_social_link):
     # Ensure that the new link is valid.
     if formatted_social_link is None:
         required_url_stub = settings.SOCIAL_PLATFORMS[platform_name]['url_stub']
-        raise ValueError(_('Make sure that you are providing a valid username or a URL that contains "{url_stub}". '
-                           'To remove the link from your edX profile, '
-                           'leave this field blank.').format(url_stub=required_url_stub))
+        raise ValueError(_(
+            'Make sure that you are providing a valid username or a URL that contains "{url_stub}". '
+            'To remove the link from your {platform_name} profile, leave this field blank.'
+        ).format(url_stub=required_url_stub, platform_name=settings.PLATFORM_NAME))
 
 
 def format_social_link(platform_name, new_social_link):
@@ -65,7 +66,7 @@ def format_social_link(platform_name, new_social_link):
         return None
 
     # For security purposes, always build up the url rather than using input from user.
-    return 'https://www.{}{}'.format(url_stub, username)
+    return f'https://www.{url_stub}{username}'
 
 
 def _get_username_from_social_link(platform_name, new_social_link):
@@ -118,7 +119,7 @@ def retrieve_last_sitewide_block_completed(user):
     :return: block_lms_url
 
     """
-    if not completion_waffle.waffle().is_enabled(completion_waffle.ENABLE_COMPLETION_TRACKING):
+    if not ENABLE_COMPLETION_TRACKING_SWITCH.is_enabled():
         return
 
     latest_completions_by_course = BlockCompletion.latest_blocks_completed_all_courses(user)
@@ -175,10 +176,10 @@ def retrieve_last_sitewide_block_completed(user):
     if not (lms_root and item):
         return
 
-    return u"{lms_root}/courses/{course_key}/jump_to/{location}".format(
+    return "{lms_root}/courses/{course_key}/jump_to/{location}".format(
         lms_root=lms_root,
-        course_key=text_type(item.location.course_key),
-        location=text_type(item.location),
+        course_key=str(item.location.course_key),
+        location=str(item.location),
     )
 
 
@@ -192,11 +193,41 @@ def is_secondary_email_feature_enabled():
     return waffle.switch_is_active(ENABLE_SECONDARY_EMAIL_FEATURE_SWITCH)
 
 
-def is_multiple_user_enterprises_feature_enabled():
+def create_retirement_request_and_deactivate_account(user):
     """
-    Checks to see if the django-waffle switch for enabling the multiple user enterprises feature is active
+    Adds user to retirement queue, unlinks social auth accounts, changes user passwords
+    and delete tokens and activation keys
+    """
+    # Add user to retirement queue.
+    UserRetirementStatus.create_retirement(user)
 
-    Returns:
-        Boolean value representing switch status
+    # Unlink LMS social auth accounts
+    UserSocialAuth.objects.filter(user_id=user.id).delete()
+
+    # Change LMS password & email
+    user.email = get_retired_email_by_email(user.email)
+    user.set_unusable_password()
+    user.save()
+
+    # TODO: Unlink social accounts & change password on each IDA.
+    # Remove the activation keys sent by email to the user for account activation.
+    Registration.objects.filter(user=user).delete()
+
+    # Delete OAuth tokens associated with the user.
+    retire_dot_oauth2_models(user)
+    AccountRecovery.retire_recovery_email(user.id)
+
+
+def username_suffix_generator(suffix_length=4):
     """
-    return user_api_waffle().is_enabled(ENABLE_MULTIPLE_USER_ENTERPRISES_FEATURE)
+    Generates a random, alternating number and letter string for the purpose of
+    appending to non-unique usernames. Alternating is less likey to produce
+    a significant/meaningful substring like an offensive word.
+    """
+    output = ''
+    for i in range(suffix_length):
+        if (i % 2) == 0:
+            output += random.choice(string.ascii_lowercase)
+        else:
+            output += random.choice(string.digits)
+    return output

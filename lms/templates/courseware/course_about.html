@@ -1,13 +1,14 @@
 <%page expression_filter="h"/>
 <%namespace name='static' file='../static_content.html'/>
 <%!
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django.utils.translation import pgettext
 from django.urls import reverse
 from lms.djangoapps.courseware.courses import get_course_about_section
+from lms.djangoapps.courseware.toggles import is_courses_default_invite_only_enabled
 from django.conf import settings
 from six import text_type
-from edxmako.shortcuts import marketing_link
+from common.djangoapps.edxmako.shortcuts import marketing_link
 from openedx.core.djangolib.js_utils import js_escaped_string
 from openedx.core.djangolib.markup import clean_dangerous_html, HTML, Text
 from openedx.core.lib.courses import course_image_url
@@ -40,9 +41,8 @@ from six import string_types
           location.href = xhr.responseText;
         }
       } else if (xhr.status == 403) {
-        $('#register_error').text(
-            (xhr.responseText ? xhr.responseText : "${_("An error has occurred. Please ensure that you are logged in to enroll.") | n, js_escaped_string}")
-        ).css("display", "block");
+        // redirect unauthenticated user to the login page
+        location.replace("${reverse('signin_user') | n, js_escaped_string}?next=" + encodeURIComponent("${request.path | n, js_escaped_string}"));
       } else {
         $('#register_error').text(
             (xhr.responseText ? xhr.responseText : "${_("An error occurred. Please try again later.") | n, js_escaped_string}")
@@ -90,7 +90,7 @@ from six import string_types
           <span class="register disabled">
             ${_("Course is full")}
           </span>
-        % elif invitation_only and not can_enroll:
+        % elif (is_courses_default_invite_only_enabled() or invitation_only) and not can_enroll:
           <span class="register disabled">${_("Enrollment in this course is by invitation only")}</span>
         ## Shib courses need the enrollment button to be displayed even when can_enroll is False,
         ## because AnonymousUsers cause can_enroll for shib courses to be False, but we need them to be able to click
@@ -240,13 +240,6 @@ from six import string_types
         </ol>
         </%block>
     </div>
-
-      <%block name="course_about_reviews_tool">
-      ## Course reviews tool
-      % if reviews_fragment_view:
-       ${HTML(reviews_fragment_view.body_html())}
-      % endif
-      </%block>
 
       ## For now, ocw links are the only thing that goes in additional resources
       % if get_course_about_section(request, course, "ocw_links"):

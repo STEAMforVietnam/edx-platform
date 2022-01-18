@@ -4,35 +4,34 @@ Allow course staff to see a student or staff view of courseware.
 Which kind of view has been selected is stored in the session state.
 '''
 
-
 import logging
 from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.db.models import Q
 from django.utils.decorators import method_decorator
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django.views import View
 from opaque_keys.edx.keys import CourseKey
 from pytz import utc
 from web_fragments.fragment import Fragment
 from xblock.runtime import KeyValueStore
 
-from course_modes.models import CourseMode
+from common.djangoapps.course_modes.models import CourseMode
 from openedx.core.djangoapps.util.user_messages import PageLevelMessages
 from openedx.core.djangolib.markup import HTML
 from openedx.features.content_type_gating.helpers import CONTENT_GATING_PARTITION_ID
 from openedx.features.content_type_gating.helpers import FULL_ACCESS
 from openedx.features.content_type_gating.helpers import LIMITED_ACCESS
-from student.models import CourseEnrollment
-from student.role_helpers import has_staff_roles
-from util.json_request import JsonResponse, expect_json
-from xmodule.modulestore.django import modulestore
-from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID
-from xmodule.partitions.partitions import NoSuchUserPartitionGroupError
-from xmodule.partitions.partitions_service import get_all_partitions_for_course
+from common.djangoapps.student.models import CourseEnrollment
+from common.djangoapps.student.role_helpers import has_staff_roles
+from common.djangoapps.util.json_request import JsonResponse, expect_json
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import NoSuchUserPartitionGroupError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions_service import get_all_partitions_for_course  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger(__name__)
 
@@ -45,10 +44,11 @@ MASQUERADE_SETTINGS_KEY = 'masquerade_settings'
 MASQUERADE_DATA_KEY = 'masquerade_data'
 
 
-class CourseMasquerade(object):
+class CourseMasquerade:
     """
     Masquerade settings for a particular course.
     """
+
     def __init__(self, course_key, role='student', user_partition_id=None, group_id=None, user_name=None):
         # All parameters to this function must be named identically to the corresponding attribute.
         # If you remove or rename an attribute, also update the __setstate__() method to migrate
@@ -68,6 +68,23 @@ class CourseMasquerade(object):
         AttributeErrors.
         """
         self.__init__(**state)
+
+    def get_active_group_name(self, available):
+        """
+        Lookup the active group name, from available options
+
+        Returns: the corresponding group name, if exists,
+            else, return None
+        """
+        if not (self.group_id and self.user_partition_id):
+            return None
+        for group in available:
+            if (
+                self.group_id == group.get('group_id') and
+                self.user_partition_id == group.get('user_partition_id')
+            ):
+                return group.get('name')
+        return None
 
 
 @method_decorator(login_required, name='dispatch')
@@ -103,7 +120,7 @@ class MasqueradeView(View):
                 'course_key': course_key_string,
                 'group_id': course.group_id,
                 'role': course.role,
-                'user_name': course.user_name or ' ',
+                'user_name': course.user_name or None,
                 'user_partition_id': course.user_partition_id,
             },
             'available': [
@@ -111,14 +128,23 @@ class MasqueradeView(View):
                     'name': 'Staff',
                     'role': 'staff',
                 },
-                {
-                    'name': 'Learner',
-                    'role': 'student',
-                },
             ],
         }
+        if len(partitions) == 0:
+            data['available'].append({
+                'name': 'Learner',
+                'role': 'student',
+            })
+
+        data['available'].append({
+            'name': 'Specific Student...',
+            'role': 'student',
+            'user_name': course.user_name or '',
+        })
         for partition in partitions:
-            if partition.active:
+            # "random" scheme implies a split_test content group, not a cohort
+            # and masquerading only cares about user cohorts
+            if partition.active and partition.scheme.name != "random":
                 data['available'].extend([
                     {
                         'group_id': group.id,
@@ -128,6 +154,7 @@ class MasqueradeView(View):
                     }
                     for group in partition.groups
                 ])
+        data['active']['group_name'] = course.get_active_group_name(data['available'])
         return JsonResponse(data)
 
     @method_decorator(expect_json)
@@ -158,7 +185,7 @@ class MasqueradeView(View):
                 return JsonResponse({
                     'success': False,
                     'error': _(
-                        u'There is no user with the username or email address u"{user_identifier}" '
+                        'There is no user with the username or email address "{user_identifier}" '
                         'enrolled in this course.'
                     ).format(
                         user_identifier=user_name,
@@ -186,9 +213,9 @@ def setup_masquerade(request, course_key, staff_access=False, reset_masquerade_d
     If the reset_masquerade_data flag is set, the field data stored in the session will be cleared.
     """
     if (
-            request.user is None or
-            not settings.FEATURES.get('ENABLE_MASQUERADE', False) or
-            not staff_access
+        request.user is None or
+        not settings.FEATURES.get('ENABLE_MASQUERADE', False) or
+        not staff_access
     ):
         return None, request.user
     if reset_masquerade_data:
@@ -326,6 +353,18 @@ def is_masquerading_as_specific_student(user, course_key):
     return bool(course_masquerade and course_masquerade.user_name)
 
 
+def get_specific_masquerading_user(user, course_key):
+    """
+    Return the specific user that a staff member is masquerading as, or None if they aren't.
+    """
+    course_masquerade = get_course_masquerade(user, course_key)
+    is_specific_user = bool(course_masquerade and course_masquerade.user_name)
+    if is_specific_user:
+        return User.objects.get(username=course_masquerade.user_name)
+    else:
+        return None
+
+
 def get_masquerading_user_group(course_key, user, user_partition):
     """
     If the current user is masquerading as a generic learner in a specific group, return that group.
@@ -377,7 +416,8 @@ class MasqueradingKeyValueStore(KeyValueStore):
     This `KeyValueStore` wraps an underlying `KeyValueStore`.  Reads are forwarded to the underlying
     store, but writes go to a Django session (or other dictionary-like object).
     """
-    def __init__(self, kvs, session):
+
+    def __init__(self, kvs, session):  # lint-amnesty, pylint: disable=super-init-not-called
         """
         Arguments:
           kvs: The KeyValueStore to wrap.
@@ -426,7 +466,7 @@ class MasqueradingKeyValueStore(KeyValueStore):
             return value != _DELETED_SENTINEL
 
 
-def filter_displayed_blocks(block, unused_view, frag, unused_context):
+def filter_displayed_blocks(block, unused_view, frag, unused_context):  # lint-amnesty, pylint: disable=unused-argument
     """
     A wrapper to only show XBlocks that set `show_in_read_only_mode` when masquerading as a specific user.
 
@@ -436,5 +476,5 @@ def filter_displayed_blocks(block, unused_view, frag, unused_context):
     if getattr(block, 'show_in_read_only_mode', False):
         return frag
     return Fragment(
-        _(u'This type of component cannot be shown while viewing the course as a specific student.')
+        _('This type of component cannot be shown while viewing the course as a specific student.')
     )

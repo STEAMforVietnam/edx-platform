@@ -2,34 +2,35 @@
 Common utility functions useful throughout the contentstore
 """
 
-
 import logging
 from contextlib import contextmanager
 from datetime import datetime
 
-import six
 from django.conf import settings
 from django.urls import reverse
 from django.utils import translation
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from opaque_keys.edx.keys import CourseKey, UsageKey
 from opaque_keys.edx.locator import LibraryLocator
 from pytz import UTC
-from six import text_type
 
+from cms.djangoapps.contentstore.toggles import exam_setting_view_enabled
+from common.djangoapps.student import auth
+from common.djangoapps.student.models import CourseEnrollment
+from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
+from openedx.core.djangoapps.course_apps.toggles import proctoring_settings_modal_view_enabled
+from openedx.core.djangoapps.discussions.config.waffle import ENABLE_PAGES_AND_RESOURCES_MICROFRONTEND
 from openedx.core.djangoapps.django_comment_common.models import assign_default_role
 from openedx.core.djangoapps.django_comment_common.utils import seed_permissions_roles
-from openedx.core.djangoapps.site_configuration.models import SiteConfiguration
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+from openedx.core.djangoapps.site_configuration.models import SiteConfiguration
 from openedx.features.content_type_gating.models import ContentTypeGatingConfig
 from openedx.features.content_type_gating.partitions import CONTENT_TYPE_GATING_SCHEME
-from student import auth
-from student.models import CourseEnrollment
-from student.roles import CourseInstructorRole, CourseStaffRole
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.exceptions import ItemNotFoundError
-from xmodule.partitions.partitions_service import get_all_partitions_for_course
+from cms.djangoapps.contentstore.toggles import use_new_text_editor
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions_service import get_all_partitions_for_course  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger(__name__)
 
@@ -99,8 +100,8 @@ def _remove_instructors(course_key):
 
     try:
         remove_all_instructors(course_key)
-    except Exception as err:
-        log.error(u"Error in deleting course groups for {0}: {1}".format(course_key, err))
+    except Exception as err:  # lint-amnesty, pylint: disable=broad-except
+        log.error(f"Error in deleting course groups for {course_key}: {err}")
 
 
 def get_lms_link_for_item(location, preview=False):
@@ -132,10 +133,10 @@ def get_lms_link_for_item(location, preview=False):
             settings.FEATURES.get('PREVIEW_LMS_BASE')
         )
 
-    return u"//{lms_base}/courses/{course_key}/jump_to/{location}".format(
+    return "//{lms_base}/courses/{course_key}/jump_to/{location}".format(
         lms_base=lms_base,
-        course_key=text_type(location.course_key),
-        location=text_type(location),
+        course_key=str(location.course_key),
+        location=str(location),
     )
 
 
@@ -151,26 +152,70 @@ def get_lms_link_for_certificate_web_view(course_key, mode):
     if lms_base is None:
         return None
 
-    return u"//{certificate_web_base}/certificates/course/{course_id}?preview={mode}".format(
+    return "//{certificate_web_base}/certificates/course/{course_id}?preview={mode}".format(
         certificate_web_base=lms_base,
-        course_id=six.text_type(course_key),
+        course_id=str(course_key),
         mode=mode
     )
 
 
-def get_proctored_exam_settings_url(course_module):
+def get_course_authoring_url(course_locator):
+    """
+    Gets course authoring microfrontend URL
+    """
+    return configuration_helpers.get_value_for_org(
+        course_locator.org,
+        'COURSE_AUTHORING_MICROFRONTEND_URL',
+        settings.COURSE_AUTHORING_MICROFRONTEND_URL
+    )
+
+
+def get_pages_and_resources_url(course_locator):
+    """
+    Gets course authoring microfrontend URL for Pages and Resources view.
+    """
+    pages_and_resources_url = None
+    if ENABLE_PAGES_AND_RESOURCES_MICROFRONTEND.is_enabled(course_locator):
+        mfe_base_url = get_course_authoring_url(course_locator)
+        if mfe_base_url:
+            pages_and_resources_url = f'{mfe_base_url}/course/{course_locator}/pages-and-resources'
+    return pages_and_resources_url
+
+
+def get_proctored_exam_settings_url(course_locator) -> str:
     """
     Gets course authoring microfrontend URL for links to proctored exam settings page
     """
-    course_authoring_microfrontend_url = ''
+    proctored_exam_settings_url = ''
+    if exam_setting_view_enabled():
+        mfe_base_url = get_course_authoring_url(course_locator)
+        course_mfe_url = f'{mfe_base_url}/course/{course_locator}'
+        if mfe_base_url:
+            if proctoring_settings_modal_view_enabled(course_locator):
+                proctored_exam_settings_url = f'{course_mfe_url}/pages-and-resources/proctoring/settings'
+            else:
+                proctored_exam_settings_url = f'{course_mfe_url}/proctored-exam-settings'
+    return proctored_exam_settings_url
 
-    if settings.FEATURES.get('ENABLE_EXAM_SETTINGS_HTML_VIEW'):
-        course_authoring_microfrontend_url = configuration_helpers.get_value_for_org(
-            course_module.location.org,
-            'COURSE_AUTHORING_MICROFRONTEND_URL',
-            settings.COURSE_AUTHORING_MICROFRONTEND_URL
-        )
-    return course_authoring_microfrontend_url
+
+def get_editor_page_base_url(course_locator) -> str:
+    """
+    Gets course authoring microfrontend URL for links to the new base editors
+    """
+    editor_url = None
+    if use_new_text_editor():
+        mfe_base_url = get_course_authoring_url(course_locator)
+        course_mfe_url = f'{mfe_base_url}/course/{course_locator}/editor'
+        if mfe_base_url:
+            editor_url = course_mfe_url
+    return editor_url
+
+
+def course_import_olx_validation_is_enabled():
+    """
+    Check if course olx validation is enabled on course import.
+    """
+    return settings.FEATURES.get('ENABLE_COURSE_OLX_VALIDATION', False)
 
 
 # pylint: disable=invalid-name
@@ -191,7 +236,7 @@ def is_currently_visible_to_students(xblock):
         return False
 
     # Check start date
-    if 'detached' not in published._class_tags and published.start is not None:
+    if 'detached' not in published._class_tags and published.start is not None:  # lint-amnesty, pylint: disable=protected-access
         return datetime.now(UTC) > published.start
 
     # No start date, so it's always visible
@@ -292,7 +337,7 @@ def reverse_url(handler_name, key_name=None, key_value=None, kwargs=None):
     Creates the URL for the given handler.
     The optional key_name and key_value are passed in as kwargs to the handler.
     """
-    kwargs_for_reverse = {key_name: six.text_type(key_value)} if key_name else None
+    kwargs_for_reverse = {key_name: str(key_value)} if key_name else None
     if kwargs:
         kwargs_for_reverse.update(kwargs)
     return reverse(handler_name, kwargs=kwargs_for_reverse)
@@ -332,7 +377,7 @@ def get_split_group_display_name(xblock, course):
     """
     for user_partition in get_user_partition_info(xblock, schemes=['random'], course=course):
         for group in user_partition['groups']:
-            if u'Group ID {group_id}'.format(group_id=group['id']) == xblock.display_name_with_default:
+            if 'Group ID {group_id}'.format(group_id=group['id']) == xblock.display_name_with_default:
                 return group['name']
 
 
@@ -400,7 +445,7 @@ def get_user_partition_info(xblock, schemes=None, course=None):
 
     if course is None:
         log.warning(
-            u"Could not find course %s to retrieve user partition information",
+            "Could not find course %s to retrieve user partition information",
             xblock.location.course_key
         )
         return []
@@ -432,7 +477,7 @@ def get_user_partition_info(xblock, schemes=None, course=None):
                 })
 
             # Next, add any groups set on the XBlock that have been deleted
-            all_groups = set(g.id for g in p.groups)
+            all_groups = {g.id for g in p.groups}
             missing_group_ids = selected_groups - all_groups
             for gid in missing_group_ids:
                 groups.append({
@@ -445,7 +490,7 @@ def get_user_partition_info(xblock, schemes=None, course=None):
             # Put together the entire partition dictionary
             partitions.append({
                 "id": p.id,
-                "name": six.text_type(p.name),  # Convert into a string in case ugettext_lazy was used
+                "name": str(p.name),  # Convert into a string in case ugettext_lazy was used
                 "scheme": p.scheme.name,
                 "groups": groups,
             })
@@ -502,7 +547,7 @@ def get_visibility_partition_info(xblock, course=None):
                 else:
                     # Translators: This is building up a list of groups. It is marked for translation because of the
                     # comma, which is used as a separator between each group.
-                    selected_groups_label = _(u'{previous_groups}, {current_group}').format(
+                    selected_groups_label = _('{previous_groups}, {current_group}').format(
                         previous_groups=selected_groups_label,
                         current_group=group['name']
                     )
@@ -527,7 +572,7 @@ def get_xblock_aside_instance(usage_key):
             if aside.scope_ids.block_type == usage_key.aside_type:
                 return aside
     except ItemNotFoundError:
-        log.warning(u'Unable to load item %s', usage_key.usage_key)
+        log.warning('Unable to load item %s', usage_key.usage_key)
 
 
 def is_self_paced(course):
@@ -537,62 +582,120 @@ def is_self_paced(course):
     return course and course.self_paced
 
 
-def get_sibling_urls(subsection):
+def get_sibling_urls(subsection, unit_location):    # pylint: disable=too-many-statements
     """
     Given a subsection, returns the urls for the next and previous units.
 
     (the first unit of the next subsection or section, and
     the last unit of the previous subsection/section)
     """
+    def get_unit_location(direction):
+        """
+        Returns the desired location of the adjacent unit in a subsection.
+        """
+        unit_index = subsection.children.index(unit_location)
+        try:
+            if direction == 'previous':
+                if unit_index > 0:
+                    location = subsection.children[unit_index - 1]
+                else:
+                    location = None
+            else:
+                location = subsection.children[unit_index + 1]
+            return location
+        except IndexError:
+            return None
+
+    def get_subsections_in_section():
+        """
+        Returns subsections present in a section.
+        """
+        try:
+            section_subsections = section.get_children()
+            return section_subsections
+        except AttributeError:
+            log.error("URL Retrieval Error: subsection {subsection} included in section {section}".format(
+                section=section.location,
+                subsection=subsection.location
+            ))
+            return None
+
+    def get_sections_in_course():
+        """
+        Returns sections present in course.
+        """
+        try:
+            section_subsections = section.get_parent().get_children()
+            return section_subsections
+        except AttributeError:
+            log.error("URL Retrieval Error: In section {section} in course".format(
+                section=section.location,
+            ))
+            return None
+
+    def get_subsection_location(section_subsections, current_subsection, direction):
+        """
+        Returns the desired location of the adjacent subsections in a section.
+        """
+        location = None
+        subsection_index = section_subsections.index(next(s for s in subsections if s.location ==
+                                                          current_subsection.location))
+        try:
+            if direction == 'previous':
+                if subsection_index > 0:
+                    prev_subsection = subsections[subsection_index - 1]
+                    location = prev_subsection.get_children()[-1].location
+            else:
+                next_subsection = subsections[subsection_index + 1]
+                location = next_subsection.get_children()[0].location
+            return location
+        except IndexError:
+            return None
+
+    def get_section_location(course_sections, current_section, direction):
+        """
+        Returns the desired location of the adjacent sections in a course.
+        """
+        location = None
+        section_index = course_sections.index(next(s for s in sections if s.location == current_section.location))
+        try:
+            if direction == 'previous':
+                if section_index > 0:
+                    prev_section = sections[section_index - 1]
+                    location = prev_section.get_children()[-1].get_children()[-1].location
+            else:
+                next_section = sections[section_index + 1]
+                location = next_section.get_children()[0].get_children()[0].location
+            return location
+        except IndexError:
+            return None
+
     section = subsection.get_parent()
     prev_url = next_url = ''
-    prev_loc = next_loc = None
-    last_block = None
-    siblings = list(section.get_children())
-    for i, block in enumerate(siblings):
-        if block.location == subsection.location:
-            if last_block:
-                try:
-                    prev_loc = last_block.get_children()[0].location
-                except IndexError:
-                    pass
-            try:
-                next_loc = siblings[i + 1].get_children()[0].location
-            except IndexError:
-                pass
-            break
-        last_block = block
+
+    prev_loc = get_unit_location('previous')
+    next_loc = get_unit_location('next')
+
     if not prev_loc:
-        try:
-            # section.get_parent SHOULD return the course, but for some reason, it might not
-            sections = section.get_parent().get_children()
-        except AttributeError:
-            log.error(u"URL Retrieval Error # 1: subsection {subsection} included in section {section}".format(
-                section=section.location,
-                subsection=subsection.location
-            ))
-            # This should not be a fatal error. The worst case is that the navigation on the unit page
-            # won't display a link to a previous unit.
-        else:
-            try:
-                prev_section = sections[sections.index(section) - 1]
-                prev_loc = prev_section.get_children()[-1].get_children()[-1].location
-            except IndexError:
-                pass
+        subsections = get_subsections_in_section()
+        if subsections:
+            prev_loc = get_subsection_location(subsections, subsection, 'previous')
+
     if not next_loc:
-        try:
-            sections = section.get_parent().get_children()
-        except AttributeError:
-            log.error(u"URL Retrieval Error # 2: subsection {subsection} included in section {section}".format(
-                section=section.location,
-                subsection=subsection.location
-            ))
-        else:
-            try:
-                next_section = sections[sections.index(section) + 1]
-                next_loc = next_section.get_children()[0].get_children()[0].location
-            except IndexError:
-                pass
+        subsections = get_subsections_in_section()
+        if subsections:
+            next_loc = get_subsection_location(subsections, subsection, 'next')
+
+    if not prev_loc:
+        sections = get_sections_in_course()
+        if sections:
+            prev_loc = get_section_location(sections, section, 'previous')
+
+    if not next_loc:
+        sections = get_sections_in_course()
+        if sections:
+            next_loc = get_section_location(sections, section, 'next')
+
     if prev_loc:
         prev_url = reverse_usage_url('container_handler', prev_loc)
     if next_loc:

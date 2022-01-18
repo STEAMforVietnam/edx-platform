@@ -4,22 +4,23 @@ Tests for contentstore.views.preview.py
 
 
 import re
+from unittest import mock
 
 import ddt
-import mock
-import six
 from django.test.client import Client, RequestFactory
+from web_fragments.fragment import Fragment
 from xblock.core import XBlock, XBlockAside
 
-from contentstore.utils import reverse_usage_url
-from contentstore.views.preview import _preview_module_system, get_preview_fragment
-from student.tests.factories import UserFactory
-from xblock_config.models import StudioConfig
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.tests.test_asides import AsideTestType
+from cms.djangoapps.contentstore.utils import reverse_usage_url
+from cms.djangoapps.xblock_config.models import StudioConfig
+from common.djangoapps.student.tests.factories import UserFactory
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.test_asides import AsideTestType  # lint-amnesty, pylint: disable=wrong-import-order
+
+from ..preview import _preview_module_system, get_preview_fragment
 
 
 @ddt.ddt
@@ -60,11 +61,11 @@ class GetPreviewHtmlTestCase(ModuleStoreTestCase):
 
         # Verify student view html is returned, and the usage ID is as expected.
         html_pattern = re.escape(
-            six.text_type(course.id.make_usage_key('html', 'replaceme'))
+            str(course.id.make_usage_key('html', 'replaceme'))
         ).replace('replaceme', r'html_[0-9]*')
         self.assertRegex(
             html,
-            'data-usage-id="{}"'.format(html_pattern)
+            f'data-usage-id="{html_pattern}"'
         )
         self.assertRegex(html, '<html>foobar</html>')
         self.assertRegex(html, r"data-block-type=[\"\']test_aside[\"\']")
@@ -109,10 +110,10 @@ class GetPreviewHtmlTestCase(ModuleStoreTestCase):
         self.assertNotRegex(html, r"data-block-type=[\"\']test_aside[\"\']")
         self.assertNotRegex(html, "Aside rendered")
 
-    @mock.patch('xmodule.conditional_module.ConditionalModule.is_condition_satisfied')
+    @mock.patch('xmodule.conditional_module.ConditionalBlock.is_condition_satisfied')
     def test_preview_conditional_module_children_context(self, mock_is_condition_satisfied):
         """
-        Testst that when empty context is pass to children of ConditionalModule it will not raise KeyError.
+        Tests that when empty context is pass to children of ConditionalBlock it will not raise KeyError.
         """
         mock_is_condition_satisfied.return_value = True
         client = Client()
@@ -168,12 +169,20 @@ class GetPreviewHtmlTestCase(ModuleStoreTestCase):
 
 @XBlock.needs("field-data")
 @XBlock.needs("i18n")
+@XBlock.needs("mako")
 @XBlock.needs("user")
+@XBlock.needs("teams_configuration")
 class PureXBlock(XBlock):
     """
     Pure XBlock to use in tests.
     """
-    pass
+    def student_view(self, context):
+        """
+        Renders the output that a student will see.
+        """
+        fragment = Fragment()
+        fragment.add_content(self.runtime.service(self, 'mako').render_template('edxmako.html', context))
+        return fragment
 
 
 @ddt.ddt
@@ -185,14 +194,14 @@ class StudioXBlockServiceBindingTest(ModuleStoreTestCase):
         """
         Set up the user and request that will be used.
         """
-        super(StudioXBlockServiceBindingTest, self).setUp()
+        super().setUp()
         self.user = UserFactory()
         self.course = CourseFactory.create()
         self.request = mock.Mock()
         self.field_data = mock.Mock()
 
     @XBlock.register_temp_plugin(PureXBlock, identifier='pure')
-    @ddt.data("user", "i18n", "field-data")
+    @ddt.data("user", "i18n", "field-data", "teams_configuration")
     def test_expected_services_exist(self, expected_service):
         """
         Tests that the 'user' and 'i18n' services are provided by the Studio runtime.
@@ -205,3 +214,45 @@ class StudioXBlockServiceBindingTest(ModuleStoreTestCase):
         )
         service = runtime.service(descriptor, expected_service)
         self.assertIsNotNone(service)
+
+
+class CmsModuleSystemShimTest(ModuleStoreTestCase):
+    """
+    Tests that the deprecated attributes in the Module System (XBlock Runtime) return the expected values.
+    """
+    def setUp(self):
+        """
+        Set up the user and other fields that will be used to instantiate the runtime.
+        """
+        super().setUp()
+        self.course = CourseFactory.create()
+        self.user = UserFactory()
+        self.request = RequestFactory().get('/dummy-url')
+        self.request.user = self.user
+        self.request.session = {}
+        self.descriptor = ItemFactory(category="video", parent=self.course)
+        self.field_data = mock.Mock()
+        self.runtime = _preview_module_system(
+            self.request,
+            self.descriptor,
+            self.field_data,
+        )
+
+    def test_get_user_role(self):
+        assert self.runtime.get_user_role() == 'staff'
+
+    @XBlock.register_temp_plugin(PureXBlock, identifier='pure')
+    def test_render_template(self):
+        descriptor = ItemFactory(category="pure", parent=self.course)
+        html = get_preview_fragment(self.request, descriptor, {'element_id': 142}).content
+        assert '<div id="142" ns="main">Testing the MakoService</div>' in html
+
+    def test_xqueue_is_not_available_in_studio(self):
+        descriptor = ItemFactory(category="problem", parent=self.course)
+        runtime = _preview_module_system(
+            self.request,
+            descriptor=descriptor,
+            field_data=mock.Mock(),
+        )
+        assert runtime.xqueue is None
+        assert runtime.service(descriptor, 'xqueue') is None

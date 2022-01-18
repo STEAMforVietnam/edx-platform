@@ -26,7 +26,8 @@ define(['backbone',
                     1,
                     Helpers.PLATFORM_NAME,
                     Helpers.CONTACT_EMAIL,
-                    true
+                    true,
+                    Helpers.ENABLE_COPPA_COMPLIANCE
                 );
                 return context.accountSettingsView;
             };
@@ -69,7 +70,7 @@ define(['backbone',
 
                 request = requests[1];
                 expect(request.method).toBe('GET');
-                expect(request.url).toBe('/user_api/v1/preferences/time_zones/?country_code=1');
+                expect(request.url).toBe('/api/user/v1/preferences/time_zones/?country_code=1');
                 AjaxHelpers.respondWithJson(requests, Helpers.TIME_ZONE_RESPONSE);
 
                 request = requests[2];
@@ -164,6 +165,7 @@ define(['backbone',
                     Helpers.PLATFORM_NAME,
                     Helpers.CONTACT_EMAIL,
                     true,
+                    Helpers.ENABLE_COPPA_COMPLIANCE,
                     '',
 
                     Helpers.SYNC_LEARNER_PROFILE_DATA,
@@ -232,7 +234,7 @@ define(['backbone',
 
                 request = requests[1];
                 expect(request.method).toBe('GET');
-                expect(request.url).toBe('/user_api/v1/preferences/time_zones/?country_code=1');
+                expect(request.url).toBe('/api/user/v1/preferences/time_zones/?country_code=1');
                 AjaxHelpers.respondWithJson(requests, Helpers.TIME_ZONE_RESPONSE);
 
                 request = requests[2];

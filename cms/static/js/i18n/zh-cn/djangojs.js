@@ -1,13 +1,14 @@
 
 
-(function(globals) {
-
-  var django = globals.django || (globals.django = {});
+'use strict';
+{
+  const globals = this;
+  const django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    var v=0;
-    if (typeof(v) == 'boolean') {
+    const v = 0;
+    if (typeof v === 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -19,8 +20,7 @@
 
   django.catalog = django.catalog || {};
   
-  var newcatalog = {
-    "\n\nThis email is to let you know that the status of your proctoring session review for %(exam_name)s in\n<a href=\"%(course_url)s\">%(course_name)s </a> is %(status)s. If you have any questions about proctoring,\ncontact %(platform)s support at %(contact_email)s.\n\n": "\n\n\u6b64\u5c01\u90ae\u4ef6\u63d0\u793a\u60a8\u5728\u76d1\u8003\u6a21\u5f0f\u4e0b\u6240\u8fdb\u884c\u7684\u8bfe\u7a0b<a href=\"%(course_url)s\">%(course_name)s</a>\u7684%(exam_name)s\u8003\u8bd5\u5ba1\u6838\u72b6\u6001\u4e3a%(status)s\u3002\u5982\u679c\u60a8\u5bf9\u76d1\u8003\u6a21\u5f0f\u6709\u4efb\u4f55\u7591\u95ee\uff0c\u8bf7\u8054\u7cfb%(platform)s\u652f\u6301\u56e2\u961f%(contact_email)s \u3002\n",
+  const newcatalog = {
     "\n                    Make sure you are on a computer with a webcam, and that you have valid photo identification\n                    such as a driver's license or passport, before you continue.\n                ": "\n                    \u8bf7\u786e\u4fdd\u60a8\u7684\u7535\u8111\u5e26\u6709\u7f51\u7edc\u6444\u50cf\u5934\uff0c\u5e76\u6709\u6709\u6548\u7684\u5e26\u7167\u7247\u8eab\u4efd\u8bc1\u660e\uff0c\n                    \u4f8b\u5982\u9a7e\u9a76\u8bc1\u6216\u62a4\u7167\u3002\n                ",
     "\n                    Your verification attempt failed. Please read our guidelines to make\n                    sure you understand the requirements for successfully completing verification,\n                    then try again.\n                ": "\n                    \u60a8\u7684\u8eab\u4efd\u8ba4\u8bc1\u5931\u8d25\u4e86\uff0c\u8bf7\u5148\u4ed4\u7ec6\u9605\u8bfb\u8bf4\u660e\uff0c\u786e\u4fdd\u60a8\u7406\u89e3\u6210\u529f\u5b8c\u6210\u8ba4\u8bc1\u7684\u8981\u6c42\uff0c\u7136\u540e\u91cd\u65b0\u8ba4\u8bc1\u3002\n                ",
     "\n                    Your verification has expired. You must successfully complete a new identity verification\n                    before you can start the proctored exam.\n                ": "\n                   \u60a8\u7684\u8eab\u4efd\u8ba4\u8bc1\u5df2\u8fc7\u671f\uff0c\u60a8\u5fc5\u987b\u91cd\u65b0\u6210\u529f\u5b8c\u6210\u8ba4\u8bc1\uff0c\n                    \u7136\u540e\u624d\u80fd\u8fdb\u884c\u76d1\u8003\u8003\u8bd5\u3002\n                ",
@@ -29,87 +29,35 @@
     "\n                You must successfully complete identity verification before you can start the proctored exam.\n            ": "\n                \u5728\u5f00\u59cb\u8fdb\u884c\u76d1\u8003\u8003\u8bd5\u524d\uff0c\u60a8\u5fc5\u987b\u5148\u5b8c\u6210\u8eab\u4efd\u8ba4\u8bc1\u3002\n            ",
     "\n            Do not close this window before you finish your exam. if you close this window, your proctoring session ends, and you will not successfully complete the proctored exam.\n          ": "\n          \u5982\u679c\u8003\u8bd5\u672a\u7ed3\u675f\uff0c\u8bf7\u52ff\u5173\u95ed\u6b64\u7a97\u53e3\u3002\u4e00\u65e6\u5173\u95ed\uff0c\u90a3\u4e48\u60a8\u7684\u76d1\u8003\u6a21\u5f0f\u5c06\u7ed3\u675f\uff0c\u5e76\u4e14\u65e0\u6cd5\u6210\u529f\u5b8c\u6210\u76d1\u8003\u8003\u8bd5\u3002\n          ",
     "\n            Return to the %(platform_name)s course window to start your exam. When you have finished your exam and\n            have marked it as complete, you can close this window to end the proctoring session\n            and upload your proctoring session data for review.\n          ": "\n            \u8fd4\u56de %(platform_name)s \u8bfe\u7a0b\u7a97\u53e3\u6765\u5f00\u59cb\u8003\u8bd5\u3002\u5f53\u60a8\u5b8c\u6210\u8003\u8bd5\u5e76\u4e14\n            \u5c06\u5176\u6807\u8bb0\u4e3a\u5df2\u5b8c\u6210\u540e\uff0c\u5219\u53ef\u4ee5\u5173\u95ed\u6b64\u7a97\u53e3\u6765\u7ed3\u675f\u76d1\u8003\u8003\u8bd5\n            \u5e76\u4e0a\u4f20\u60a8\u7684\u76d1\u8003\u6570\u636e\u4ee5\u5ba1\u6838\u3002\n          ",
-    "\n          3. When you have finished setting up proctoring, start the exam.\n        ": "\n          3. \u5f53\u60a8\u5b8c\u6210\u76d1\u8003\u6a21\u5f0f\u7684\u8bbe\u7f6e\u540e\uff0c\u8bf7\u5f00\u59cb\u8003\u8bd5\u3002\n        ",
-    "\n          Start my exam\n        ": "\n\u5f00\u59cb\u8003\u8bd5",
-    "\n        &#8226; When you start your exam you will have %(total_time)s to complete it. </br>\n        &#8226; You cannot stop the timer once you start. </br>\n        &#8226; If time expires before you finish your exam, your completed answers will be\n                submitted for review. </br>\n      ": "\n        &#8226\uff1b\u8003\u8bd5\u65f6\u95f4\u4e3a%(total_time)s \u3002 </br>\n        &#8226\uff1b\u8ba1\u65f6\u5668\u4e00\u65e6\u5f00\u59cb\uff0c\u5219\u65e0\u6cd5\u505c\u6b62\u3002</br>\n        &#8226\uff1b\u5982\u679c\u5df2\u8d85\u8fc7\u8003\u8bd5\u65f6\u95f4\uff0c\u800c\u60a8\u5c1a\u672a\u5b8c\u6210\u8003\u8bd5\uff0c\u90a3\u4e48\u5df2\u5b8c\u6210\u7684\u7b54\u6848\u4f1a\u88ab\u63d0\u4ea4\u81f3\u5ba1\u6838\u3002</br>\n      ",
-    "\n        1. Copy this unique exam code. You will be prompted to paste this code later before you start the exam.\n      ": "\n        1. \u590d\u5236\u6b64\u552f\u4e00\u7684\u8003\u8bd5\u7801\uff0c\u7a0d\u540e\u5f00\u59cb\u8003\u8bd5\u524d\u7cfb\u7edf\u4f1a\u63d0\u793a\u60a8\u7c98\u8d34\u6b64\u8003\u8bd5\u7801\u3002\n      ",
-    "\n        2. Follow the link below to set up proctoring.\n      ": "\n        2. \u70b9\u51fb\u4ee5\u4e0b\u94fe\u63a5\u6765\u8bbe\u7f6e\u76d1\u8003\u3002\n      ",
-    "\n        A new window will open. You will run a system check before downloading the proctoring application.\n      ": "\n        \u5c06\u6253\u5f00\u4e00\u4e2a\u65b0\u7a97\u53e3\uff0c\u5728\u4e0b\u8f7d\u76d1\u8003\u8f6f\u4ef6\u524d\uff0c\u7535\u8111\u4f1a\u8fdb\u884c\u4e00\u6b21\u7cfb\u7edf\u68c0\u67e5\u3002\n      ",
     "\n        About Proctored Exams\n        ": "\n        \u5173\u4e8e\u76d1\u8003\u8003\u8bd5\n        ",
-    "\n        After the due date has passed, you can review the exam, but you cannot change your answers.\n      ": "\n        \u5728\u622a\u6b62\u65e5\u671f\u8fc7\u540e\uff0c\u60a8\u53ef\u4ee5\u67e5\u770b\u8003\u8bd5\u5185\u5bb9\uff0c\u4f46\u65e0\u6cd5\u66f4\u6539\u7b54\u6848\u3002\n      ",
     "\n        Are you sure you want to take this exam without proctoring?\n      ": "\n        \u60a8\u786e\u5b9a\u5173\u95ed\u76d1\u8003\u6a21\u5f0f\uff1f\n      ",
     "\n        Due to unsatisfied prerequisites, you can only take this exam without proctoring.\n      ": "\n        \u60a8\u4e0d\u6ee1\u8db3\u5148\u4fee\u6761\u4ef6\uff0c\u65e0\u6cd5\u5f00\u542f\u76d1\u8003\u6a21\u5f0f\u3002\n      ",
-    "\n        I am not interested in academic credit.\n      ": "\n        \u6211\u5bf9\u5b66\u5206\u4e0d\u611f\u5174\u8da3\u3002\n      ",
     "\n        I am ready to start this timed exam.\n      ": "\n       \u6211\u5df2\u51c6\u5907\u597d\u5f00\u59cb\u6b64\u9650\u65f6\u8003\u8bd5\u3002\n      ",
-    "\n        If you take this exam without proctoring, you will <strong> no longer be eligible for academic credit. </strong>\n      ": "\n        \u5982\u679c\u60a8\u5173\u95ed\u76d1\u8003\u6a21\u5f0f\uff0c\u90a3\u4e48\u5c06 <strong>\u65e0\u6cd5\u83b7\u5f97\u5b66\u5206\u3002 </strong>\n      ",
     "\n        No, I want to continue working.\n      ": "\n        \u7ee7\u7eed\u8003\u8bd5\n      ",
     "\n        No, I'd like to continue working\n      ": "\n        \u4e0d\uff0c\u7ee7\u7eed\u8003\u8bd5\n      ",
-    "\n        Select the exam code, then copy it using Command+C (Mac) or Control+C (Windows).\n      ": "\n        \u9009\u62e9\u8003\u8bd5\u7801\uff0c\u7136\u540e Command + C (Mac) \u6216 Control + C (Windows) \u8fdb\u884c\u590d\u5236\u3002\n      ",
-    "\n        The time allotted for this exam has expired. Your exam has been submitted and any work you completed will be graded.\n      ": "\n        \u6b64\u95e8\u8003\u8bd5\u7684\u65f6\u95f4\u5df2\u7ed3\u675f\uff0c\u5df2\u63d0\u4ea4\u60a8\u7684\u8003\u8bd5\uff0c\u6240\u6709\u5df2\u5b8c\u6210\u7684\u90e8\u5206\u90fd\u5c06\u88ab\u8bc4\u5206\u3002\n      ",
-    "\n        You have submitted your timed exam.\n      ": "\n       \u60a8\u5df2\u63d0\u4ea4\u9650\u65f6\u8003\u8bd5\u3002\n      ",
-    "\n        You will be asked to verify your identity as part of the proctoring exam set up.\n        Make sure you are on a computer with a webcam, and that you have valid photo identification\n        such as a driver's license or passport, before you continue.\n      ": "\n        \u76d1\u8003\u8003\u8bd5\u7684\u8bbe\u7f6e\u8981\u6c42\u9700\u8981\u60a8\u8ba4\u8bc1\u8eab\u4efd\u3002\n        \u8bf7\u786e\u4fdd\u60a8\u7684\u7535\u8111\u6709\u7f51\u7edc\u6444\u50cf\u5934\uff0c\u5e76\u6709\u6709\u6548\u7684\u5e26\u7167\u7247\u7684\u8eab\u4efd\u8bc1\u660e\uff0c\n        \u4f8b\u5982\u9a7e\u9a76\u8bc1\u6216\u62a4\u7167\u3002\n      ",
-    "\n        You will be guided through steps to set up online proctoring software and to perform various checks.\n      ": "\n   \u5c06\u6709\u8bf4\u660e\u544a\u77e5\u60a8\u5982\u4f55\u8fdb\u884c\u76d1\u8003\u8f6f\u4ef6\u7684\u8bbe\u7f6e\u6b65\u9aa4\u548c\u5404\u79cd\u68c0\u67e5\u3002 \n      ",
-    "\n        You will be guided through steps to set up online proctoring software and to perform various checks.</br>\n      ": "\n        \u5c06\u6709\u8bf4\u660e\u544a\u77e5\u60a8\u5982\u4f55\u8fdb\u884c\u76d1\u8003\u8f6f\u4ef6\u7684\u8bbe\u7f6e\u6b65\u9aa4\u548c\u5404\u79cd\u68c0\u67e5\u3002</br>\n      ",
-    "\n      &#8226; After you quit the proctoring session, the recorded data is uploaded for review. </br>\n      &#8226; Proctoring results are usually available within 5 business days after you submit your exam.\n    ": "\n      &#8226\uff1b\u5728\u60a8\u9000\u51fa\u76d1\u8003\u6a21\u5f0f\u540e\uff0c\u6570\u636e\u4f1a\u88ab\u8bb0\u5f55\u5e76\u63d0\u4ea4\u81f3\u5ba1\u6838\u3002 </br>\n      &#8226\uff1b\u5728\u60a8\u63d0\u4ea4\u8003\u8bd5\u540e\uff0c\u4e00\u822c\u4f1a\u57285\u4e2a\u5de5\u4f5c\u65e5\u5185\u5f97\u77e5\u76d1\u8003\u5ba1\u6838\u7ed3\u679c\u3002\n    ",
-    "\n      A technical error has occurred with your proctored exam. To resolve this problem, contact\n      <a href=\"mailto:%(tech_support_email)s\">technical support</a>. All exam data, including answers\n      for completed problems, has been lost. When the problem is resolved you will need to restart\n      the exam and complete all problems again.\n    ": "\n      \u60a8\u7684\u76d1\u8003\u8003\u8bd5\u53d1\u751f\u9519\u8bef\uff0c\u8bf7\u8054\u7cfb\n      <a href=\"mailto:%(tech_support_email)s\">\u6280\u672f\u652f\u6301</a>\u3002\u5305\u62ec\u5df2\u56de\u7b54\u95ee\u9898\u5728\u5185\u7684\u6240\u6709\u8003\u8bd5\u6570\u636e\u90fd\u5df2\u4e22\u5931\u3002\u89e3\u51b3\u6b64\u95ee\u9898\u540e\uff0c\u60a8\u9700\u8981\u91cd\u65b0\u5f00\u59cb\u8003\u8bd5\u3002\n ",
-    "\n      After the due date for this exam has passed, you will be able to review your answers on this page.\n    ": "\n      \u5728\u6b64\u95e8\u8003\u8bd5\u622a\u6b62\u65e5\u671f\u540e\uff0c\u60a8\u53ef\u4ee5\u5728\u6b64\u9875\u9762\u67e5\u770b\u60a8\u7684\u56de\u7b54\u3002\n    ",
     "\n      After you submit your exam, your exam will be graded.\n    ": "\n      \u5728\u60a8\u63d0\u4ea4\u8003\u8bd5\u540e\uff0c\u4f1a\u5bf9\u60a8\u7684\u56de\u7b54\u8fdb\u884c\u8bc4\u5206\u3002\n    ",
-    "\n      After you submit your exam, your responses are graded and your proctoring session is reviewed.\n      You might be eligible to earn academic credit for this course if you complete all required exams\n      as well as achieve a final grade that meets credit requirements for the course.\n    ": "\n \u5728\u60a8\u63d0\u4ea4\u8003\u8bd5\u540e\uff0c\u4f1a\u5bf9\u60a8\u7684\u7b54\u6848\u8fdb\u884c\u8bc4\u5206\u5e76\u5ba1\u6838\u60a8\u7684\u76d1\u8003\u8003\u8bd5\u3002\n \u5982\u679c\u60a8\u5b8c\u6210\u4e86\u6240\u6709\u8003\u8bd5\uff0c\u5e76\u4e14\u6700\u7ec8\u6210\u7ee9\u8fbe\u5230\u8be5\u95e8\u8bfe\u7a0b\u7684\u5b66\u5206\u8981\u6c42\uff0c\n \u90a3\u4e48\u60a8\u5373\u53ef\u83b7\u5f97\u5b66\u5206\u3002\n \n    ",
     "\n      Are you sure that you want to submit your timed exam?\n    ": "\n      \u60a8\u786e\u5b9a\u8981\u63d0\u4ea4\u6b64\u9650\u65f6\u8003\u8bd5\u5417\uff1f\n    ",
     "\n      Are you sure you want to end your proctored exam?\n    ": "\n      \u60a8\u786e\u5b9a\u7ed3\u675f\u76d1\u8003\u8003\u8bd5\uff1f\n    ",
     "\n      Because the due date has passed, you are no longer able to take this exam.\n    ": "\n      \u5df2\u8d85\u8fc7\u622a\u6b62\u65e5\u671f\uff0c\u60a8\u65e0\u6cd5\u8fdb\u884c\u8003\u8bd5\u3002\n    ",
     "\n      Error with proctored exam\n    ": "\n      \u76d1\u8003\u8003\u8bd5\u53d1\u751f\u9519\u8bef\n    ",
-    "\n      Follow these instructions\n    ": "\n      \u53c2\u8003\u8fd9\u4e9b\u8bf4\u660e\n    ",
-    "\n      Follow these steps to set up and start your proctored exam.\n    ": "\n      \u6839\u636e\u8fd9\u4e9b\u6b65\u9aa4\u8bbe\u7f6e\u5e76\u5f00\u59cb\u60a8\u7684\u76d1\u8003\u8003\u8bd5\u3002\n    ",
-    "\n      Get familiar with proctoring for real exams later in the course. This practice exam has no impact\n      on your grade in the course.\n    ": "\n      \u672c\u6b21\u6a21\u62df\u8003\u5bf9\u60a8\u8bfe\u7a0b\u771f\u5b9e\u6210\u7ee9\u65e0\u5f71\u54cd\uff0c\u901a\u8fc7\u6a21\u62df\u8003\u8bd5\u60a8\u53ef\u4ee5\u4e86\u89e3\u6b63\u5f0f\u8003\u8bd5\u7684\u76d1\u8003\u60c5\u51b5\u3002\n    ",
-    "\n      If the proctoring software window is still open, you can close it now. Confirm that you want to quit the application when you are prompted.\n    ": "\n      \u5982\u679c\u76d1\u8003\u8f6f\u4ef6\u7a97\u53e3\u4ecd\u7136\u672a\u5173\u95ed\uff0c\u60a8\u73b0\u5728\u53ef\u4ee5\u5173\u95ed\u3002\u5f53\u5f39\u51fa\u63d0\u793a\u65f6\uff0c\u8bf7\u70b9\u51fb\u786e\u5b9a\u4ee5\u9000\u51fa\u8f6f\u4ef6\u3002\n    ",
-    "\n      If you have concerns about your proctoring session results, contact your course team.\n    ": "\n     \u5982\u679c\u60a8\u5bf9\u60a8\u7684\u76d1\u8003\u4f1a\u8bdd\u7ed3\u679c\u6709\u7591\u95ee\uff0c\u8bf7\u8054\u7cfb\u60a8\u7684\u8bfe\u7a0b\u56e2\u961f\u3002\n    ",
     "\n      If you have disabilities,\n      you might be eligible for an additional time allowance on timed exams.\n      Ask your course team for information about additional time allowances.\n    ": "\n      \u5982\u679c\u60a8\u8eab\u4f53\u6709\u6b8b\u75be\u95ee\u9898\uff0c\n      \u90a3\u4e48\u60a8\u53ef\u80fd\u6709\u8d44\u683c\u7533\u8bf7\u989d\u5916\u7684\u8003\u8bd5\u65f6\u95f4\u3002\n      \u60a8\u53ef\u4ee5\u5411\u60a8\u7684\u8bfe\u7a0b\u56e2\u961f\u54a8\u8be2\u5173\u4e8e\u989d\u5916\u8003\u8bd5\u65f6\u95f4\u7684\u4fe1\u606f\u3002\n    ",
     "\n      If you have questions about the status of your proctored exam results, contact %(platform_name)s Support.\n    ": "\n     \u5982\u679c\u60a8\u5bf9\u81ea\u5df1\u7684\u76d1\u8003\u6a21\u8bd5\u7ed3\u679c\u6709\u4efb\u4f55\u95ee\u9898\uff0c\u8bf7\u8054\u7cfb%(platform_name)s\u652f\u6301\u5e2e\u52a9\u3002\n    ",
-    "\n      If you have questions about the status of your requirements for course credit, contact %(platform_name)s Support.\n    ": "\n      \u5982\u679c\u60a8\u5bf9\u81ea\u5df1\u7684\u8bfe\u7a0b\u5b66\u5206\u8d44\u683c\u7533\u8bf7\u72b6\u6001\u6709\u7591\u95ee\uff0c\u8bf7\u8054\u7cfb %(platform_name)s \u652f\u6301\u5e2e\u52a9\u3002\n    ",
     "\n      Make sure that you have selected \"Submit\" for each problem before you submit your exam.\n    ": "\n      \u8bf7\u786e\u4fdd\u60a8\u5df2\u70b9\u51fb\u201c\u63d0\u4ea4\u201d\u6bcf\u4e2a\u95ee\u9898\u7684\u7b54\u6848\uff0c\u7136\u540e\u518d\u63d0\u4ea4\u8003\u8bd5\u3002\n    ",
-    "\n      Practice exams do not affect your grade or your credit eligibility.\n      You have completed this practice exam and can continue with your course work.\n    ": "\n      \u6a21\u62df\u8003\u8bd5\u4e0d\u5f71\u54cd\u60a8\u7684\u6210\u7ee9\u6216\u5b66\u5206\u8d44\u683c\u3002\n      \u60a8\u5df2\u5b8c\u6210\u6b64\u6a21\u62df\u8003\u8bd5\uff0c\u53ef\u7ee7\u7eed\u5b66\u4e60\u8bfe\u7a0b\u3002\n    ",
     "\n      The due date for this exam has passed\n    ": "\n      \u5df2\u8d85\u8fc7\u6b64\u8003\u8bd5\u7684\u622a\u6b62\u65e5\u671f\n    ",
-    "\n      There was a problem with your practice proctoring session\n    ": "\n      \u60a8\u7684\u6a21\u62df\u76d1\u8003\u4f1a\u8bdd\u53d1\u751f\u4e86\u9519\u8bef\n    ",
     "\n      This exam is proctored\n    ": "\n      \u9700\u5f00\u542f\u76d1\u8003\u6a21\u5f0f\n    ",
-    "\n      To be eligible for course credit or for a MicroMasters credential, you must pass the proctoring review for this exam.\n    ": "\n      \u4e3a\u83b7\u53d6\u8bfe\u7a0b\u5b66\u5206\u6216 MicroMasters \u8bc1\u4e66\uff0c\u60a8\u5fc5\u987b\u901a\u8fc7\u6b64\u95e8\u8003\u8bd5\u7684\u76d1\u8003\u5ba1\u6838\u3002\n    ",
     "\n      To view your exam questions and responses, select <strong>View my exam</strong>. The exam's review status is shown in the left navigation pane.\n    ": "\n      \u5982\u9700\u67e5\u770b\u60a8\u7684\u8003\u8bd5\u9898\u76ee\u548c\u56de\u7b54\uff0c\u8bf7\u70b9\u51fb <strong>\u67e5\u770b\u6211\u7684\u8003\u8bd5</strong>\u3002\u8003\u8bd5\u8bc4\u5206\u72b6\u6001\u663e\u793a\u5728\u5de6\u65b9\u5bfc\u822a\u65b9\u6846\u4e2d\u3002\n    ",
-    "\n      Try a proctored exam\n    ": "\n      \u8fdb\u884c\u76d1\u8003\u8003\u8bd5\n    ",
-    "\n      View your credit eligibility status on your <a href=\"%(progress_page_url)s\">Progress</a> page.\n    ": "\n      \u5728 <a href=\"%(progress_page_url)s\">\u5b66\u5206\u8d44\u683c\u8fdb\u5ea6</a> \u9875\u9762\u53ef\u67e5\u770b\u60a8\u5b66\u5206\u8d44\u683c\u7684\u72b6\u6001\u3002\n    ",
-    "\n      Yes, end my proctored exam\n    ": "\n      \u662f\u7684\uff0c\u786e\u5b9a\u5173\u95ed\u76d1\u8003\u8003\u8bd5\n    ",
     "\n      Yes, submit my timed exam.\n    ": "\n      \u786e\u5b9a\u63d0\u4ea4\n    ",
-    "\n      You are eligible to purchase academic credit for this course if you complete all required exams\n      and also achieve a final grade that meets the credit requirements for the course.\n    ": "\n      \u5982\u679c\u60a8\u5b8c\u6210\u6b64\u95e8\u8bfe\u7a0b\u7684\u6240\u6709\u8003\u8bd5\uff0c\u5e76\u4e14\u6700\u7ec8\u6210\u7ee9\u8fbe\u5230\u5b66\u5206\u8981\u6c42\uff0c\n      \u90a3\u4e48\u60a8\u5c06\u53ef\u83b7\u5f97\u5b66\u5206\u3002\n    ",
-    "\n      You are no longer eligible for academic credit for this course, regardless of your final grade.\n      If you have questions about the status of your proctored exam results, contact %(platform_name)s Support.\n    ": "\n      \u60a8\u5df2\u4e0d\u5177\u5907\u83b7\u5f97\u6b64\u95e8\u8bfe\u7a0b\u5b66\u5206\u7684\u8d44\u683c\uff0c\u65e0\u8bba\u60a8\u7684\u6700\u7ec8\u6210\u7ee9\u5982\u4f55\u3002\n      \u5982\u679c\u60a8\u5bf9\u60a8\u7684\u76d1\u8003\u8003\u8bd5\u7684\u7ed3\u679c\u72b6\u6001\u6709\u4efb\u4f55\u95ee\u9898\uff0c\u8bf7\u8054\u7cfb%(platform_name)s \u652f\u6301\u5e2e\u52a9\u3002\n    ",
-    "\n      You have submitted this practice proctored exam\n    ": "\n      \u60a8\u5df2\u63d0\u4ea4\u672c\u6b21\u6a21\u62df\u76d1\u8003\u8003\u8bd5\n    ",
     "\n      You have submitted this proctored exam for review\n    ": "\n      \u60a8\u5df2\u63d0\u4ea4\u6b64\u76d1\u8003\u8003\u8bd5\u81f3\u5ba1\u6838\n    ",
-    "\n      Your grade for this timed exam will be immediately available on the <a href=\"%(progress_page_url)s\">Progress</a> page.\n    ": "\n      \u60a8\u6b64\u95e8\u9650\u65f6\u8003\u8bd5\u7684\u6210\u7ee9\u4f1a\u9a6c\u4e0a\u663e\u793a\u5728<a href=\"%(progress_page_url)s\">\u5b66\u5206\u8fdb\u5ea6</a>\u9875\u9762\u3002\n    ",
     "\n      Your practice proctoring results: <b class=\"failure\"> Unsatisfactory </b>\n    ": "\n      \u60a8\u7684\u6a21\u62df\u76d1\u8003\u7ed3\u679c\uff1a <b class=\"failure\"> \u4e0d\u6ee1\u610f </b>\n    ",
-    "\n      Your proctoring session ended before you completed this practice exam.\n      You can retry this practice exam if you had problems setting up the online proctoring software.\n    ": "\n      \u76d1\u8003\u4f1a\u8bdd\u5df2\u7ed3\u675f\uff0c\u60a8\u672a\u5b8c\u6210\u672c\u6b21\u6a21\u62df\u76d1\u8003\u3002\n      \u5982\u679c\u5728\u60a8\u8bbe\u7f6e\u5728\u7ebf\u76d1\u8003\u8f6f\u4ef6\u65f6\u9047\u5230\u95ee\u9898\uff0c\u8bf7\u91cd\u65b0\u8fdb\u884c\u6a21\u62df\u8003\u8bd5\u3002\n    ",
-    "\n      Your proctoring session was reviewed and did not pass requirements\n    ": "\n      \u60a8\u7684\u76d1\u8003\u5df2\u5ba1\u6838\u4f46\u672a\u901a\u8fc7\n    ",
-    "\n      Your proctoring session was reviewed and passed all requirements\n    ": "\n      \u60a8\u7684\u76d1\u8003\u8003\u8bd5\u5df2\u5ba1\u6838\u5e76\u901a\u8fc7\n    ",
     "\n    %(exam_name)s is a Timed Exam (%(total_time)s)\n    ": "\n    %(exam_name)s \u662f\u9650\u65f6\u8003\u8bd5 (%(total_time)s)\n    ",
     "\n    The following prerequisites are in a <strong>pending</strong> state and must be successfully completed before you can proceed:\n    ": "\n    \u4ee5\u4e0b\u5148\u4fee\u6761\u4ef6\u4efb\u52a1\u4e3a <strong>\u5f85\u5904\u7406</strong> \u72b6\u6001\uff0c \u8bf7\u52a1\u5fc5\u5148\u6210\u529f\u5b8c\u6210\u4efb\u52a1\u518d\u7ee7\u7eed\u64cd\u4f5c\u4e0b\u4e00\u6b65\uff1a\n    ",
-    "\n    You can take this exam with proctoring only when all prerequisites have been successfully completed. Check your <a href=\"%(progress_page_url)s\">Progress</a>  page to see if prerequisite results have been updated. You can also take this exam now without proctoring, but you will not be eligible for credit.\n    ": "\n    \u5982\u679c\u60a8\u5df2\u5b8c\u6210\u6ee1\u8db3\u6240\u6709\u5148\u4fee\u6761\u4ef6\uff0c\u90a3\u4e48\u60a8\u53ef\u4ee5\u5173\u95ed\u6b64\u95e8\u8003\u8bd5\u7684\u76d1\u8003\u529f\u80fd\u3002\u5728<a href=\"%(progress_page_url)s\">\u5b66\u5206\u8fdb\u5ea6</a>\u9875\u9762\u67e5\u770b\u6700\u65b0\u7684\u5148\u4fee\u6761\u4ef6\u72b6\u6001\u3002\u60a8\u4e5f\u53ef\u4ee5\u5173\u95ed\u6b64\u6b21\u8003\u8bd5\u7684\u76d1\u8003\u6a21\u5f0f\uff0c\u4f46\u5c06\u65e0\u6cd5\u83b7\u5f97\u5b66\u5206\u3002\n    ",
     "\n    You did not satisfy the following prerequisites:\n    ": "\n    \u60a8\u4e0d\u6ee1\u8db3\u4e0b\u5217\u5148\u4fee\u6761\u4ef6\uff1a\n    ",
-    "\n    You did not satisfy the requirements for taking this exam with proctoring, and are not eligible for credit. See your <a href=\"%(progress_page_url)s\">Progress</a> page for a list of requirements and your status for each.\n    ": "\n    \u60a8\u4e0d\u6ee1\u8db3\u6b64\u76d1\u8003\u8003\u8bd5\u7684\u8981\u6c42\uff0c\u5e76\u4e14\u6ca1\u6709\u7533\u8bf7\u5b66\u5206\u7684\u8d44\u683c\u3002\u8bf7\u524d\u5f80 <a href=\"%(progress_page_url)s\">\u5b66\u5206\u8d44\u683c\u8fdb\u5ea6</a>\u9875\u9762\u67e5\u770b\u6240\u6709\u8981\u6c42\u548c\u60a8\u6bcf\u9879\u8981\u6c42\u4e0b\u7684\u72b6\u6001\u3002\n    ",
-    "\n    You have not completed the prerequisites for this exam. All requirements must be satisfied before you can take this proctored exam and be eligible for credit. See your <a href=\"%(progress_page_url)s\">Progress</a> page for a list of requirements in the order that they must be completed.\n    ": "\n    \u60a8\u6682\u65f6\u4e0d\u5177\u5907\u6b64\u95e8\u8003\u8bd5\u7684\u5148\u4fee\u6761\u4ef6\u3002\u60a8\u5fc5\u987b\u6ee1\u8db3\u6240\u6709\u8003\u8bd5\u8981\u6c42\u624d\u53ef\u4ee5\u8fdb\u884c\u6b64\u95e8\u8003\u8bd5\u5e76\u83b7\u5f97\u5b66\u5206\u8d44\u683c\u3002\u8bf7\u5728\u60a8\u7684<a href=\"%(progress_page_url)s\">\u5b66\u4e60\u8fdb\u5ea6</a>\u9875\u9762\u4e0a\u67e5\u770b\u9700\u8981\u5b8c\u6210\u7684\u8981\u6c42\u5217\u8868\u3002\n    ",
     " ${price} {currency} )": " ${price} {currency} )",
     " From this point in time, you must follow the <a href=\"%(link_urls.online_proctoring_rules)s\" target=\"_blank\">online proctoring rules</a> to pass the proctoring review for your exam. ": "\u4ece\u73b0\u5728\u5f00\u59cb\uff0c\u60a8\u5fc5\u987b\u9075\u5b88<a href=\"%(link_urls.online_proctoring_rules)s\" target=\"_blank\">\u5728\u7ebf\u76d1\u8003\u89c4\u5219</a>\u4ee5\u901a\u8fc7\u76d1\u8003\u8003\u8bd5\u5ba1\u6838\u3002",
-    " Link": "\u5173\u8054",
     " Your Proctoring Session Has Started ": "\u76d1\u8003\u6a21\u5f0f\u5df2\u5f00\u59cb",
     " and ": "\u53ca",
     " and {num_of_minutes} minute": "\u548c {num_of_minutes} \u5206\u949f",
     " and {num_of_minutes} minutes": "\u548c{num_of_minutes}\u5206\u949f",
-    " learner does not exist in LMS and not added to the exception list": "\u5b66\u4e60\u8005\u4e0d\u5b58\u5728\u7cfb\u7edf\u4e2d\uff0c\u5c06\u4e0d\u52a0\u5230\u4f8b\u5916\u5217\u8868\u4e2d",
-    " learner is already white listed and not added to the exception list": "\u5b66\u5458\u5df2\u88ab\u5217\u5165\u767d\u540d\u5355\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
-    " learner is not enrolled in course and not added to the exception list": "\u5b66\u5458\u672a\u62a5\u540d\u6b64\u8bfe\u7a0b\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
-    " learner is successfully added to the exception list": "\u5b66\u4e60\u8005\u5df2\u7ecf\u6210\u529f\u5730\u52a0\u5165\u5230\u4f8b\u5916\u5217\u8868",
-    " learners are already white listed and not added to the exception list": "\u5b66\u5458\u5df2\u88ab\u5217\u5165\u767d\u540d\u5355\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
-    " learners are not enrolled in course and not added to the exception list": "\u5b66\u5458\u672a\u62a5\u540d\u6b64\u8bfe\u7a0b\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
-    " learners are successfully added to exception list": "\u5b66\u4e60\u8005\u5df2\u7ecf\u6210\u529f\u5730\u52a0\u5165\u5230\u4f8b\u5916\u5217\u8868",
-    " learners do not exist in LMS and not added to the exception list": "\u5b66\u5458\u8bb0\u5f55\u4e0d\u5b58\u5728LMS\u4e2d\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
-    " record is not in correct format and not added to the exception list": "\u8fd9\u6761\u8bb0\u5f55\u7684\u683c\u5f0f\u4e0d\u6b63\u786e\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
-    " records are not in correct format and not added to the exception list": "\u8fd9\u4e9b\u8bb0\u5f55\u7684\u683c\u5f0f\u4e0d\u6b63\u786e\uff0c\u65e0\u6cd5\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355",
     " to complete and submit the exam.": "\u6765\u5b8c\u6210\u5e76\u63d0\u4ea4\u8003\u8bd5\u3002",
     "${listPrice}": "${listPrice}",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
@@ -161,10 +109,7 @@
     "(required):": "(\u5fc5\u987b):",
     "- Sortable": "\u2014\u53ef\u6392\u5e8f\u7684",
     ": video upload complete.": "\u89c6\u9891\u4e0a\u4f20\u6210\u529f",
-    "<%= user %> already in exception list.": "<%= user %> \u5df2\u5728\u7279\u4f8b\u540d\u5355\u4e2d\u3002",
-    "<%= user %> has been successfully added to the exception list. Click Generate Exception Certificate below to send the certificate.": "\u5df2\u7ecf\u6210\u529f\u65b0\u589e<%= user %>\u5230\u7279\u4f8b\u540d\u5355\u4e2d\u3002\u8bf7\u70b9\u51fb\u4e0b\u9762\u7684\u4ea7\u751f\u7279\u4f8b\u8bc1\u4e66\u5e76\u53d1\u9001\u8bc1\u4e66\u3002",
     "A Password is required": "\u5bc6\u7801\u4e3a\u5fc5\u586b\u9879",
-    "A driver's license, passport, or government-issued ID with your name and photo.": "\u9a7e\u7167\u3001\u62a4\u7167\u6216\u8005\u7531\u653f\u5e9c\u7b7e\u53d1\u7684\u5e26\u6709\u60a8\u59d3\u540d\u548c\u7167\u7247\u7684\u8eab\u4efd\u8bc1\u4ef6\u3002",
     "A driver's license, passport, or other government-issued ID with your name and photo": "\u9a7e\u7167\u3001\u62a4\u7167\u6216\u8005\u5176\u4ed6\u7531\u653f\u5e9c\u7b7e\u53d1\u7684\u5e26\u6709\u60a8\u59d3\u540d\u548c\u7167\u7247\u7684\u8eab\u4efd\u8bc1\u4ef6",
     "A highlight to look forward to this week.": "\u672c\u5468\u7684\u4e00\u4e2a\u671f\u5f85\u91cd\u70b9\u3002",
     "A list of courses you have just enrolled in as a verified student": "\u60a8\u4ee5\u8ba4\u8bc1\u5b66\u751f\u7684\u8eab\u4efd\u9009\u4fee\u7684\u8bfe\u7a0b\u5217\u8868",
@@ -275,7 +220,6 @@
     "Alternative source": "\u5907\u7528\u6e90",
     "Always divide content-specific discussion topics": "\u603b\u662f\u5c06\u4ee5\u5177\u4f53\u5185\u5bb9\u800c\u5b9a\u7684\u8ba8\u8bba\u4e3b\u9898\u533a\u5206\u5f00",
     "Always show assessment results": "\u603b\u662f\u663e\u793a\u8bc4\u4f30\u7ed3\u679c",
-    "Amount": "\u91d1\u989d",
     "An email has been sent to {userEmail} with a link for you to activate your account.": "\u4e00\u5c01\u5e26\u6709\u6fc0\u6d3b\u8d26\u53f7\u94fe\u63a5\u7684\u90ae\u4ef6\u5df2\u53d1\u9001\u81f3{userEmail}\u3002",
     "An error has occurred. Check your Internet connection and try again.": "\u9519\u8bef\u53d1\u751f\u3002\u8bf7\u68c0\u67e5\u60a8\u7684\u7f51\u7edc\u8fde\u63a5\u60c5\u51b5\uff0c\u5e76\u4e14\u91cd\u8bd5\u4e00\u6b21\u3002",
     "An error has occurred. Make sure that you are connected to the Internet, and then try refreshing the page.": "\u51fa\u73b0\u4e86\u4e00\u4e2a\u9519\u8bef\u3002\u8bf7\u786e\u4fdd\u60a8\u5df2\u8054\u7f51\uff0c\u7136\u540e\u5237\u65b0\u9875\u9762\u3002",
@@ -346,10 +290,8 @@
     "Basic Account Information": "\u57fa\u672c\u8d26\u53f7\u4fe1\u606f",
     "Be sure your entire face is inside the frame": "\u8bf7\u786e\u4fdd\u60a8\u7684\u6574\u5f20\u8138\u90fd\u5728\u6846\u5185",
     "Before proceeding, please confirm that your details match": "\u5728\u8fdb\u884c\u4e0b\u4e00\u6b65\u4e4b\u524d\uff0c\u8bf7\u786e\u8ba4\u60a8\u63d0\u4f9b\u7684\u4fe1\u606f\u4e4b\u95f4\u76f8\u7b26",
-    "Before proceeding, please {htmlStart}activate your account{htmlEnd}.": "\u7ee7\u7eed\u64cd\u4f5c\u524d\uff0c\u8bf7\u5148{htmlStart}\u6fc0\u6d3b\u60a8\u7684\u8d26\u53f7{htmlEnd}\u3002",
     "Before proceeding, please {htmlStart}unlink all social media accounts{htmlEnd}.": "\u7ee7\u7eed\u64cd\u4f5c\u524d\uff0c\u8bf7\u5148{htmlStart}\u89e3\u7ed1\u6240\u6709\u793e\u4ea4\u8f6f\u4ef6\u8d26\u53f7{htmlEnd}\u3002",
     "Before you upgrade to a certificate track, you must activate your account.": "\u5728\u60a8\u5347\u7ea7\u81f3\u8bc1\u4e66\u8def\u5f84\u4e4b\u524d\uff0c\u60a8\u5fc5\u987b\u6fc0\u6d3b\u60a8\u7684\u8d26\u53f7\u3002",
-    "Billed to": "\u8d26\u5355\u5bc4\u7ed9",
     "Biography": "\u7b80\u4ecb",
     "Block view is unavailable": "\u5757\u89c6\u56fe\u4e0d\u53ef\u7528",
     "Blockquote": "\u5f15\u7528",
@@ -379,10 +321,8 @@
     "Cancel team creating.": "\u53d6\u6d88\u521b\u5efa\u56e2\u961f\u3002",
     "Cancel team updating.": "\u53d6\u6d88\u56e2\u961f\u66f4\u65b0\u3002",
     "Cancel upload": "\u53d6\u6d88\u4e0a\u4f20",
-    "Cannot Start Proctored Exam": "\u65e0\u6cd5\u5f00\u59cb\u76d1\u8003\u8003\u8bd5",
     "Cannot delete when in use by a unit": "\u5728\u5355\u5143\u4e2d\u4f7f\u7528\u65f6\u4e0d\u80fd\u88ab\u5220\u9664",
     "Cannot delete when in use by an experiment": "\u5f53\u5728\u5b9e\u9a8c\u4e2d\u4f7f\u7528\u65f6\u4e0d\u80fd\u88ab\u5220\u9664",
-    "Cannot drop more <%= types %> assignments than are assigned.": "\u65e0\u6cd5\u5220\u9664\u66f4\u591a\u7684 <%= types %> \u4ee5\u81f3\u4e8e\u8d85\u8fc7\u5206\u914d\u7684\u6570\u91cf",
     "Caption": "\u6807\u9898",
     "Caution: The last published version of this unit is live. By publishing changes you will change the student experience.": "\u6ce8\u610f\uff1a\u8be5\u5355\u5143\u6700\u65b0\u53d1\u5e03\u7684\u7248\u672c\u5df2\u4e0a\u7ebf\u3002\u901a\u8fc7\u53d1\u5e03\u66f4\u65b0\u5c06\u4f1a\u6539\u5584\u5b66\u751f\u4f53\u9a8c\u3002",
     "Cell": "\u5355\u5143\u683c",
@@ -420,7 +360,6 @@
     "Check Your Email": "\u8bf7\u68c0\u67e5\u60a8\u7684\u7535\u5b50\u90ae\u4ef6",
     "Check the highlighted fields below and try again.": "\u8bf7\u786e\u8ba4\u4e0b\u65b9\u63d0\u9192\u7684\u5b57\u6bb5\u5e76\u91cd\u65b0\u8f93\u5165\u3002",
     "Check this box to receive an email digest once a day notifying you about new, unread activity from posts you are following.": "\u52fe\u9009\u6b64\u9879\uff0c\u6bcf\u5929\u63a5\u6536\u4e00\u5c01\u90ae\u4ef6\uff0c\u901a\u77e5\u60a8\u6240\u5173\u6ce8\u7684\u8ba8\u8bba\u5e16\u7684\u6700\u65b0\u672a\u8bfb\u60c5\u51b5\u3002",
-    "Check your email": "\u67e5\u6536\u60a8\u7684\u90ae\u4ef6",
     "Check your email account for instructions to reset your password.": "\u67e5\u770b\u90ae\u7bb1\u4e2d\u7684\u91cd\u7f6e\u5bc6\u7801\u6307\u5f15\u3002",
     "Check your email for an activation message.": "\u68c0\u67e5\u60a8\u7684\u7535\u5b50\u90ae\u7bb1\u662f\u5426\u6536\u5230\u6fc0\u6d3b\u6d88\u606f\u3002",
     "Checkout": "\u4ed8\u6b3e",
@@ -493,13 +432,11 @@
     "Continue Exam Without Proctoring": "\u5173\u95ed\u76d1\u8003\u6a21\u5f0f",
     "Continue to Verification": "\u7ee7\u7eed\u8ba4\u8bc1\u8eab\u4efd",
     "Continue to my practice exam": "\u7ee7\u7eed\u8fdb\u884c\u6a21\u62df\u8003\u8bd5",
-    "Continue to my proctored exam. I want to be eligible for credit.": "\u7ee7\u7eed\u8fdb\u884c\u76d1\u8003\u8003\u8bd5\uff0c\u6211\u5e0c\u671b\u7533\u8bf7\u5b66\u5206\u3002",
     "Copy": "\u590d\u5236",
     "Copy Email To Editor": "\u590d\u5236\u90ae\u4ef6\u81f3\u7f16\u8f91\u5668",
     "Copy row": "\u590d\u5236\u884c",
     "Correct failed component": "\u7ea0\u6b63\u5931\u8d25\u7684\u7ec4\u4ef6",
     "Cost": "\u4ef7\u683c",
-    "Could not find Certificate Exception in white list. Please refresh the page and try again": "\u5728\u8bb8\u53ef\u540d\u5355\u4e2d\u627e\u4e0d\u5230\u8bc1\u4e66\u7279\u4f8b\u7684\u4eba\u3002\u8bf7\u91cd\u65b0\u8f7d\u5165\u9875\u9762\u6216\u518d\u8bd5\u4e00\u6b21\u3002",
     "Could not find Certificate Invalidation in the list. Please refresh the page and try again": "\u65e0\u6cd5\u5728\u8fd9\u4efd\u5217\u8868\u4e2d\u627e\u5230\u8bc1\u4e66\u5931\u6548\u8bc1\u660e\u3002\u8bf7\u91cd\u65b0\u8f7d\u5165\u9875\u9762\u6216\u518d\u8bd5\u4e00\u6b21\u3002",
     "Could not find a user with username or email address '<%- identifier %>'.": "\u672a\u627e\u5230\u7528\u6237\u540d\u6216\u90ae\u7bb1\u4e3a<%- identifier %>\u7684\u7528\u6237\u3002",
     "Could not find the specified string.": "\u65e0\u6cd5\u627e\u5230\u6307\u5b9a\u7684\u5b57\u7b26\u4e32\u3002",
@@ -507,12 +444,10 @@
     "Could not grade your answer. The submission was aborted.": "\u65e0\u6cd5\u8fdb\u884c\u8bc4\u5206\u3002\u63d0\u4ea4\u4e2d\u65ad\u3002",
     "Could not override problem score for {user}.": "\u65e0\u6cd5\u8986\u76d6{user}\u7684\u9898\u76ee\u5f97\u5206\u3002",
     "Could not retrieve download url.": "\u4e0d\u80fd\u8bfb\u53d6\u4e0b\u8f7d\u94fe\u63a5\u5730\u5740",
-    "Could not retrieve payment information": "\u65e0\u6cd5\u8bfb\u53d6\u652f\u4ed8\u4fe1\u606f",
     "Could not retrieve upload url.": "\u4e0d\u80fd\u8bfb\u53d6\u4e0a\u4f20\u94fe\u63a5\u5730\u5740",
     "Could not submit order": "\u8ba2\u5355\u63d0\u4ea4\u5931\u8d25",
     "Could not submit photos": "\u7167\u7247\u63d0\u4ea4\u5931\u8d25",
     "Could not upload the video image file": "\u65e0\u6cd5\u4e0a\u4f20\u8be5\u89c6\u9891\u56fe\u7247\u6587\u4ef6",
-    "Couldn't Save This Assignment": "\u4fdd\u5b58\u4f5c\u4e1a\u5931\u8d25",
     "Country": "\u56fd\u5bb6\uff0f\u5730\u533a",
     "Country of residence": "\u5c45\u4f4f\u56fd\u5bb6",
     "Country or Region of Residence": "\u56fd\u5bb6\u6216\u5730\u533a",
@@ -557,7 +492,6 @@
     "Creative Commons licensed content, with terms as follow:": "\u77e5\u8bc6\u5171\u4eab\u8bb8\u53ef\u5185\u5bb9\uff0c\u6761\u6b3e\u5982\u4e0b\uff1a",
     "Criterion Added": "\u6807\u51c6\u5df2\u6dfb\u52a0",
     "Criterion Deleted": "\u89c4\u8303\u5df2\u5220\u9664",
-    "Crossed out items have been refunded.": "\u5212\u6389\u7684\u9879\u76ee\u5df2\u9000\u6b3e\u3002",
     "Current Role:": "\u5f53\u524d\u89d2\u8272\uff1a",
     "Current conversation": "\u5f53\u524d\u5bf9\u8bdd",
     "Current enrollment mode:": "\u5f53\u524d\u9009\u8bfe\u6a21\u5f0f\uff1a",
@@ -568,7 +502,6 @@
     "Custom...": "\u81ea\u5b9a\u4e49\u2026",
     "Cut": "\u526a\u5207",
     "Cut row": "\u526a\u5207\u884c",
-    "Date": "\u65e5\u671f",
     "Date Added": "\u6dfb\u52a0\u65e5\u671f",
     "Date Joined": "\u52a0\u5165\u65e5\u671f",
     "Date Placed": "\u5df2\u8bbe\u7f6e\u65e5\u671f",
@@ -619,11 +552,9 @@
     "Do not show again": "\u4e0d\u518d\u663e\u793a",
     "Do you want to allow this student ('{student_id}') to skip the entrance exam?": "\u60a8\u662f\u5426\u5141\u8bb8\u8be5\u5b66\u751f('{student_id}')\u8df3\u8fc7\u5165\u5b66\u8003\u8bd5\uff1f",
     "Do you want to replace the edX transcript with the YouTube transcript?": "\u60a8\u5e0c\u671b\u7528 YouTube \u5b57\u5e55\u66ff\u6362 edX \u5b57\u5e55\u5417\uff1f",
-    "Do you want to upload your file before submitting?": "\u60a8\u786e\u5b9a\u5728\u63d0\u4ea4\u4e4b\u524d\u4e0a\u4f20\u60a8\u7684\u6587\u4ef6\u5417\uff1f",
     "Document properties": "\u6587\u6863\u5c5e\u6027",
     "Does the name on your ID match your account name: %(fullName)s?": "\u60a8\u8eab\u4efd\u8bc1\u4ef6\u4e0a\u7684\u59d3\u540d\u548c\u60a8\u5728\u8d26\u53f7\u4e2d\u586b\u5199\u7684\u59d3\u540d\u201c%(fullName)s\u201d\u76f8\u7b26\u5417\uff1f",
     "Does the photo of you show your whole face?": "\u8fd9\u5f20\u7167\u7247\u4e2d\u6709\u60a8\u7684\u6574\u5f20\u8138\u5417\uff1f",
-    "Doing so means that you are no longer eligible for academic credit.": "\u5173\u95ed\u76d1\u8003\u529f\u80fd\u610f\u5473\u7740\u60a8\u5c06\u5931\u53bb\u5b66\u5206\u8d44\u683c\u3002",
     "Don't see your picture? Make sure to allow your browser to use your camera when it asks for permission.": "\u6ca1\u6709\u770b\u5230\u60a8\u81ea\u5df1\uff1f\u8bf7\u786e\u8ba4\u5f53\u6d4f\u89c8\u5668\u8bf7\u6c42\u4f7f\u7528\u6444\u50cf\u5934\u6743\u9650\u7684\u65f6\u5019\u60a8\u9009\u62e9\u4e86\u5141\u8bb8\u3002",
     "Donate": "\u6350\u732e",
     "Double-check that your webcam is connected and working to continue.": "\u7ee7\u7eed\u524d\u8bf7\u518d\u6b21\u786e\u8ba4\u60a8\u7684\u6444\u50cf\u5934\u5df2\u7ecf\u8fde\u63a5\u5e76\u4e14\u53ef\u4ee5\u6b63\u5e38\u4f7f\u7528\u3002",
@@ -674,7 +605,6 @@
     "Enable": "\u542f\u7528",
     "Enable Cohorts": "\u542f\u7528\u7fa4\u7ec4",
     "Enable Now": "\u7acb\u5373\u542f\u7528",
-    "Enable Weekly Highlight Emails": "\u542f\u7528\u6bcf\u5468\u70ed\u70b9\u90ae\u4ef6",
     "Enabled": "\u542f\u7528",
     "Encoding": "\u7f16\u7801",
     "End My Exam": "\u7ed3\u675f\u6211\u7684\u8003\u8bd5",
@@ -706,7 +636,6 @@
     "Enter the page number you'd like to quickly navigate to.": "\u8f93\u5165\u60a8\u9700\u8981\u5feb\u901f\u524d\u5f80\u7684\u9875\u7801\u3002",
     "Enter the username or email address of each learner that you want to add as an exception.": "\u8f93\u5165\u60a8\u8981\u6dfb\u52a0\u4e3a\u7279\u6b8a\u5904\u7406\u7684\u6bcf\u4e00\u4f4d\u5b66\u5458\u7684\u7528\u6237\u540d\u6216\u90ae\u7bb1\u3002",
     "Enter username or email": "\u8f93\u5165\u7528\u6237\u540d\u6216\u8005\u90ae\u7bb1",
-    "Enter your ": "\u8bf7\u8f93\u5165\u60a8\u7684",
     "Entrance exam attempts is being reset for student '{student_id}'.": "\u6b63\u5728\u91cd\u7f6e\u5b66\u751f\u201c{student_id}\u201d\u7684\u5165\u5b66\u8003\u8bd5\u5c1d\u8bd5\u6b21\u6570\u3002",
     "Entrance exam state is being deleted for student '{student_id}'.": "\u5b66\u751f'{student_id}'\u7684\u5165\u5b66\u8003\u8bd5\u7684\u72b6\u6001\u5df2\u88ab\u5220\u9664\u3002",
     "Error": "\u9519\u8bef",
@@ -735,7 +664,6 @@
     "Error listing task history for this student and problem.": "\u663e\u793a\u6b64\u5b66\u751f\u4e0e\u95ee\u9898\u7684\u4efb\u52a1\u5386\u53f2\u65f6\u53d1\u751f\u9519\u8bef\u3002",
     "Error removing user": "\u5220\u9664\u7528\u6237\u8fc7\u7a0b\u4e2d\u51fa\u73b0\u9519\u8bef",
     "Error resetting entrance exam attempts for student '{student_id}'. Make sure student identifier is correct.": "\u91cd\u7f6e\u5b66\u751f'{student_id}'\u7684\u5165\u5b66\u8003\u8bd5\u5c1d\u8bd5\u6b21\u6570\u65f6\u51fa\u9519\u4e86\uff0c\u8bf7\u786e\u8ba4\u5b66\u751f\u7f16\u53f7\u65e0\u8bef\u3002",
-    "Error resetting problem attempts for problem '<%= problem_id %>' and student '<%- student_id %>'. Make sure that the problem and student identifiers are complete and correct.": "\u91cd\u7f6e\u9898\u76ee\u201c<%= problem_id %>\u201d\u548c\u5b66\u751f\u201c<%- student_id %>\u201d\u7684\u56de\u7b54\u5c1d\u8bd5\u6b21\u6570\u65f6\u53d1\u751f\u9519\u8bef\uff0c\u8bf7\u786e\u4fdd\u9898\u76eeID\u548c\u5b66\u751fID\u62fc\u5199\u6b63\u786e\u3002",
     "Error retrieving grading configuration.": "\u53d6\u5f97\u8bc4\u5206\u6807\u51c6\u65f6\u9519\u8bef\u3002",
     "Error sending email.": "\u53d1\u9001\u7535\u5b50\u90ae\u4ef6\u65f6\u51fa\u9519\u3002",
     "Error starting a task to override score for problem '<%- problem_id %>' for student '<%- student_id %>'. Make sure that the the score and the problem and student identifiers are complete and correct.": "\u542f\u52a8\u8986\u76d6\u5b66\u751f\u201c<%- student_id %>\u201d\u7684\u9898\u76ee\u201c<%- problem_id %>\u201d\u7684\u8bc4\u5206\u4efb\u52a1\u65f6\u51fa\u9519\u3002\u8bf7\u786e\u8ba4\u8be5\u9898\u76ee\u7684 ID \u53ca\u5b66\u751f\u7684 ID \u662f\u5b8c\u6574\u4e14\u6b63\u786e\u7684\u3002",
@@ -778,7 +706,6 @@
     "File": "\u6587\u4ef6",
     "File Name": "\u6587\u4ef6\u540d",
     "File format not supported. Please upload a file with a {ext} extension.": "\u6587\u4ef6\u683c\u5f0f\u4e0d\u652f\u6301\uff0c\u8bf7\u4e0a\u4f20\u6269\u5c55\u540d\u4e3a\"{ext}\"\u7684\u6587\u4ef6\u3002",
-    "File type is not allowed.": "\u6587\u4ef6\u7c7b\u578b\u4e0d\u53ef\u7528\u3002",
     "File types can not be empty.": "\u6587\u4ef6\u7c7b\u578b\u4e0d\u80fd\u4e3a\u7a7a\u3002",
     "File upload succeeded": "\u6587\u4ef6\u4e0a\u4f20\u6210\u529f",
     "File {filename} exceeds maximum size of {maxFileSizeInMBs} MB": "\u6587\u4ef6 {filename} \u7684\u5927\u5c0f\u8d85\u8fc7\u4e86 {maxFileSizeInMBs} MB \u7684\u9650\u5236",
@@ -897,7 +824,6 @@
     "If the unit was previously published and released to learners, any changes you made to the unit when it was hidden will now be visible to learners.": "\u5982\u679c\u6b64\u5355\u5143\u5148\u524d\u5df2\u88ab\u53d1\u5e03\u4e14\u5411\u5b66\u751f\u516c\u5f00\uff0c\u4efb\u4f55\u5728\u8be5\u5355\u5143\u5904\u4e8e\u9690\u85cf\u65f6\u7684\u6539\u52a8\u90fd\u5c06\u5bf9\u5b66\u751f\u53ef\u89c1\u3002",
     "If the unit was previously published and released to students, any changes you made to the unit when it was hidden will now be visible to students. Do you want to proceed?": "\u82e5\u6b64\u5355\u5143\u5148\u524d\u5df2\u53d1\u8868\u4e14\u5411\u5b66\u751f\u516c\u5f00\uff0c\u4efb\u4f55\u5728\u8be5\u5355\u5143\u5904\u4e8e\u9690\u85cf\u72b6\u6001\u65f6\u6240\u4f5c\u51fa\u7684\u6539\u52a8\u90fd\u5c06\u5bf9\u5b66\u751f\u53ef\u89c1\u3002\u662f\u5426\u7ee7\u7eed\uff1f",
     "If you do not yet have an account, use the button below to register.": "\u5982\u679c\u60a8\u5c1a\u65e0\u8d26\u53f7\uff0c\u8bf7\u4f7f\u7528\u4ee5\u4e0b\u6309\u94ae\u8fdb\u884c\u6ce8\u518c\u3002",
-    "If you don't verify your identity now, you can still explore your course from your dashboard. You will receive periodic reminders from %(platformName)s to verify your identity.": "\u5982\u679c\u60a8\u73b0\u5728\u4e0d\u9a8c\u8bc1\u60a8\u7684\u8eab\u4efd\uff0c\u60a8\u4ecd\u53ef\u4ee5\u901a\u8fc7\u63a7\u5236\u9762\u677f\u6d4f\u89c8\u8bfe\u7a0b\u3002\u4f46\u60a8\u4f1a\u5b9a\u671f\u4ece%(platformName)s\u6536\u5230\u8eab\u4efd\u9a8c\u8bc1\u63d0\u9192\u3002",
     "If you leave this page without saving or submitting your response, you will lose any work you have done on the response.": "\u5982\u679c\u60a8\u4e0d\u4fdd\u5b58\u6216\u8005\u63d0\u4ea4\u7b54\u6848\u5c31\u79bb\u5f00\uff0c\u60a8\u53ef\u80fd\u4f1a\u4e22\u5931\u6389\u5199\u5b8c\u7684\u4e00\u5207\u3002",
     "If you leave this page without submitting your peer assessment, you will lose any work you have done.": "\u5982\u679c\u60a8\u79bb\u5f00\u672c\u9875\u65f6\u6ca1\u6709\u63d0\u4ea4\u60a8\u7684\u540c\u5b66\u4e92\u8bc4\uff0c\u60a8\u5c06\u4e22\u5931\u60a8\u6240\u505a\u7684\u4e00\u5207\u3002",
     "If you leave this page without submitting your self assessment, you will lose any work you have done.": "\u5982\u679c\u60a8\u672a\u63d0\u4ea4\u60a8\u7684\u81ea\u6211\u8bc4\u4f30\u5c31\u79bb\u5f00\u6b64\u9875\u9762\uff0c\u60a8\u5c06\u4e22\u5931\u6240\u505a\u7684\u4e00\u5207\u3002",
@@ -1095,7 +1021,6 @@
     "New window": "\u65b0\u5efa\u7a97\u53e3",
     "New {component_type}": "\u65b0\u5efa {component_type}",
     "Next": "\u4e0b\u4e00\u4e2a",
-    "Next Step: Confirm your identity": "\u4e0b\u4e00\u6b65\uff1a\u786e\u8ba4\u60a8\u7684\u8eab\u4efd",
     "Next: %(nextStepTitle)s": "\u4e0b\u4e00\u6b65\uff1a%(nextStepTitle)s",
     "No Content Group": "\u6ca1\u6709\u5185\u5bb9\u7ec4",
     "No Derivatives": "\u65e0\u76f8\u5173\u884d\u751f\u4f5c\u54c1",
@@ -1108,9 +1033,7 @@
     "No description available": "\u6ca1\u6709\u53ef\u7528\u7684\u63cf\u8ff0",
     "No posts matched your query.": "\u672a\u627e\u5230\u4e0e\u60a8\u67e5\u8be2\u5185\u5bb9\u76f8\u5339\u914d\u7684\u5e16\u5b50\u3002",
     "No prerequisite": "\u4e0d\u9700\u8981\u9884\u5907\u77e5\u8bc6",
-    "No receipt available": "\u6ca1\u6709\u53ef\u63d0\u4f9b\u7684\u6536\u636e\u3002",
     "No results": "\u6ca1\u6709\u7ed3\u679c",
-    "No results found for \"%(query_string)s\". Please try searching again.": "\u672a\u627e\u5230\u6709\u5173\"%(query_string)s\"\u7684\u4efb\u4f55\u7ed3\u679c\u3002\u8bf7\u91cd\u65b0\u641c\u7d22\u3002",
     "No results found for {original_query}. Showing results for {suggested_query}.": "\u641c\u7d22\u201c{original_query}\u201d\u672a\u627e\u5230\u7ed3\u679c\uff0c\u4e3a\u60a8\u63a8\u8350{suggested_query}\u3002",
     "No tasks currently running.": "\u6ca1\u6709\u6b63\u5728\u6267\u884c\u7684\u4efb\u52a1",
     "No transcript uploaded.": "\u672a\u4e0a\u4f20\u5b57\u5e55\u3002",
@@ -1163,7 +1086,6 @@
     "Options for {license_name}": " {license_name}\u9009\u9879",
     "Order Details": "\u8ba2\u5355\u7ec6\u8282",
     "Order History": "\u8ba2\u5355\u8bb0\u5f55",
-    "Order No.": "\u8ba2\u5355\u53f7\uff1a",
     "Order Number": "\u8ba2\u5355\u53f7",
     "Organization": "\u673a\u6784",
     "Organization ": "\u673a\u6784",
@@ -1204,7 +1126,6 @@
     "Placeholder": "\u5360\u4f4d\u7b26",
     "Play": "\u64ad\u653e",
     "Play video": "\u64ad\u653e\u89c6\u9891",
-    "Please Note": "\u8bf7\u6ce8\u610f",
     "Please add a photo of the instructor (Note: only JPEG or PNG format supported)": "\u8bf7\u6dfb\u52a0\u4e00\u5f20\u8bb2\u5e08\u7684\u7167\u7247 (\u6ce8\u610f: \u4ec5\u652f\u6301JPEG\u548cPNG\u683c\u5f0f)",
     "Please add at least one chapter": "\u8bf7\u81f3\u5c11\u6dfb\u52a0\u4e00\u4e2a\u7ae0\u8282",
     "Please add the institute where the instructor is associated": "\u8bf7\u6dfb\u52a0\u6388\u8bfe\u8001\u5e08\u6240\u5c5e\u673a\u6784",
@@ -1213,7 +1134,6 @@
     "Please add the instructor's title": "\u8bf7\u6dfb\u52a0\u5bfc\u5e08\u5934\u8854",
     "Please address the errors on this page first, and then save your progress.": "\u8bf7\u5148\u89e3\u51b3\u672c\u9875\u5b58\u5728\u7684\u9519\u8bef\uff0c\u7136\u540e\u4fdd\u5b58\u3002",
     "Please check the following validation feedbacks and reflect them in your course settings:": "\u8bf7\u68c0\u67e5\u4ee5\u4e0b\u9a8c\u8bc1\u53cd\u9988\u5e76\u7ed3\u5408\u8fd9\u6837\u53cd\u9988\u4fee\u6539\u60a8\u7684\u8bfe\u7a0b\u8bbe\u7f6e\uff1a",
-    "Please correct the outlined fields.": "\u8bf7\u6539\u6b63\u753b\u51fa\u533a\u57df",
     "Please describe this image or agree that it has no contextual value by checking the checkbox.": "\u8bf7\u63cf\u8ff0\u672c\u56fe\u7247\u6216\u52fe\u9009\u590d\u9009\u6846\u8868\u793a\u56fe\u7247\u4e0d\u542b\u4e0e\u5185\u5bb9\u76f8\u5173\u7684\u4ef7\u503c\u3002",
     "Please do not use any spaces in this field.": "\u6b64\u5b57\u6bb5\u7684\u5185\u5bb9\u4e0d\u80fd\u5305\u542b\u7a7a\u683c\u3002",
     "Please do not use any spaces or special characters in this field.": "\u6b64\u5b57\u6bb5\u7684\u5185\u5bb9\u4e0d\u80fd\u5305\u542b\u7a7a\u683c\u6216\u7279\u6b8a\u5b57\u7b26\u3002",
@@ -1232,7 +1152,6 @@
     "Please enter your log-in or recovery email address below and we will send you an email with instructions.": "\u8bf7\u5728\u4e0b\u9762\u8f93\u5165\u60a8\u7684\u767b\u5f55\u6216\u9a8c\u8bc1\u90ae\u7bb1\u5730\u5740\uff0c\u6211\u4eec\u4f1a\u5411\u60a8\u53d1\u9001\u4e00\u5c01\u5305\u542b\u8bf4\u660e\u7684\u7535\u5b50\u90ae\u4ef6\u3002",
     "Please fix the following errors:": "\u8bf7\u6539\u6b63\u4ee5\u4e0b\u9519\u8bef\uff1a",
     "Please follow the instructions here to upload a file elsewhere and link to it: {maxFileSizeRedirectUrl}": "\u8bf7\u6309\u7167\u8fd9\u91cc\uff08{maxFileSizeRedirectUrl}\uff09\u7684\u8bf4\u660e\u4e0a\u4f20\u6587\u4ef6\u5230\u522b\u5904\u540e\u94fe\u63a5\u5230\u8be5\u6587\u4ef6\u3002",
-    "Please print this page for your records; it serves as your receipt. You will also receive an email with the same information.": "\u8bf7\u6253\u5370\u6b64\u9875\u7559\u4f5c\u7eaa\u5f55\uff0c\u8fd9\u662f\u60a8\u7684\u6536\u636e\u3002\u60a8\u4e5f\u4f1a\u6536\u5230\u4e00\u5c01\u6709\u76f8\u540c\u4fe1\u606f\u7684\u7535\u5b50\u90ae\u4ef6\u3002",
     "Please provide a description of the link destination.": "\u8bf7\u63d0\u4f9b\u94fe\u63a5\u7684\u63cf\u8ff0\u3002",
     "Please provide a valid URL.": "\u8bf7\u63d0\u4f9b\u4e00\u4e2a\u6709\u6548\u7684\u7f51\u5740\u3002",
     "Please re-enter your password.": "\u8bf7\u91cd\u65b0\u8f93\u5165\u60a8\u7684\u5bc6\u7801\u3002",
@@ -1280,8 +1199,6 @@
     "Proctored Exam": "\u76d1\u8003\u4e0b\u7684\u6d4b\u8bd5",
     "Proctored Option Available": "\u53ef\u542f\u7528\u76d1\u8003\u6a21\u5f0f",
     "Proctored Option No Longer Available": "\u65e0\u6cd5\u518d\u542f\u7528\u76d1\u8003\u6a21\u5f0f",
-    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "\u76d1\u8003\u4e0b\u7684\u8003\u8bd5\u662f\u8ba1\u65f6\u7684\uff0c\u5e76\u4e14\u6bcf\u4e2a\u5b66\u751f\u7684\u8003\u8bd5\u8fc7\u7a0b\u5c06\u88ab\u5f55\u50cf\u3002\u5f55\u50cf\u5c06\u88ab\u5ba1\u6838\u4ee5\u786e\u4fdd\u5b66\u751f\u9075\u5b88\u4e86\u8003\u8bd5\u7eaa\u5f8b\u3002",
-    "Proctoring Session Results Update for {course_name} {exam_name}": "{course_name} {exam_name}\u7684\u76d1\u8003\u6a21\u5f0f\u4f1a\u8bdd\u7ed3\u679c\u66f4\u65b0",
     "Proctoring Settings": "\u76d1\u8003\u8bbe\u7f6e",
     "Product Name": "\u4ea7\u54c1\u540d\u79f0",
     "Professional Certificate for {courseName}": "{courseName} \u7684\u4e13\u4e1a\u8bc1\u4e66",
@@ -1381,7 +1298,6 @@
     "Right": "\u53f3\u5bf9\u9f50",
     "Right to left": "\u4ece\u53f3\u5411\u5de6",
     "Robots": "\u673a\u5668\u4eba",
-    "Role field should not be left unselected.": "\u8bf7\u52fe\u9009\u89d2\u8272\u9009\u9879\u3002",
     "Row": "\u884c",
     "Row group": "\u884c\u7ec4",
     "Row properties": "\u884c\u5c5e\u6027",
@@ -1400,7 +1316,6 @@
     "Search Results": "\u641c\u7d22\u7ed3\u679c",
     "Search all posts": "\u641c\u7d22\u6240\u6709\u5e16\u5b50",
     "Search teams": "\u641c\u7d22\u56e2\u961f",
-    "Search the {platform} Help Center": "\u5728{platform}\u7684\u5e2e\u52a9\u4e2d\u5fc3\u5bfb\u6c42\u5e2e\u52a9",
     "Second Review Required": "\u9700\u8981\u4e8c\u6b21\u5ba1\u6838",
     "Section": "\u7ae0",
     "Section Highlights": "\u7ae0\u91cd\u70b9\u5185\u5bb9",
@@ -1513,7 +1428,6 @@
     "Staff Only": "\u4ec5\u5458\u5de5",
     "Staff and Learners": "\u5458\u5de5\u4e0e\u5b66\u5458",
     "Start Date": "\u5f00\u59cb\u65e5\u671f",
-    "Start Proctored Exam": "\u5f00\u59cb\u76d1\u8003\u8003\u8bd5",
     "Start System Check": "\u5f00\u59cb\u68c0\u67e5\u7cfb\u7edf",
     "Start generating certificates for all students in this course?": "\u662f\u5426\u5f00\u59cb\u4e3a\u8be5\u8bfe\u7a0b\u7684\u6240\u6709\u5b66\u751f\u751f\u6210\u8bc1\u4e66\uff1f",
     "Start of transcript. Skip to the end.": "\u5b57\u5e55\u5f00\u59cb\u3002\u8df3\u8f6c\u81f3\u7ed3\u5c3e\u3002",
@@ -1533,7 +1447,6 @@
     "Status of Your Response": "\u60a8\u7684\u7b54\u6848\u7684\u72b6\u6001",
     "Strikethrough": "\u5220\u9664\u7ebf",
     "Student": "\u5b66\u751f",
-    "Student Removed from certificate white list successfully.": "\u5b66\u751f\u5df2\u4ece\u8bc1\u4e66\u8bb8\u53ef\u540d\u5355\u4e2d\u79fb\u9664\u6210\u529f\u3002",
     "Student email or username": "\u5b66\u751f\u90ae\u7bb1\u6216\u7528\u6237\u540d",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Add to Exception List\" button.": "\u5b66\u751f\u7684\u7528\u6237\u540d / \u7535\u5b50\u90ae\u4ef6\u662f\u5fc5\u586b\u9879\uff0c\u4e0d\u80fd\u7559\u7a7a\u3002\u8bf7\u586b\u5165\u7528\u6237\u540d / \u7535\u5b50\u90ae\u4ef6\uff0c\u5e76\u70b9\u51fb\u201c\u6dfb\u52a0\u5230\u4f8b\u5916\u540d\u5355\u201d\u6309\u94ae\u3002",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Invalidate Certificate\" button.": "\u5b66\u751f\u7684\u7528\u6237\u540d / \u7535\u5b50\u90ae\u4ef6\u662f\u5fc5\u586b\u9879\uff0c\u4e0d\u80fd\u7559\u7a7a\u3002\u8bf7\u586b\u5165\u7528\u6237\u540d / \u7535\u5b50\u90ae\u4ef6\uff0c\u5e76\u70b9\u51fb\u201c\u4f5c\u5e9f\u8bc1\u4e66\u201d\u7684\u6309\u94ae\u3002",
@@ -1618,7 +1531,6 @@
     "Thank you for setting your course goal to {goal}!": "\u611f\u8c22\u60a8\u5c06\u8bfe\u7a0b\u76ee\u6807\u5b9a\u4e3a{goal}\uff01",
     "Thank you for submitting your financial assistance application for {course_name}! You can expect a response in 2-4 business days.": "\u611f\u8c22\u60a8\u63d0\u4ea4 {course_name} \u7684\u7ecf\u6d4e\u63f4\u52a9\u7533\u8bf7\uff01\u60a8\u5c06\u5728 2 \u81f3 4 \u4e2a\u5de5\u4f5c\u65e5\u5185\u5f97\u5230\u56de\u590d\u3002",
     "Thank you for submitting your photos. We will review them shortly. You can now sign up for any %(platformName)s course that offers verified certificates. Verification is good for one year. After one year, you must submit photos for verification again.": "\u611f\u8c22\u63d0\u4ea4\u60a8\u7684\u7167\u7247\uff0c\u6211\u4eec\u7a0d\u540e\u5c06\u8fdb\u884c\u5ba1\u6838\u3002\u60a8\u73b0\u5728\u5c31\u53ef\u4ee5\u53bb\u52a0\u5165%(platformName)s\u4e0a\u4efb\u4f55\u63d0\u4f9b\u8ba4\u8bc1\u8bc1\u4e66\u7684\u8bfe\u7a0b\u3002\u8ba4\u8bc1\u6709\u6548\u671f\u4e3a\u4e00\u5e74\u3002\u4e00\u5e74\u540e\uff0c\u60a8\u9700\u8981\u91cd\u65b0\u63d0\u4ea4\u7167\u7247\u8fdb\u884c\u8ba4\u8bc1\u3002",
-    "Thank you! We have received your payment for {courseName}.": "\u8c22\u8c22\uff01\u6211\u4eec\u5df2\u7ecf\u6536\u5230\u60a8\u7684 {courseName} \u4ed8\u6b3e\u3002",
     "Thanks for returning to verify your ID in: {courseName}": "\u611f\u8c22\u60a8\u8fd4\u56de\u8ba4\u8bc1\u60a8\u5728 {courseName} \u4e2d\u7684 ID",
     "The URL you entered seems to be an email address. Do you want to add the required mailto: prefix?": "\u8f93\u5165\u7684 URL \u4f3c\u4e4e\u662f\u4e00\u4e2a\u90ae\u7bb1\u5730\u5740\uff0c\u60a8\u60f3\u52a0\u4e0a\u5fc5\u8981\u7684 mailto: \u524d\u7f00\u5417\uff1f",
     "The URL you entered seems to be an external link. Do you want to add the required http:// prefix?": "\u8f93\u5165\u7684 URL \u4f3c\u4e4e\u662f\u4e00\u4e2a\u5916\u90e8\u94fe\u63a5\uff0c\u60a8\u60f3\u52a0\u4e0a\u5fc5\u8981\u7684 http:// \u524d\u7f00\u5417\uff1f",
@@ -1663,7 +1575,6 @@
     "The post you selected has been deleted.": "\u60a8\u6240\u9009\u62e9\u7684\u5e16\u5b50\u5df2\u88ab\u5220\u9664\u3002",
     "The published branch version, {published}, was reset to the draft branch version, {draft}.": "\u5df2\u53d1\u5e03\u5206\u652f\u7248\u672c{published}\u88ab\u91cd\u7f6e\u4e3a\u521d\u7a3f\u5206\u652f\u7248\u672c{draft}\u3002",
     "The raw error message is:": "\u539f\u59cb\u7684\u9519\u8bef\u4fe1\u606f\u662f\uff1a",
-    "The refund deadline for this course has passed,so you will not receive a refund.": "\u6b64\u8bfe\u7a0b\u7684\u9000\u6b3e\u671f\u9650\u5df2\u8fc7\uff0c\u60a8\u5c06\u65e0\u6cd5\u83b7\u5f97\u9000\u6b3e\u3002",
     "The selected content group does not exist": "\u9009\u53d6\u7684\u5185\u5bb9\u7ec4\u4e0d\u5b58\u5728\u3002",
     "The selected image must be larger than {minFileSizeInKB}.": "\u6240\u9009\u62e9\u7684\u56fe\u7247\u5fc5\u987b\u5927\u4e8e {minFileSizeInKB}\u3002",
     "The selected image must be smaller than {maxFileSizeInMB}.": "\u6240\u9009\u62e9\u7684\u56fe\u7247\u5fc5\u987b\u5c0f\u4e8e {maxFileSizeInMB}\u3002",
@@ -1732,7 +1643,6 @@
     "This course uses automatic cohorting for verified track learners. You cannot disable cohorts, and you cannot rename the manual cohort named '{verifiedCohortName}'. To change the configuration for verified track cohorts, contact your edX partner manager.": "\u8fd9\u95e8\u8bfe\u7a0b\u4e3a\u8981\u83b7\u53d6\u8ba4\u8bc1\u8bc1\u4e66\u7684\u5b66\u751f\u81ea\u52a8\u5206\u7ec4\u3002\u60a8\u65e0\u6cd5\u53d6\u6d88\u5206\u7ec4\uff0c\u4e5f\u65e0\u6cd5\u91cd\u65b0\u547d\u540d\u624b\u52a8\u8bbe\u7f6e\u7684\u7fa4\u7ec4'{verifiedCohortName}'\u3002\u5982\u8981\u6539\u53d8\u8ba4\u8bc1\u7ec4\u7684\u5206\u7ec4\u8bbe\u7f6e\uff0c\u8bf7\u8054\u7cfb\u60a8\u7684edX \u5408\u4f5c\u7ecf\u7406\u3002",
     "This discussion could not be loaded. Refresh the page and try again.": "\u65e0\u6cd5\u52a0\u8f7d\u6b64\u8ba8\u8bba\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
     "This exam has a time limit associated with it.": "\u6b64\u95e8\u8003\u8bd5\u8bbe\u6709\u65f6\u9650\u3002",
-    "This feature is currently in testing. Course teams can enter highlights, but learners will not receive email messages.": "\u6b64\u529f\u80fd\u76ee\u524d\u4ecd\u5728\u6d4b\u8bd5\u4e2d\uff0c\u8bfe\u7a0b\u56e2\u961f\u53ef\u8f93\u5165\u91cd\u70b9\u5185\u5bb9\uff0c\u4f46\u5b66\u5458\u65e0\u6cd5\u63a5\u6536\u5230\u7535\u5b50\u90ae\u4ef6\u3002",
     "This feedback could not be submitted.": "\u8fd9\u6761\u53cd\u9988\u65e0\u6cd5\u63d0\u4ea4\u3002",
     "This file type is not supported. Supported file type is {supportedFileFormat}.": "\u4e0d\u652f\u6301\u6b64\u6587\u4ef6\u683c\u5f0f\u3002\u4ec5\u652f\u6301 {supportedFileFormat} \u683c\u5f0f\u3002",
     "This group controls access to:": "\u6b64\u5206\u7ec4\u63a7\u5236\u7684\u8bbf\u95ee\u5185\u5bb9\u4e3a\uff1a",
@@ -1745,7 +1655,6 @@
     "This learner is currently sharing a limited profile.": "\u8be5\u5b66\u751f\u5f53\u524d\u516c\u5f00\u90e8\u5206\u4e2a\u4eba\u4fe1\u606f\u3002",
     "This link will open in a modal window": "\u8be5\u94fe\u63a5\u5c06\u5728\u6a21\u5f0f\u7a97\u53e3\u4e2d\u6253\u5f00",
     "This link will open in a new browser window/tab": "\u8be5\u94fe\u63a5\u5c06\u5728\u65b0\u6d4f\u89c8\u5668\u7a97\u53e3/\u6807\u7b7e\u9875\u4e2d\u6253\u5f00",
-    "This may be happening because of an error with our server or your internet connection. Try refreshing the page or making sure you are online.": "\u6b64\u60c5\u51b5\u53ef\u80fd\u7531\u4e8e\u670d\u52a1\u5668\u9519\u8bef\u6216\u8005\u60a8\u7684\u7f51\u7edc\u8fde\u63a5\u9519\u8bef\u5bfc\u81f4\u3002\u5c1d\u8bd5\u5237\u65b0\u9875\u9762\u6216\u8005\u786e\u4fdd\u7f51\u7edc\u7545\u901a\u3002",
     "This page contains information about orders that you have placed with {platform_name}.": "\u6b64\u9875\u9762\u5305\u542b\u60a8\u5728{platform_name}\u6240\u4e0b\u7684\u8ba2\u5355\u4fe1\u606f\u3002",
     "This post could not be closed. Refresh the page and try again.": "\u65e0\u6cd5\u5173\u95ed\u6b64\u5e16\u5b50\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
     "This post could not be flagged for abuse. Refresh the page and try again.": "\u65e0\u6cd5\u5c06\u6b64\u5e16\u5b50\u4e3e\u62a5\u4e3a\u6ee5\u7528\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
@@ -1754,7 +1663,6 @@
     "This post could not be unflagged for abuse. Refresh the page and try again.": "\u65e0\u6cd5\u53d6\u6d88\u6b64\u5e16\u5b50\u7684\u6ee5\u7528\u4e3e\u62a5\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
     "This post could not be unpinned. Refresh the page and try again.": "\u65e0\u6cd5\u53d6\u6d88\u7f6e\u9876\u6b64\u5e16\u5b50\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
     "This problem could not be saved.": "\u8be5\u95ee\u9898\u65e0\u6cd5\u4fdd\u5b58\u3002",
-    "This problem has already been released. Any changes will apply only to future assessments.": "\u6b64\u95ee\u9898\u5df2\u53d1\u5e03\u3002\u4efb\u4f55\u66f4\u6539\u90fd\u53ea\u9002\u7528\u4e8e\u672a\u6765\u7684\u8bc4\u4f30\u3002",
     "This problem has been reset.": "\u6b64\u95ee\u9898\u5df2\u91cd\u7f6e\u3002",
     "This response could not be marked as an answer. Refresh the page and try again.": "\u65e0\u6cd5\u5c06\u8be5\u56de\u590d\u6807\u8bb0\u4e3a\u7b54\u6848\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
     "This response could not be marked as endorsed. Refresh the page and try again.": "\u65e0\u6cd5\u6807\u8bb0\u6b64\u56de\u590d\u4e3a\u8d5e\u540c\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u5e76\u91cd\u8bd5\u3002",
@@ -1821,7 +1729,6 @@
     "Transcript will be displayed when you start playing the video.": "\u5f00\u59cb\u64ad\u653e\u89c6\u9891\u65f6\u5c06\u663e\u793a\u5b57\u5e55\u3002",
     "Transcripts": "\u5b57\u5e55",
     "Try the transaction again in a few minutes.": "\u8bf7\u7b49\u5f85\u51e0\u5206\u949f\u540e\u518d\u5c1d\u8bd5\u3002",
-    "Try this practice exam again": "\u91cd\u65b0\u8fdb\u884c\u6a21\u62df\u8003\u8bd5",
     "Try using a different browser, such as Google Chrome.": "\u8bf7\u5c1d\u8bd5\u66f4\u6362\u4e00\u4e2a\u6d4f\u89c8\u5668\uff0c\u5982\u8c37\u6b4c\u7684 Chrome \u6d4f\u89c8\u5668\u3002",
     "Turn off transcripts": "\u5173\u95ed\u5b57\u5e55",
     "Turn on closed captioning": "\u6253\u5f00CC\u5b57\u5e55",
@@ -1965,7 +1872,6 @@
     "Volume": "\u97f3\u91cf",
     "Vote for good posts and responses": "\u4e3a\u51fa\u8272\u7684\u53d1\u5e16\u548c\u56de\u590d\u6295\u7968",
     "Waiting": "\u7b49\u5f85",
-    "Want to confirm your identity later?": "\u5e0c\u671b\u7a0d\u540e\u518d\u9a8c\u8bc1\u60a8\u7684\u8eab\u4efd\uff1f",
     "Warning": "\u8b66\u544a",
     "Warnings": "\u8b66\u544a",
     "We ask you to activate your account to ensure it is really you creating the account and to prevent fraud.": "\u6211\u4eec\u8981\u6c42\u60a8\u6fc0\u6d3b\u60a8\u7684\u8d26\u53f7\u662f\u4e3a\u4e86\u786e\u8ba4\u771f\u7684\u662f\u60a8\u521b\u5efa\u4e86\u8d26\u53f7\uff0c\u9632\u6b62\u6b3a\u8bc8\u3002",
@@ -1983,7 +1889,6 @@
     "We've sent a message to {email}. Click the link in the message to reset your password. Didn't receive the message? Contact {anchorStart}technical support{anchorEnd}.": "\u5bc6\u7801\u91cd\u7f6e\u90ae\u4ef6\u5df2\u53d1\u9001\u81f3{email}\uff0c\u8bf7\u70b9\u51fb\u90ae\u4ef6\u4e2d\u7684\u94fe\u63a5\u6765\u91cd\u7f6e\u5bc6\u7801\uff0c\u5982\u672a\u6536\u5230\u90ae\u4ef6\uff0c\u8bf7\u8054\u7cfb{anchorStart}\u6280\u672f\u652f\u6301{anchorEnd}\u3002",
     "Web:": "\u7f51\u9875\uff1a",
     "Webcam": "\u6444\u50cf\u5934",
-    "Weekly Highlight Emails": "\u6bcf\u5468\u4eae\u70b9\u5185\u5bb9\u90ae\u4ef6",
     "Weight of Total Grade": "\u5728\u603b\u8bc4\u5206\u4e2d\u7684\u6743\u91cd",
     "We\u2019re sorry to see you go!": "\u5f88\u9057\u61be\u770b\u5230\u60a8\u8981\u79bb\u5f00\uff01",
     "What You Need for Verification": "\u8ba4\u8bc1\u6240\u9700",
@@ -2014,7 +1919,6 @@
     "You are now enrolled as a verified student for:": "\u60a8\u5df2\u7ecf\u5df2\u8ba4\u8bc1\u5b66\u751f\u7684\u8eab\u4efd\u9009\u62e9\u4e86\u8bfe\u7a0b\uff1a",
     "You are sending an email message with the subject {subject} to the following recipients.": "\u60a8\u6b63\u5728\u53d1\u9001\u542b\u6709{subject}\u4e3b\u9898\u7684\u7535\u5b50\u90ae\u4ef6\u7ed9\u4ee5\u4e0b\u6536\u4ef6\u4eba\u3002",
     "You are upgrading your enrollment for: {courseName}": "\u60a8\u6b63\u5728\u5347\u7ea7\u60a8\u7684 {courseName} \u9009\u8bfe\u72b6\u6001",
-    "You can also retry this practice exam": "\u60a8\u53ef\u4ee5\u91cd\u8003\u6b64\u6a21\u62df\u8003\u8bd5",
     "You can change sessions until {expiration_date}.": "\u60a8\u53ef\u5728{expiration_date}\u524d\u66f4\u6539\u5b66\u671f\u3002",
     "You can link your social media accounts to simplify signing in to {platform_name}.": "\u60a8\u53ef\u4ee5\u5173\u8054\u60a8\u7684\u793e\u4ea4\u5a92\u4f53\u8d26\u53f7\u6765\u767b\u5f55{platform_name}\u3002",
     "You can no longer change sessions.": "\u60a8\u5df2\u65e0\u6cd5\u66f4\u6539\u5b66\u671f\u3002",
@@ -2022,7 +1926,6 @@
     "You can pay now even if you don't have the following items available, but you will need to have these by {date} to qualify to earn a Verified Certificate.": "\u5373\u4f7f\u60a8\u6ca1\u6709\u6ee1\u8db3\u4e0b\u9762\u8fd9\u4e9b\u8981\u6c42\uff0c\u60a8\u4e5f\u53ef\u4ee5\u73b0\u5728\u4ed8\u6b3e\uff1b\u4f46\u662f\u60a8\u53ea\u6709\u5728 {date} \u4e4b\u524d\u6ee1\u8db3\u8fd9\u4e9b\u8981\u6c42\u624d\u6709\u8d44\u683c\u83b7\u5f97\u8ba4\u8bc1\u8bc1\u4e66\u3002",
     "You can pay now even if you don't have the following items available, but you will need to have these to qualify to earn a Verified Certificate.": "\u5373\u4f7f\u60a8\u6ca1\u6709\u6ee1\u8db3\u4e0b\u9762\u8fd9\u4e9b\u8981\u6c42\uff0c\u60a8\u4e5f\u53ef\u4ee5\u73b0\u5728\u5c31\u4ed8\u6b3e\uff1b\u4f46\u662f\u60a8\u53ea\u6709\u6ee1\u8db3\u4e86\u8fd9\u4e9b\u8981\u6c42\u624d\u6709\u8d44\u683c\u83b7\u5f97\u8ba4\u8bc1\u8bc1\u4e66\u3002",
     "You can remove members from this team, especially if they have not participated in the team's activity.": "\u60a8\u53ef\u4ee5\u4ece\u6b64\u7ec4\u4e2d\u5220\u9664\u6210\u5458\uff0c\u5c24\u5176\u662f\u8fd8\u6ca1\u6709\u53c2\u52a0\u56e2\u961f\u6d3b\u52a8\u7684\u6210\u5458\u3002",
-    "You can upload files with these file types: ": "\u60a8\u53ef\u4ee5\u4e0a\u4f20\u7684\u6587\u4ef6\u7c7b\u578b\uff1a",
     "You can use your {accountName} account to sign in to your {platformName} account.": "\u60a8\u53ef\u4ee5\u4f7f\u7528\u60a8\u7684{accountName}\u8d26\u53f7\u6765\u767b\u5f55\u60a8\u7684{platformName}\u8d26\u53f7\u3002",
     "You can view your information or unlink from {enterprise_name} anytime in your Account Settings.": "\u60a8\u53ef\u5728\u8d26\u53f7\u8bbe\u7f6e\u4e2d\uff0c\u968f\u65f6\u67e5\u770b\u8d26\u53f7\u4fe1\u606f\u6216\u4e0e{enterprise_name}\u89e3\u7ed1\u3002",
     "You cannot view the course as a student or beta tester before the course release date.": "\u5728\u6b64\u8bfe\u7a0b\u516c\u5f00\u4e4b\u524d\uff0c\u60a8\u65e0\u6cd5\u4ee5\u5b66\u751f\u6216\u6d4b\u8bd5\u8005\u8eab\u4efd\u67e5\u770b\u8be5\u8bfe\u7a0b\u3002",
@@ -2036,9 +1939,7 @@
     "You did not submit the required files: {requiredFiles}.": "\u60a8\u6ca1\u6709\u63d0\u4ea4\u9700\u8981\u7684\u6587\u4ef6\uff1a{requiredFiles}\u3002",
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "\u60a8\u4f3c\u4e4e\u5e76\u672a\u5b89\u88c5Flash\u8f6f\u4ef6\u3002\u4e3a\u80fd\u7ee7\u7eed\u8fdb\u884c\u8ba4\u8bc1\uff0c\u8bf7\u5b89\u88c5Flash\u3002",
     "You don't seem to have a webcam connected.": "\u60a8\u4f3c\u4e4e\u6ca1\u6709\u8fde\u63a5\u4e00\u4e2a\u6444\u50cf\u5934\u3002",
-    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "\u60a8\u5df2\u7ecf\u6dfb\u52a0\u4e86\u4e00\u4e2a\u6807\u51c6\u3002\u60a8\u5c06\u9700\u8981\u4e3a\u201c\u5b66\u5458\u8bad\u7ec3\u201d\u6b65\u9aa4\u4e2d\u7684\u6807\u51c6\u9009\u62e9\u4e00\u4e2a\u9009\u9879\u3002\u8981\u6267\u884c\u6b64\u64cd\u4f5c\uff0c\u8bf7\u5355\u51fb\u201c\u8bbe\u7f6e\u201d\u9009\u9879\u5361\u3002",
     "You have already verified your ID!": "\u60a8\u5df2\u7ecf\u6210\u529f\u9a8c\u8bc1\u4e86\u60a8\u7684\u8eab\u4efd\u8bc1\u4ef6\uff01",
-    "You have been logged out of your edX account. Click Okay to log in again now. Click Cancel to stay on this page (you must log in again to save your work).": "\u60a8\u5df2\u9000\u51faedX\u8d26\u53f7\uff0c\u70b9\u51fb\u201c\u786e\u5b9a\u201d\u91cd\u65b0\u767b\u5f55\uff0c\u70b9\u51fb\u201c\u53d6\u6d88\u201d\u7559\u5728\u6b64\u9875\u9762\uff08\u5fc5\u987b\u91cd\u65b0\u767b\u5f55\u624d\u80fd\u4fdd\u5b58\u5185\u5bb9\uff09\u3002",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "\u60a8\u5df2\u5220\u9664\u4e86\u4e00\u4e2a\u6807\u51c6\u3002\u6b64\u6807\u51c6\u5df2\u4ece\u201c\u5b66\u5458\u8bad\u7ec3\u201d\u6b65\u9aa4\u7684\u56de\u590d\u793a\u4f8b\u4e2d\u64a4\u9500\u3002",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "\u60a8\u5df2\u5220\u9664\u6b64\u6807\u51c6\u7684\u6240\u6709\u9009\u9879\u3002\u6b64\u6807\u51c6\u5df2\u4ece\u201c\u5b66\u5458\u8bad\u7ec3\u201d\u6b65\u9aa4\u7684\u56de\u590d\u793a\u4f8b\u4e2d\u5220\u9664\u3002",
     "You have deleted an option. That option has been removed from its criterion in the sample responses in the Learner Training step. You might have to select a new option for the criterion.": "\u60a8\u5df2\u5220\u9664\u4e00\u4e2a\u9009\u9879\u3002\u6b64\u9009\u9879\u5df2\u4ece\u201c\u5b66\u5458\u8bad\u7ec3\u201d\u6b65\u9aa4\u4e2d\u7684\u56de\u590d\u793a\u4f8b\u6807\u51c6\u4e2d\u5220\u9664\u3002\u60a8\u53ef\u80fd\u5fc5\u987b\u4e3a\u6b64\u6807\u51c6\u9009\u62e9\u4e00\u4e2a\u65b0\u9009\u9879\u3002",
@@ -2067,7 +1968,6 @@
     "You must specify a name": "\u60a8\u5fc5\u987b\u6307\u5b9a\u4e00\u4e2a\u540d\u79f0",
     "You must specify a name for the cohort": "\u60a8\u5fc5\u987b\u4e3a\u8be5\u7fa4\u7ec4\u547d\u540d\u3002",
     "You must specify your birth year before you can share your full profile. To specify your birth year, go to the {account_settings_page_link}": "\u60a8\u5fc5\u987b\u586b\u5199\u51fa\u751f\u5e74\u4efd\u624d\u80fd\u5206\u4eab\u5b8c\u6574\u8d44\u6599\u3002\u70b9\u51fb {account_settings_page_link} \u586b\u5199",
-    "You need to activate your account before you can enroll in courses. Check your inbox for an activation email.": "\u5728\u9009\u8bfe\u4e4b\u524d\u60a8\u9700\u8981\u5148\u6fc0\u6d3b\u60a8\u7684\u8d26\u53f7\uff0c\u8bf7\u68c0\u67e5\u6536\u4ef6\u7bb1\u4e2d\u7684\u6fc0\u6d3b\u90ae\u4ef6\u3002",
     "You need to activate your account before you can enroll in courses. Check your inbox for an activation email. After you complete activation you can return and refresh this page.": "\u5728\u9009\u8bfe\u4e4b\u524d\u60a8\u9700\u8981\u5148\u6fc0\u6d3b\u60a8\u7684\u8d26\u53f7\uff0c\u8bf7\u68c0\u67e5\u6536\u4ef6\u7bb1\u4e2d\u7684\u6fc0\u6d3b\u90ae\u4ef6\u3002\u5f53\u60a8\u5b8c\u6210\u6fc0\u6d3b\u540e\uff0c\u60a8\u53ef\u4ee5\u8fd4\u56de\u5e76\u5237\u65b0\u672c\u9875\u9762\u3002",
     "You receive messages from {platform_name} and course teams at this address.": "\u6b64\u90ae\u7bb1\u7528\u4e8e\u63a5\u6536\u6765\u81ea{platform_name}\u548c\u8bfe\u7a0b\u56e2\u961f\u7684\u4fe1\u606f\u3002",
     "You reserve all rights for your work": "\u60a8\u5bf9\u60a8\u6240\u4f5c\u51fa\u7684\u8d21\u732e\u4fdd\u7559\u6240\u6709\u6743\u5229",
@@ -2180,15 +2080,11 @@
     "or create a new one here": "\u6216\u5728\u6b64\u521b\u5efa\u4e00\u4e2a\u65b0\u8d26\u53f7",
     "or sign in with": "\u6216\u8005\u901a\u8fc7\u4ee5\u4e0b\u65b9\u5f0f\u767b\u5f55",
     "path/to/introductionToCookieBaking-CH{order}.pdf": "path/to/introductionToCookieBaking-CH{order}.pdf",
-    "pending": "\u7b49\u5f85",
-    "practice": "\u6a21\u8003",
     "price": "\u4ef7\u683c",
-    "proctored": "\u76d1\u8003",
     "provide the title/name of the chapter that will be used in navigating": "\u63d0\u4f9b\u5c06\u7528\u5728\u5bfc\u822a\u4e2d\u7684\u7ae0\u6807\u9898\uff0f\u540d\u79f0",
     "provide the title/name of the text book as you would like your students to see it": "\u63d0\u4f9b\u60a8\u5e0c\u671b\u5b66\u751f\u770b\u5230\u7684\u8bfe\u672c\u6807\u9898\uff0f\u540d\u79f0",
     "remove": "\u79fb\u9664",
     "remove all": "\u5168\u90e8\u79fb\u9664",
-    "satisfactory": "\u6ee1\u610f",
     "second": "\u79d2",
     "seconds": "\u79d2",
     "section": "\u8282",
@@ -2201,12 +2097,10 @@
     "there is currently {numVotes} vote": [
       "\u5f53\u524d\u6709 {numVotes} \u7968"
     ],
-    "timed": "\u9650\u65f6",
     "title_word_{uniqueId}": "title_word_{uniqueId}",
     "toggle chapter %(displayName)s": "\u5207\u6362%(displayName)s\u7ae0",
     "toggle subsection %(displayName)s": "\u5207\u6362%(displayName)s\u5c0f\u8282",
     "unit": "\u5355\u5143",
-    "unsatisfactory": "\u4e0d\u6ee1\u610f",
     "unsubmitted": "\u672a\u63d0\u4ea4",
     "upload a PDF file or provide the path to a Studio asset file": "\u4e0a\u4f20 PDF \u6587\u4ef6\u6216\u63d0\u4f9b\u6307\u5411 Studio \u8d44\u6e90\u6587\u4ef6\u7684\u8def\u5f84",
     "username or email": "\u7528\u6237\u540d/\u90ae\u7bb1",
@@ -2265,31 +2159,28 @@
     "{sessionDates} - Currently Selected": "{sessionDates} - \u5f53\u524d\u5df2\u9009",
     "{start_strong}{total}{end_strong} words submitted in total.": "\u5171\u63d0\u4ea4{start_strong}{total}{end_strong}\u5b57\u3002",
     "{totalItems} total": "\u5171{totalItems} ",
-    "{total_results} result": [
-      "{total_results} \u7ed3\u679c"
-    ],
     "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}": "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}",
     "{type} Progress": "{type}\u8fdb\u5ea6",
     "\u2026": "\u2026"
   };
-  for (var key in newcatalog) {
+  for (const key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      var value = django.catalog[msgid];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[msgid];
+      if (typeof value === 'undefined') {
         return msgid;
       } else {
-        return (typeof(value) == 'string') ? value : value[0];
+        return (typeof value === 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      var value = django.catalog[singular];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[singular];
+      if (typeof value === 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -2299,16 +2190,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      var value = django.gettext(context + '\x04' + msgid);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.gettext(context + '\x04' + msgid);
+      if (value.includes('\x04')) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.includes('\x04')) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -2331,15 +2222,12 @@
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
-      "%Y-%m-%d",
       "%m/%d/%Y %H:%M:%S",
       "%m/%d/%Y %H:%M:%S.%f",
       "%m/%d/%Y %H:%M",
-      "%m/%d/%Y",
       "%m/%d/%y %H:%M:%S",
       "%m/%d/%y %H:%M:%S.%f",
-      "%m/%d/%y %H:%M",
-      "%m/%d/%y"
+      "%m/%d/%y %H:%M"
     ],
     "DATE_FORMAT": "N j, Y",
     "DATE_INPUT_FORMATS": [
@@ -2372,8 +2260,8 @@
   };
 
     django.get_format = function(format_type) {
-      var value = django.formats[format_type];
-      if (typeof(value) == 'undefined') {
+      const value = django.formats[format_type];
+      if (typeof value === 'undefined') {
         return format_type;
       } else {
         return value;
@@ -2392,6 +2280,5 @@
 
     django.jsi18n_initialized = true;
   }
-
-}(this));
+};
 
