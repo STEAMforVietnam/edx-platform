@@ -10,7 +10,6 @@ This is the default template for our main set of AWS servers.
 import codecs
 import copy
 import os
-import warnings
 import yaml
 
 from corsheaders.defaults import default_headers as corsheaders_default_headers
@@ -18,7 +17,6 @@ from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse_lazy
 from edx_django_utils.plugins import add_plugins
 from path import Path as path
-
 
 from openedx.core.djangoapps.plugins.constants import ProjectType, SettingsType
 
@@ -53,15 +51,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ############### END ALWAYS THE SAME ################################
 
 # A file path to a YAML file from which to load all the configuration for the edx platform
-try:
-    CONFIG_FILE = get_env_setting('CMS_CFG')
-except ImproperlyConfigured:
-    CONFIG_FILE = get_env_setting('STUDIO_CFG')
-    warnings.warn(
-        "STUDIO_CFG environment variable is deprecated. Use CMS_CFG instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
+CONFIG_FILE = get_env_setting('STUDIO_CFG')
 
 with codecs.open(CONFIG_FILE, encoding='utf-8') as f:
     __config__ = yaml.safe_load(f)
@@ -217,10 +207,6 @@ if ENV_TOKENS.get('SESSION_COOKIE_NAME', None):
     # NOTE, there's a bug in Django (http://bugs.python.org/issue18012) which necessitates this being a str()
     SESSION_COOKIE_NAME = str(ENV_TOKENS.get('SESSION_COOKIE_NAME'))
 
-# This is the domain that is used to set shared cookies between various sub-domains.
-# By default, it's set to the same thing as the SESSION_COOKIE_DOMAIN, but we want to make it overrideable.
-SHARED_COOKIE_DOMAIN = ENV_TOKENS.get('SHARED_COOKIE_DOMAIN', SESSION_COOKIE_DOMAIN)
-
 # Determines whether the CSRF token can be transported on
 # unencrypted channels. It is set to False here for backward compatibility,
 # but it is highly recommended that this is True for environments accessed
@@ -286,13 +272,8 @@ if "TRACKING_IGNORE_URL_PATTERNS" in ENV_TOKENS:
 # Heartbeat
 HEARTBEAT_CELERY_ROUTING_KEY = ENV_TOKENS.get('HEARTBEAT_CELERY_ROUTING_KEY', HEARTBEAT_CELERY_ROUTING_KEY)
 
-# Sometimes, OAuth2 clients want the user to redirect back to their site after logout. But to determine if the given
-# redirect URL/path is safe for redirection, the following variable is used by edX.
-LOGIN_REDIRECT_WHITELIST = ENV_TOKENS.get(
-    'LOGIN_REDIRECT_WHITELIST',
-    LOGIN_REDIRECT_WHITELIST
-)
-LOGIN_REDIRECT_WHITELIST.extend([reverse_lazy('home')])
+LOGIN_REDIRECT_WHITELIST = [reverse_lazy('home')]
+
 
 ############### XBlock filesystem field config ##########
 if 'DJFS' in AUTH_TOKENS and AUTH_TOKENS['DJFS'] is not None:
@@ -501,7 +482,7 @@ if FEATURES.get('CUSTOM_COURSES_EDX'):
     INSTALLED_APPS.append('openedx.core.djangoapps.ccxcon.apps.CCXConnectorConfig')
 
 ############## Settings for CourseGraph ############################
-COURSEGRAPH_JOB_QUEUE = ENV_TOKENS.get('COURSEGRAPH_JOB_QUEUE', LOW_PRIORITY_QUEUE)
+COURSEGRAPH_JOB_QUEUE = ENV_TOKENS.get('COURSEGRAPH_JOB_QUEUE', DEFAULT_PRIORITY_QUEUE)
 
 ########## Settings for video transcript migration tasks ############
 VIDEO_TRANSCRIPT_MIGRATIONS_JOB_QUEUE = ENV_TOKENS.get('VIDEO_TRANSCRIPT_MIGRATIONS_JOB_QUEUE', DEFAULT_PRIORITY_QUEUE)
@@ -554,21 +535,20 @@ SYSTEM_WIDE_ROLE_CLASSES = ENV_TOKENS.get('SYSTEM_WIDE_ROLE_CLASSES') or SYSTEM_
 ######################## Setting for content libraries ########################
 MAX_BLOCKS_PER_CONTENT_LIBRARY = ENV_TOKENS.get('MAX_BLOCKS_PER_CONTENT_LIBRARY', MAX_BLOCKS_PER_CONTENT_LIBRARY)
 
-########################## Derive Any Derived Settings  #######################
-
-derive_settings(__name__)
-
 ####################### Plugin Settings ##########################
 
 # This is at the bottom because it is going to load more settings after base settings are loaded
 
 add_plugins(__name__, ProjectType.CMS, SettingsType.PRODUCTION)
 
+########################## Derive Any Derived Settings  #######################
+
+derive_settings(__name__)
+
 ############# CORS headers for cross-domain requests #################
 if FEATURES.get('ENABLE_CORS_HEADERS'):
     CORS_ALLOW_CREDENTIALS = True
     CORS_ORIGIN_WHITELIST = ENV_TOKENS.get('CORS_ORIGIN_WHITELIST', ())
-
     CORS_ORIGIN_ALLOW_ALL = ENV_TOKENS.get('CORS_ORIGIN_ALLOW_ALL', False)
     CORS_ALLOW_INSECURE = ENV_TOKENS.get('CORS_ALLOW_INSECURE', False)
     CORS_ALLOW_HEADERS = corsheaders_default_headers + (
@@ -583,6 +563,10 @@ FAVICON_URL = ENV_TOKENS.get('FAVICON_URL', FAVICON_URL)
 
 ######################## CELERY ROTUING ########################
 
+# Celery beat configuration
+
+CELERYBEAT_SCHEDULER = ENV_TOKENS.get('CELERYBEAT_SCHEDULER', CELERYBEAT_SCHEDULER)
+
 # Defines alternate environment tasks, as a dict of form { task_name: alternate_queue }
 ALTERNATE_ENV_TASKS = {
     'completion_aggregator.tasks.update_aggregators': 'lms',
@@ -596,24 +580,6 @@ EXPLICIT_QUEUES = {
         'queue': POLICY_CHANGE_GRADES_ROUTING_KEY},
     'cms.djangoapps.contentstore.tasks.update_search_index': {
         'queue': UPDATE_SEARCH_INDEX_JOB_QUEUE},
-    'openedx.core.djangoapps.coursegraph.tasks.dump_course_to_neo4j': {
-        'queue': COURSEGRAPH_JOB_QUEUE},
 }
 
 LOGO_IMAGE_EXTRA_TEXT = ENV_TOKENS.get('LOGO_IMAGE_EXTRA_TEXT', '')
-
-############## XBlock extra mixins ############################
-XBLOCK_MIXINS += tuple(XBLOCK_EXTRA_MIXINS)
-
-############## Settings for course import olx validation ############################
-COURSE_OLX_VALIDATION_STAGE = ENV_TOKENS.get('COURSE_OLX_VALIDATION_STAGE', COURSE_OLX_VALIDATION_STAGE)
-COURSE_OLX_VALIDATION_IGNORE_LIST = ENV_TOKENS.get(
-    'COURSE_OLX_VALIDATION_IGNORE_LIST',
-    COURSE_OLX_VALIDATION_IGNORE_LIST
-)
-
-################# show account activate cta after register ########################
-SHOW_ACCOUNT_ACTIVATION_CTA = ENV_TOKENS.get('SHOW_ACCOUNT_ACTIVATION_CTA', SHOW_ACCOUNT_ACTIVATION_CTA)
-
-LANGUAGE_COOKIE_NAME = ENV_TOKENS.get('LANGUAGE_COOKIE', None) or ENV_TOKENS.get(
-    'LANGUAGE_COOKIE_NAME', LANGUAGE_COOKIE_NAME)

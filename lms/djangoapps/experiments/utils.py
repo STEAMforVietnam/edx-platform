@@ -7,7 +7,7 @@ import logging
 from decimal import Decimal
 
 from django.utils.timezone import now
-from edx_toggles.toggles import WaffleFlag
+from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 
@@ -21,12 +21,14 @@ from openedx.core.djangoapps.catalog.utils import get_programs
 from openedx.core.djangoapps.django_comment_common.models import Role
 from openedx.core.djangoapps.schedules.models import Schedule
 from openedx.features.course_duration_limits.access import get_user_course_duration, get_user_course_expiration_date
-from xmodule.partitions.partitions_service import get_all_partitions_for_course, get_user_partition_groups  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions_service import get_all_partitions_for_course, get_user_partition_groups
 
 logger = logging.getLogger(__name__)
 
 
 # TODO: clean up as part of REVEM-199 (START)
+experiments_namespace = LegacyWaffleFlagNamespace(name='experiments')
+
 # .. toggle_name: experiments.add_programs
 # .. toggle_implementation: WaffleFlag
 # .. toggle_default: False
@@ -36,9 +38,10 @@ logger = logging.getLogger(__name__)
 # .. toggle_target_removal_date: None
 # .. toggle_tickets: REVEM-63, REVEM-198
 # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
-PROGRAM_INFO_FLAG = WaffleFlag(
-    'experiments.add_programs',
-    __name__,
+PROGRAM_INFO_FLAG = LegacyWaffleFlag(
+    waffle_namespace=experiments_namespace,
+    flag_name='add_programs',
+    module_name=__name__,
 )
 
 # .. toggle_name: experiments.add_dashboard_info
@@ -50,7 +53,7 @@ PROGRAM_INFO_FLAG = WaffleFlag(
 # .. toggle_target_removal_date: None
 # .. toggle_tickets: REVEM-118
 # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
-DASHBOARD_INFO_FLAG = WaffleFlag('experiments.add_dashboard_info', __name__)
+DASHBOARD_INFO_FLAG = LegacyWaffleFlag(experiments_namespace, 'add_dashboard_info', __name__)
 # TODO END: clean up as part of REVEM-199 (End)
 
 # TODO: Clean up as part of REV-1205 (START)
@@ -63,9 +66,10 @@ DASHBOARD_INFO_FLAG = WaffleFlag('experiments.add_dashboard_info', __name__)
 # .. toggle_target_removal_date: None
 # .. toggle_tickets: REV-1205
 # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
-UPSELL_TRACKING_FLAG = WaffleFlag(
-    'experiments.add_upsell_tracking',
-    __name__,
+UPSELL_TRACKING_FLAG = LegacyWaffleFlag(
+    waffle_namespace=experiments_namespace,
+    flag_name='add_upsell_tracking',
+    module_name=__name__,
 )
 # TODO END: Clean up as part of REV-1205 (End)
 

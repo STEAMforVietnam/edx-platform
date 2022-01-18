@@ -1,7 +1,7 @@
 <%page expression_filter="h"/>
 <%namespace name='static' file='/static_content.html'/>
 <%!
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from openedx.core.djangolib.markup import HTML
 from openedx.core.djangolib.js_utils import js_escaped_string
 from six import text_type
@@ -105,13 +105,13 @@ ${block_content | n, decode.utf8}
       <table summary="${_('Module Fields')}">
         <tr><th>${_('Module Fields')}</th></tr>
         %for name, field in fields:
-        <tr><td style="width:25%">${name}</td><td><pre style="display:inline-block; margin: 0; overflow-wrap: anywhere;">${field}</pre></td></tr>
+        <tr><td style="width:25%">${name}</td><td><pre style="display:inline-block; margin: 0;">${field}</pre></td></tr>
         %endfor
       </table>
       <table>
         <tr><th>${_('XML attributes')}</th></tr>
         %for name, field in xml_attributes.items():
-        <tr><td style="width:25%">${name}</td><td><pre style="display:inline-block; margin: 0; overflow-wrap: anywhere;">${field}</pre></td></tr>
+        <tr><td style="width:25%">${name}</td><td><pre style="display:inline-block; margin: 0;">${field}</pre></td></tr>
         %endfor
       </table>
       category = ${category}

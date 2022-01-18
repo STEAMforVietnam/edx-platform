@@ -2,17 +2,23 @@
 
 
 import pytest
+from contracts import new_contract
 from django.test import TestCase
 from opaque_keys.edx.locator import CourseLocator
 
 from openedx.core.djangoapps.course_groups.cohorts import CourseCohortsSettings
 from openedx.core.djangoapps.django_comment_common.models import CourseDiscussionSettings, Role
-from common.djangoapps.student.models import CourseEnrollment
-from common.djangoapps.student.tests.factories import UserFactory
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from openedx.core.djangoapps.django_comment_common.utils import (
+    get_course_discussion_settings,
+    set_course_discussion_settings
+)
+from common.djangoapps.student.models import CourseEnrollment, User
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
+
+new_contract('basestring', str)
 
 
 class RoleAssignmentTest(TestCase):
@@ -24,15 +30,15 @@ class RoleAssignmentTest(TestCase):
     def setUp(self):
         super().setUp()
         # Check a staff account because those used to get the Moderator role
-        self.staff_user = UserFactory.create(
-            username="patty",
-            email="patty@fake.edx.org",
+        self.staff_user = User.objects.create_user(
+            "patty",
+            "patty@fake.edx.org",
         )
         self.staff_user.is_staff = True
 
-        self.student_user = UserFactory.create(
-            username="hacky",
-            email="hacky@fake.edx.org",
+        self.student_user = User.objects.create_user(
+            "hacky",
+            "hacky@fake.edx.org"
         )
         self.course_key = CourseLocator("edX", "Fake101", "2012")
         CourseEnrollment.enroll(self.staff_user, self.course_key)
@@ -74,7 +80,7 @@ class CourseDiscussionSettingsTest(ModuleStoreTestCase):
         self.course = CourseFactory.create()
 
     def test_get_course_discussion_settings(self):
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        discussion_settings = get_course_discussion_settings(self.course.id)
         assert CourseDiscussionSettings.NONE == discussion_settings.division_scheme
         assert [] == discussion_settings.divided_discussions
         assert not discussion_settings.always_divide_inline_discussions
@@ -86,7 +92,7 @@ class CourseDiscussionSettingsTest(ModuleStoreTestCase):
             'cohorted_discussions': ['foo']
         }
         modulestore().update_item(self.course, ModuleStoreEnum.UserID.system)
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        discussion_settings = get_course_discussion_settings(self.course.id)
         assert CourseDiscussionSettings.COHORT == discussion_settings.division_scheme
         assert ['foo'] == discussion_settings.divided_discussions
         assert discussion_settings.always_divide_inline_discussions
@@ -100,19 +106,19 @@ class CourseDiscussionSettingsTest(ModuleStoreTestCase):
                 'cohorted_discussions': ['foo', 'bar']
             }
         )
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        discussion_settings = get_course_discussion_settings(self.course.id)
         assert CourseDiscussionSettings.COHORT == discussion_settings.division_scheme
         assert ['foo', 'bar'] == discussion_settings.divided_discussions
         assert discussion_settings.always_divide_inline_discussions
 
-    def test_update_course_discussion_settings(self):
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
-        discussion_settings.update({
-            'divided_discussions': ['cohorted_topic'],
-            'division_scheme': CourseDiscussionSettings.ENROLLMENT_TRACK,
-            'always_divide_inline_discussions': True,
-        })
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
+    def test_set_course_discussion_settings(self):
+        set_course_discussion_settings(
+            course_key=self.course.id,
+            divided_discussions=['cohorted_topic'],
+            division_scheme=CourseDiscussionSettings.ENROLLMENT_TRACK,
+            always_divide_inline_discussions=True,
+        )
+        discussion_settings = get_course_discussion_settings(self.course.id)
         assert CourseDiscussionSettings.ENROLLMENT_TRACK == discussion_settings.division_scheme
         assert ['cohorted_topic'] == discussion_settings.divided_discussions
         assert discussion_settings.always_divide_inline_discussions
@@ -126,9 +132,8 @@ class CourseDiscussionSettingsTest(ModuleStoreTestCase):
         ]
         invalid_value = 3.14
 
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
         for field in fields:
             with pytest.raises(ValueError) as value_error:
-                discussion_settings.update({field['name']: invalid_value})
+                set_course_discussion_settings(self.course.id, **{field['name']: invalid_value})
 
             assert str(value_error.value) == exception_msg_template.format(field['name'], field['type'].__name__)

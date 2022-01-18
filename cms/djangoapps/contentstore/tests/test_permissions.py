@@ -5,12 +5,13 @@ Test CRUD for authorization.
 
 import copy
 
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
+
 from cms.djangoapps.contentstore.tests.utils import AjaxEnabledTestClient
 from cms.djangoapps.contentstore.utils import reverse_course_url, reverse_url
 from common.djangoapps.student import auth
 from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole, OrgInstructorRole, OrgStaffRole
-from common.djangoapps.student.tests.factories import UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 
 
 class TestCourseAccess(ModuleStoreTestCase):
@@ -51,7 +52,7 @@ class TestCourseAccess(ModuleStoreTestCase):
         for i in range(8):
             username = f"user{i}"
             email = f"test+user{i}@edx.org"
-            user = UserFactory.create(username=username, email=email, password='foo')
+            user = User.objects.create_user(username, email, 'foo')
             user.is_active = True
             user.save()
             users.append(user)

@@ -2,9 +2,9 @@
 Enterprise support admin views.
 """
 
-from django.contrib import messages
+from django.contrib import admin, messages  # lint-amnesty, pylint: disable=unused-import
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django.views.generic.edit import FormView
 from enterprise.models import EnterpriseCourseEnrollment
 

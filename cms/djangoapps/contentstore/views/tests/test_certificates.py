@@ -19,9 +19,9 @@ from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
 from common.djangoapps.student.tests.factories import UserFactory
 from common.djangoapps.util.testing import EventTestMixin, UrlResetMixin
-from xmodule.contentstore.content import StaticContent  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.contentstore.django import contentstore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.exceptions import NotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.contentstore.content import StaticContent
+from xmodule.contentstore.django import contentstore
+from xmodule.exceptions import NotFoundError
 
 from ..certificates import CERTIFICATE_SCHEMA_VERSION, CertificateManager
 
@@ -715,7 +715,7 @@ class CertificatesDetailHandlerTestCase(
         image_asset_location = AssetKey.from_string(signatory['signature_image_path'])
         content = contentstore().find(image_asset_location)
         self.assertIsNotNone(content)
-        test_url = f'{self._url(cid=1)}/signatories/1'
+        test_url = '{}/signatories/1'.format(self._url(cid=1))
         response = self.client.delete(
             test_url,
             content_type="application/json",
@@ -737,7 +737,7 @@ class CertificatesDetailHandlerTestCase(
         Delete an signatory whose signature image is already removed or does not exist
         """
         self._add_course_certificates(count=2, signatory_count=4, asset_path_format=signatory_path)
-        test_url = f'{self._url(cid=1)}/signatories/3'
+        test_url = '{}/signatories/3'.format(self._url(cid=1))
         response = self.client.delete(
             test_url,
             content_type="application/json",
@@ -751,7 +751,7 @@ class CertificatesDetailHandlerTestCase(
         Try to delete a non existing certificate signatory. It should return status code 404 Not found.
         """
         self._add_course_certificates(count=2)
-        test_url = f'{self._url(cid=100)}/signatories/1'
+        test_url = '{}/signatories/1'.format(self._url(cid=100))
         response = self.client.delete(
             test_url,
             content_type="application/json",

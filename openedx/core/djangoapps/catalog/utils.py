@@ -206,7 +206,7 @@ def get_programs_by_uuids(uuids):
     missing_uuids = set(uuid_strings) - {program['uuid'] for program in programs}
     if missing_uuids:
         logger.info(
-            f'Failed to get details for {len(missing_uuids)} programs. Retrying.'
+            'Failed to get details for {count} programs. Retrying.'.format(count=len(missing_uuids))
         )
 
         retried_programs = cache.get_many([PROGRAM_CACHE_KEY_TPL.format(uuid=uuid) for uuid in missing_uuids])
@@ -287,7 +287,7 @@ def get_pathways(site, pathway_id=None):
     missing_ids = set(pathway_ids) - {pathway['id'] for pathway in pathways}
     if missing_ids:
         logger.info(
-            f'Failed to get details for {len(missing_ids)} pathways. Retrying.'
+            'Failed to get details for {count} pathways. Retrying.'.format(count=len(missing_ids))
         )
 
         retried_pathways = cache.get_many(
@@ -330,7 +330,7 @@ def format_price(price, symbol='$', code='USD'):
     :return: A formatted price string, i.e. '$10 USD', '$10.52 USD'.
     """
     if int(price) == price:
-        return f'{symbol}{int(price)} {code}'
+        return '{}{} {}'.format(symbol, int(price), code)
     return f'{symbol}{price:0.2f} {code}'
 
 
@@ -593,7 +593,7 @@ def get_course_run_details(course_run_key, fields):
     Returns:
         dict with language, start date, end date, and max_effort details about specified course run
     """
-    course_run_details = {}
+    course_run_details = dict()
     user, catalog_integration = check_catalog_integration_and_get_user(
         error_message_field=f'Data for course_run {course_run_key}'
     )

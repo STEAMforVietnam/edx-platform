@@ -35,7 +35,6 @@
         });
 
         createTestView = function(test) {
-            var testView;
             var courseSettings = DiscussionSpecHelper.createTestCourseSettings({
                 groups: [
                     {
@@ -63,7 +62,7 @@
                     children: []
                 }
             });
-            testView = new DiscussionInlineView({
+            var testView = new DiscussionInlineView({
                 el: $('.discussion-module')
             });
             testView.render();
@@ -234,22 +233,6 @@
 
                 // Verify that the individual thread is no longer shown
                 expect(testView.$('.group-visibility-label').length).toBe(0);
-            });
-
-            it('marks a thread as read once it is opened', function() {
-                var testView = createTestView(this);
-                var thread;
-                showDiscussion(this, testView);
-                thread = testView.$('.forum-nav-thread');
-
-                // The thread is marked as unread.
-                expect(thread).toHaveClass('never-read');
-
-                // Navigate to the thread.
-                thread.find('.forum-nav-thread-link').click();
-
-                // The thread is no longer marked as unread.
-                expect(thread).not.toHaveClass('never-read');
             });
         });
     });

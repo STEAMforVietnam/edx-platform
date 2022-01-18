@@ -1,38 +1,56 @@
 """
 Discussion API internal interface
 """
-from __future__ import annotations
+
 
 import itertools
 from collections import defaultdict
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Set, Tuple
-from urllib.parse import urlencode, urlunparse
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.urls import reverse
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.locator import CourseKey
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.request import Request
-from xmodule.course_module import CourseBlock
-from xmodule.tabs import CourseTabList
+from six.moves.urllib.parse import urlencode, urlunparse
 
 from lms.djangoapps.courseware.courses import get_course_with_access
 from lms.djangoapps.courseware.exceptions import CourseAccessRedirect
-from openedx.core.djangoapps.discussions.utils import get_accessible_discussion_xblocks
+from lms.djangoapps.discussion.django_comment_client.base.views import (
+    track_comment_created_event,
+    track_thread_created_event,
+    track_voted_event
+)
+from lms.djangoapps.discussion.django_comment_client.utils import (
+    get_accessible_discussion_xblocks,
+    get_group_id_for_user,
+    is_commentable_divided,
+)
+from lms.djangoapps.discussion.rest_api.exceptions import (
+    CommentNotFoundError,
+    ThreadNotFoundError,
+    DiscussionDisabledError,
+    DiscussionBlackOutException
+)
+from lms.djangoapps.discussion.rest_api.forms import CommentActionsForm, ThreadActionsForm
+from lms.djangoapps.discussion.rest_api.pagination import DiscussionAPIPagination
+from lms.djangoapps.discussion.rest_api.permissions import (
+    can_delete,
+    get_editable_fields,
+    get_initializable_comment_fields,
+    get_initializable_thread_fields
+)
+from lms.djangoapps.discussion.rest_api.serializers import (
+    CommentSerializer,
+    DiscussionTopicSerializer,
+    ThreadSerializer,
+    get_context
+)
+from lms.djangoapps.discussion.rest_api.utils import discussion_open_for_user
 from openedx.core.djangoapps.django_comment_common.comment_client.comment import Comment
-from openedx.core.djangoapps.django_comment_common.comment_client.course import get_course_commentable_counts
 from openedx.core.djangoapps.django_comment_common.comment_client.thread import Thread
 from openedx.core.djangoapps.django_comment_common.comment_client.utils import CommentClientRequestError
-from openedx.core.djangoapps.django_comment_common.models import (
-    CourseDiscussionSettings,
-    FORUM_ROLE_ADMINISTRATOR,
-    FORUM_ROLE_COMMUNITY_TA,
-    FORUM_ROLE_MODERATOR,
-)
 from openedx.core.djangoapps.django_comment_common.signals import (
     comment_created,
     comment_deleted,
@@ -41,48 +59,13 @@ from openedx.core.djangoapps.django_comment_common.signals import (
     thread_created,
     thread_deleted,
     thread_edited,
-    thread_voted,
+    thread_voted
 )
+from openedx.core.djangoapps.django_comment_common.utils import get_course_discussion_settings
 from openedx.core.djangoapps.user_api.accounts.api import get_account_settings
+from openedx.core.djangoapps.user_api.accounts.views import \
+    AccountViewSet  # lint-amnesty, pylint: disable=unused-import
 from openedx.core.lib.exceptions import CourseNotFoundError, DiscussionNotFoundError, PageNotFoundError
-
-from .exceptions import (
-    CommentNotFoundError,
-    DiscussionBlackOutException,
-    DiscussionDisabledError,
-    ThreadNotFoundError,
-)
-from .forms import CommentActionsForm, ThreadActionsForm
-from .pagination import DiscussionAPIPagination
-from .permissions import (
-    can_delete,
-    get_editable_fields,
-    get_initializable_comment_fields,
-    get_initializable_thread_fields,
-)
-from .serializers import (
-    CommentSerializer,
-    DiscussionTopicSerializer,
-    ThreadSerializer,
-    get_context,
-)
-from .utils import discussion_open_for_user
-from ..django_comment_client.base.views import (
-    track_comment_created_event,
-    track_thread_created_event,
-    track_voted_event,
-)
-from ..django_comment_client.utils import (
-    get_group_id_for_user,
-    get_user_role_names,
-    is_commentable_divided,
-)
-
-User = get_user_model()
-
-ThreadType = Literal["discussion", "question"]
-ViewType = Literal["unread", "unanswered"]
-ThreadOrderingType = Literal["last_activity_at", "comment_count", "vote_count"]
 
 
 class DiscussionTopic:
@@ -90,21 +73,11 @@ class DiscussionTopic:
     Class for discussion topic structure
     """
 
-    def __init__(
-        self,
-        topic_id: Optional[str],
-        name: str,
-        thread_list_url: str,
-        children: Optional[List[DiscussionTopic]] = None,
-        thread_counts: Dict[str, int] = None,
-    ):
+    def __init__(self, topic_id, name, thread_list_url, children=None):
         self.id = topic_id  # pylint: disable=invalid-name
         self.name = name
         self.thread_list_url = thread_list_url
         self.children = children or []  # children are of same type i.e. DiscussionTopic
-        if not children and not thread_counts:
-            thread_counts = {"discussion": 0, "question": 0}
-        self.thread_counts = thread_counts
 
 
 class DiscussionEntity(Enum):
@@ -123,15 +96,15 @@ def _get_course(course_key, user):
     """
     try:
         course = get_course_with_access(user, 'load', course_key, check_if_enrolled=True)
-    except (Http404, CourseAccessRedirect) as err:
+    except Http404:
         # Convert 404s into CourseNotFoundErrors.
+        raise CourseNotFoundError("Course not found.")  # lint-amnesty, pylint: disable=raise-missing-from
+    except CourseAccessRedirect:
         # Raise course not found if the user cannot access the course
-        raise CourseNotFoundError("Course not found.") from err
-
-    discussion_tab = CourseTabList.get_tab_by_type(course.tabs, 'discussion')
-    if not (discussion_tab and discussion_tab.is_enabled(course, user)):
+        # since it doesn't make sense to redirect an API.
+        raise CourseNotFoundError("Course not found.")  # lint-amnesty, pylint: disable=raise-missing-from
+    if not any(tab.type == 'discussion' and tab.is_enabled(course, user) for tab in course.tabs):
         raise DiscussionDisabledError("Discussion is disabled for the course.")
-
     return course
 
 
@@ -153,11 +126,7 @@ def _get_thread_and_context(request, thread_id, retrieve_kwargs=None):
         course_key = CourseKey.from_string(cc_thread["course_id"])
         course = _get_course(course_key, request.user)
         context = get_context(course, request, cc_thread)
-
-        if retrieve_kwargs.get("flagged_comments") and not context["is_requester_privileged"]:
-            raise ValidationError("Only privileged users can request flagged comments")
-
-        course_discussion_settings = CourseDiscussionSettings.get(course_key)
+        course_discussion_settings = get_course_discussion_settings(course_key)
         if (
                 not context["is_requester_privileged"] and
                 cc_thread["group_id"] and
@@ -167,10 +136,10 @@ def _get_thread_and_context(request, thread_id, retrieve_kwargs=None):
             if requester_group_id is not None and cc_thread["group_id"] != requester_group_id:
                 raise ThreadNotFoundError("Thread not found.")
         return cc_thread, context
-    except CommentClientRequestError as err:
+    except CommentClientRequestError:
         # params are validated at a higher level, so the only possible request
         # error is if the thread doesn't exist
-        raise ThreadNotFoundError("Thread not found.") from err
+        raise ThreadNotFoundError("Thread not found.")  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 def _get_comment_and_context(request, comment_id):
@@ -185,8 +154,8 @@ def _get_comment_and_context(request, comment_id):
         cc_comment = Comment(id=comment_id).retrieve()
         _, context = _get_thread_and_context(request, cc_comment["thread_id"])
         return cc_comment, context
-    except CommentClientRequestError as err:
-        raise CommentNotFoundError("Comment not found.") from err
+    except CommentClientRequestError:
+        raise CommentNotFoundError("Comment not found.")  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 def _is_user_author_or_privileged(cc_content, context):
@@ -258,7 +227,6 @@ def get_course(request, course_key):
         return dt.isoformat().replace('+00:00', 'Z')
 
     course = _get_course(course_key, request.user)
-    user_roles = get_user_role_names(request.user, course_key)
     return {
         "id": str(course_key),
         "blackouts": [
@@ -272,25 +240,11 @@ def get_course(request, course_key):
         "following_thread_list_url": get_thread_list_url(request, course_key, following=True),
         "topics_url": request.build_absolute_uri(
             reverse("course_topics", kwargs={"course_id": course_key})
-        ),
-        "allow_anonymous": course.allow_anonymous,
-        "allow_anonymous_to_peers": course.allow_anonymous_to_peers,
-        "user_roles": user_roles,
-        "user_is_privileged": bool(user_roles & {
-            FORUM_ROLE_ADMINISTRATOR,
-            FORUM_ROLE_MODERATOR,
-            FORUM_ROLE_COMMUNITY_TA,
-        })
+        )
     }
 
 
-def get_courseware_topics(
-    request: Request,
-    course_key: CourseKey,
-    course: CourseBlock,
-    topic_ids: Optional[List[str]],
-    thread_counts: Dict[str, Dict[str, int]],
-) -> Tuple[List[Dict], Set[str]]:
+def get_courseware_topics(request, course_key, course, topic_ids):
     """
     Returns a list of topic trees for courseware-linked topics.
 
@@ -301,8 +255,6 @@ def get_courseware_topics(
         course: The course for which topics are requested.
         topic_ids: A list of topic IDs for which details are requested.
             This is optional. If None then all course topics are returned.
-        thread_counts: A map of the thread ids to the count of each type of thread in them
-           e.g. discussion, question
 
     Returns:
         A list of courseware topics and a set of existing topics among
@@ -336,8 +288,6 @@ def get_courseware_topics(
                     xblock.discussion_id,
                     xblock.discussion_target,
                     get_thread_list_url(request, course_key, [xblock.discussion_id]),
-                    None,
-                    thread_counts.get(xblock.discussion_id),
                 )
                 children.append(discussion_topic)
 
@@ -350,20 +300,13 @@ def get_courseware_topics(
                 category,
                 get_thread_list_url(request, course_key, [item.discussion_id for item in get_sorted_xblocks(category)]),
                 children,
-                None,
             )
             courseware_topics.append(DiscussionTopicSerializer(discussion_topic).data)
 
     return courseware_topics, existing_topic_ids
 
 
-def get_non_courseware_topics(
-    request: Request,
-    course_key: CourseKey,
-    course: CourseBlock,
-    topic_ids: Optional[List[str]],
-    thread_counts: Dict[str, Dict[str, int]]
-) -> Tuple[List[Dict], Set[str]]:
+def get_non_courseware_topics(request, course_key, course, topic_ids):
     """
     Returns a list of topic trees that are not linked to courseware.
 
@@ -374,8 +317,6 @@ def get_non_courseware_topics(
         course: The course for which topics are requested.
         topic_ids: A list of topic IDs for which details are requested.
             This is optional. If None then all course topics are returned.
-        thread_counts: A map of the thread ids to the count of each type of thread in them
-           e.g. discussion, question
 
     Returns:
         A list of non-courseware topics and a set of existing topics among
@@ -388,9 +329,7 @@ def get_non_courseware_topics(
     for name, entry in sorted_topics:
         if not topic_ids or entry['id'] in topic_ids:
             discussion_topic = DiscussionTopic(
-                entry["id"], name, get_thread_list_url(request, course_key, [entry["id"]]),
-                None,
-                thread_counts.get(entry["id"])
+                entry["id"], name, get_thread_list_url(request, course_key, [entry["id"]])
             )
             non_courseware_topics.append(DiscussionTopicSerializer(discussion_topic).data)
 
@@ -400,7 +339,7 @@ def get_non_courseware_topics(
     return non_courseware_topics, existing_topic_ids
 
 
-def get_course_topics(request: Request, course_key: CourseKey, topic_ids: Optional[Set[str]] = None):
+def get_course_topics(request, course_key, topic_ids=None):
     """
     Returns the course topic listing for the given course and user; filtered
     by 'topic_ids' list if given.
@@ -420,13 +359,10 @@ def get_course_topics(request: Request, course_key: CourseKey, topic_ids: Option
         DiscussionNotFoundError: If topic/s not found for given topic_ids.
     """
     course = _get_course(course_key, request.user)
-    thread_counts = get_course_commentable_counts(course.id)
 
-    courseware_topics, existing_courseware_topic_ids = get_courseware_topics(
-        request, course_key, course, topic_ids, thread_counts
-    )
+    courseware_topics, existing_courseware_topic_ids = get_courseware_topics(request, course_key, course, topic_ids)
     non_courseware_topics, existing_non_courseware_topic_ids = get_non_courseware_topics(
-        request, course_key, course, topic_ids, thread_counts,
+        request, course_key, course, topic_ids
     )
 
     if topic_ids:
@@ -583,21 +519,17 @@ def _serialize_discussion_entities(request, context, discussion_entities, reques
 
 
 def get_thread_list(
-    request: Request,
-    course_key: CourseKey,
-    page: int,
-    page_size: int,
-    topic_id_list: List[str] = None,
-    text_search: Optional[str] = None,
-    following: Optional[bool] = False,
-    author: Optional[str] = None,
-    thread_type: Optional[ThreadType] = None,
-    flagged: Optional[bool] = None,
-    view: Optional[ViewType] = None,
-    order_by: ThreadOrderingType = "last_activity_at",
-    order_direction: Literal["desc"] = "desc",
-    requested_fields: Optional[List[Literal["profile_image"]]] = None,
-    count_flagged: bool = None,
+        request,
+        course_key,
+        page,
+        page_size,
+        topic_id_list=None,
+        text_search=None,
+        following=False,
+        view=None,
+        order_by="last_activity_at",
+        order_direction="desc",
+        requested_fields=None,
 ):
     """
     Return the list of all discussion threads pertaining to the given course
@@ -608,13 +540,9 @@ def get_thread_list(
     course_key: The key of the course to get discussion threads for
     page: The page number (1-indexed) to retrieve
     page_size: The number of threads to retrieve per page
-    count_flagged: If true, fetch the count of flagged items in each thread
     topic_id_list: The list of topic_ids to get the discussion threads for
     text_search A text search query string to match
     following: If true, retrieve only threads the requester is following
-    author: If provided, retrieve only threads by this author
-    thread_type: filter for "discussion" or "question threads
-    flagged: filter for only threads that are flagged
     view: filters for either "unread" or "unanswered" threads
     order_by: The key in which to sort the threads by. The only values are
         "last_activity_at", "comment_count", and "vote_count". The default is
@@ -634,7 +562,6 @@ def get_thread_list(
 
     Raises:
 
-    PermissionDenied: If count_flagged is set but the user isn't privileged
     ValidationError: if an invalid value is passed for a field.
     ValueError: if more than one of the mutually exclusive parameters is
       provided
@@ -659,35 +586,16 @@ def get_thread_list(
     course = _get_course(course_key, request.user)
     context = get_context(course, request)
 
-    author_id = None
-    if author:
-        try:
-            author_id = User.objects.get(username=author).id
-        except User.DoesNotExist:
-            # Raising an error for a missing user leaks the presence of a username,
-            # so just return an empty response.
-            return DiscussionAPIPagination(request, 0, 1).get_paginated_response({
-                "results": [],
-                "text_search_rewrite": None,
-            })
-
-    if count_flagged and not context["is_requester_privileged"]:
-        raise PermissionDenied("`count_flagged` can only be set by users with moderator access or higher.")
-
     query_params = {
         "user_id": str(request.user.id),
         "group_id": (
             None if context["is_requester_privileged"] else
-            get_group_id_for_user(request.user, CourseDiscussionSettings.get(course.id))
+            get_group_id_for_user(request.user, get_course_discussion_settings(course.id))
         ),
         "page": page,
         "per_page": page_size,
         "text": text_search,
         "sort_key": cc_map.get(order_by),
-        "author_id": author_id,
-        "flagged": flagged,
-        "thread_type": thread_type,
-        "count_flagged": count_flagged,
     }
 
     if view:
@@ -727,7 +635,7 @@ def get_thread_list(
     })
 
 
-def get_comment_list(request, thread_id, endorsed, page, page_size, flagged=False, requested_fields=None):
+def get_comment_list(request, thread_id, endorsed, page, page_size, requested_fields=None):
     """
     Return the list of comments in the given thread.
 
@@ -746,8 +654,6 @@ def get_comment_list(request, thread_id, endorsed, page, page_size, flagged=Fals
 
         page_size: The number of comments to retrieve per page
 
-        flagged: Filter comments by flagged for abuse status.
-
         requested_fields: Indicates which additional fields to return for
         each comment. (i.e. ['profile_image'])
 
@@ -764,7 +670,6 @@ def get_comment_list(request, thread_id, endorsed, page, page_size, flagged=Fals
             "with_responses": True,
             "recursive": False,
             "user_id": request.user.id,
-            "flagged_comments": flagged,
             "response_skip": response_skip,
             "response_limit": page_size,
         }
@@ -893,8 +798,6 @@ def _do_extra_actions(api_content, cc_content, request_fields, actions_form, con
                 _handle_voted_field(form_value, cc_content, api_content, request, context)
             elif field == "read":
                 _handle_read_field(api_content, form_value, context["cc_requester"], cc_content)
-            elif field == "pinned":
-                _handle_pinned_field(form_value, cc_content, context["cc_requester"])
             else:
                 raise ValidationError({field: ["Invalid Key"]})
 
@@ -941,22 +844,6 @@ def _handle_read_field(api_content, form_value, user, cc_content):
         api_content["unread_comment_count"] = 0
 
 
-def _handle_pinned_field(pin_thread: bool, cc_content: Thread, user: User):
-    """
-    Pins or unpins a thread
-
-    Arguments:
-
-        pin_thread (bool): Value of field from API
-        cc_content (Thread): The thread on which to operate
-        user (User): The user performing the action
-    """
-    if pin_thread:
-        cc_content.pin(user, cc_content.id)
-    else:
-        cc_content.un_pin(user, cc_content.id)
-
-
 def create_thread(request, thread_data):
     """
     Create a thread.
@@ -980,15 +867,15 @@ def create_thread(request, thread_data):
     try:
         course_key = CourseKey.from_string(course_id)
         course = _get_course(course_key, user)
-    except InvalidKeyError as err:
-        raise ValidationError({"course_id": ["Invalid value."]}) from err
+    except InvalidKeyError:
+        raise ValidationError({"course_id": ["Invalid value."]})  # lint-amnesty, pylint: disable=raise-missing-from
 
     if not discussion_open_for_user(course, user):
         raise DiscussionBlackOutException
 
     context = get_context(course, request)
     _check_initializable_thread_fields(thread_data, context)
-    discussion_settings = CourseDiscussionSettings.get(course_key)
+    discussion_settings = get_course_discussion_settings(course_key)
     if (
             "group_id" not in thread_data and
             is_commentable_divided(course_key, thread_data.get("topic_id"), discussion_settings)
@@ -1221,76 +1108,8 @@ def get_response_comments(request, comment_id, page, page_size, requested_fields
         num_pages = (comments_count + page_size - 1) // page_size if comments_count else 1
         paginator = DiscussionAPIPagination(request, page, num_pages, comments_count)
         return paginator.get_paginated_response(results)
-    except CommentClientRequestError as err:
-        raise CommentNotFoundError("Comment not found") from err
-
-
-def get_user_comments(
-    request: Request,
-    author: User,
-    course_key: CourseKey,
-    flagged: bool = False,
-    page: int = 1,
-    page_size: int = 10,
-    requested_fields: Optional[List[str]] = None,
-):
-    """
-    Returns the list of comments made by the user in the requested course.
-
-    Arguments:
-
-        request: The django request object.
-
-        author: The user to get comments from.
-
-        course_key: The course locator to filter the comments.
-
-        flagged: Filter comments by flagged status.
-
-        page: The page number (1-indexed) to retrieve
-
-        page_size: The number of comments to retrieve per page
-
-        requested_fields: Indicates which additional fields to return for
-        each child comment. (i.e. ['profile_image'])
-
-    Returns:
-
-        A paginated result containing a list of comments.
-    """
-    course = _get_course(course_key, request.user)
-    context = get_context(course, request)
-
-    if flagged and not context["is_requester_privileged"]:
-        raise ValidationError("Only privileged users can filter comments by flagged status")
-
-    try:
-        response = Comment.retrieve_all({
-            'user_id': author.id,
-            'course_id': str(course_key),
-            'flagged': flagged,
-            'page': page,
-            'per_page': page_size,
-        })
-    except CommentClientRequestError as err:
-        raise CommentNotFoundError("Comment not found") from err
-
-    response_comments = response["collection"]
-    if not response_comments and page != 1:
-        raise PageNotFoundError("Page not found (No results on this page).")
-
-    results = _serialize_discussion_entities(
-        request,
-        context,
-        response_comments,
-        requested_fields,
-        DiscussionEntity.comment,
-    )
-
-    comment_count = response["comment_count"]
-    num_pages = response["num_pages"]
-    paginator = DiscussionAPIPagination(request, page, num_pages, comment_count)
-    return paginator.get_paginated_response(results)
+    except CommentClientRequestError:
+        raise CommentNotFoundError("Comment not found")  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 def delete_thread(request, thread_id):

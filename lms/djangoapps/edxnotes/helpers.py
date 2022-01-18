@@ -15,7 +15,7 @@ from dateutil.parser import parse as dateutil_parse
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from oauth2_provider.models import Application
 from opaque_keys.edx.keys import UsageKey
 from requests.exceptions import RequestException
@@ -29,8 +29,8 @@ from lms.djangoapps.edxnotes.plugins import EdxNotesTab
 from lms.lib.utils import get_parent_unit
 from openedx.core.djangoapps.oauth_dispatch.jwt import create_jwt_for_user
 from openedx.core.djangolib.markup import Text
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.exceptions import ItemNotFoundError
 
 log = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ def preprocess_collection(user, course, collection):
     # pylint: disable=too-many-statements
 
     store = modulestore()
-    filtered_collection = []
+    filtered_collection = list()
     cache = {}
     include_path_info = ('course_structure' not in settings.NOTES_DISABLED_TABS)
     with store.bulk_operations(course.id):
@@ -173,7 +173,7 @@ def preprocess_collection(user, course, collection):
 
             model.update(update)
             usage_id = model["usage_id"]
-            if usage_id in list(cache.keys()):  # lint-amnesty, pylint: disable=consider-iterating-dictionary
+            if usage_id in list(cache.keys()):
                 model.update(cache[usage_id])
                 filtered_collection.append(model)
                 continue
@@ -202,7 +202,7 @@ def preprocess_collection(user, course, collection):
                 if not section:
                     log.debug("Section not found: %s", usage_key)
                     continue
-                if section.location in list(cache.keys()):   # lint-amnesty, pylint: disable=consider-iterating-dictionary
+                if section.location in list(cache.keys()):
                     usage_context = cache[section.location]
                     usage_context.update({
                         "unit": get_module_context(course, unit),
@@ -216,7 +216,7 @@ def preprocess_collection(user, course, collection):
                 if not chapter:
                     log.debug("Chapter not found: %s", usage_key)
                     continue
-                if chapter.location in list(cache.keys()):  # lint-amnesty, pylint: disable=consider-iterating-dictionary
+                if chapter.location in list(cache.keys()):
                     usage_context = cache[chapter.location]
                     usage_context.update({
                         "unit": get_module_context(course, unit),
@@ -308,7 +308,7 @@ def construct_pagination_urls(request, course_id, api_next_url, api_previous_url
         query_params = parse_qs(parsed.query)
 
         encoded_query_params = urlencode({key: query_params.get(key)[0] for key in keys if key in query_params})
-        return f"{request.build_absolute_uri(base_url)}?{encoded_query_params}"
+        return "{}?{}".format(request.build_absolute_uri(base_url), encoded_query_params)
 
     base_url = reverse("notes", kwargs={"course_id": course_id})
     next_url = lms_url(api_next_url)
@@ -349,7 +349,7 @@ def get_notes(request, course, page=DEFAULT_PAGE, page_size=DEFAULT_PAGE_SIZE, t
 
     # Verify response dict structure
     expected_keys = ['total', 'rows', 'num_pages', 'start', 'next', 'previous', 'current_page']
-    keys = list(collection.keys())   # lint-amnesty, pylint: disable=consider-iterating-dictionary
+    keys = list(collection.keys())
     if not keys or not all(key in expected_keys for key in keys):
         log.error("Incorrect data received from notes api: collection_data=%s", str(collection))
         raise EdxNotesParseError(_("Incorrect data received from notes api."))

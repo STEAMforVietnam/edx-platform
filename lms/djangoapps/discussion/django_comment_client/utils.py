@@ -1,9 +1,8 @@
 # pylint: skip-file
+
+
 import json
 import logging
-from typing import Set
-
-import regex
 from collections import defaultdict
 from datetime import datetime
 
@@ -18,6 +17,7 @@ from pytz import UTC
 
 from common.djangoapps.student.models import get_user_by_username_or_email
 from common.djangoapps.student.roles import GlobalStaff
+from lms.djangoapps.courseware import courses
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.discussion.django_comment_client.constants import TYPE_ENTRY, TYPE_SUBCATEGORY
 from lms.djangoapps.discussion.django_comment_client.permissions import (
@@ -26,15 +26,7 @@ from lms.djangoapps.discussion.django_comment_client.permissions import (
     has_permission
 )
 from lms.djangoapps.discussion.django_comment_client.settings import MAX_COMMENT_DEPTH
-from openedx.core.djangoapps.course_groups.cohorts import get_cohort_id
-from openedx.core.djangoapps.discussions.utils import (
-    get_accessible_discussion_xblocks,
-    get_accessible_discussion_xblocks_by_course_id,
-    get_course_division_scheme,
-    get_discussion_categories_ids,
-    get_group_names_by_id,
-    has_required_keys,
-)
+from openedx.core.djangoapps.course_groups.cohorts import get_cohort_id, get_cohort_names, is_course_cohorted
 from openedx.core.djangoapps.django_comment_common.models import (
     FORUM_ROLE_COMMUNITY_TA,
     FORUM_ROLE_STUDENT,
@@ -42,8 +34,8 @@ from openedx.core.djangoapps.django_comment_common.models import (
     DiscussionsIdMapping,
     Role
 )
+from openedx.core.djangoapps.django_comment_common.utils import get_course_discussion_settings
 from openedx.core.lib.cache_utils import request_cached
-from openedx.core.lib.courses import get_course_by_id
 from xmodule.modulestore.django import modulestore
 from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID
 from xmodule.partitions.partitions_service import PartitionService
@@ -87,26 +79,6 @@ def get_role_ids(course_id):
     return {role.name: list(role.users.values_list('id', flat=True)) for role in roles}
 
 
-def get_user_role_names(user: User, course_key: CourseKey) -> Set[str]:
-    """
-    Get a set of discussion roles a user has for the specified course.
-
-    Args:
-        user (User): a user
-        course_key (CourseKey): a course key
-
-    Returns:
-        (Set[str]) a set of role names that the user has.
-
-    """
-    return set(
-        Role.objects.filter(
-            users=user,
-            course_id=course_key,
-        ).values_list('name', flat=True).distinct()
-    )
-
-
 def has_discussion_privileges(user, course_id):
     """
     Returns True if the user is privileged in teams discussions for
@@ -120,10 +92,10 @@ def has_discussion_privileges(user, course_id):
     Returns:
       bool
     """
+    # get_role_ids returns a dictionary of only admin, moderator and community TAs.
     roles = get_role_ids(course_id)
-
-    for user_ids in roles.values():
-        if user.id in user_ids:
+    for role in roles:
+        if user.id in roles[role]:
             return True
     return False
 
@@ -144,6 +116,45 @@ def is_user_community_ta(user, course_id):
     Boolean operation to check whether a user's role is Community TA or not
     """
     return has_forum_access(user, course_id, FORUM_ROLE_COMMUNITY_TA)
+
+
+def has_required_keys(xblock):
+    """
+    Returns True iff xblock has the proper attributes for generating metadata
+    with get_discussion_id_map_entry()
+    """
+    for key in ('discussion_id', 'discussion_category', 'discussion_target'):
+        if getattr(xblock, key, None) is None:
+            log.debug(
+                "Required key '%s' not in discussion %s, leaving out of category map",
+                key,
+                xblock.location
+            )
+            return False
+    return True
+
+
+def get_accessible_discussion_xblocks(course, user, include_all=False):
+    """
+    Return a list of all valid discussion xblocks in this course that
+    are accessible to the given user.
+    """
+    include_all = getattr(user, 'is_community_ta', False)
+    return get_accessible_discussion_xblocks_by_course_id(course.id, user, include_all=include_all)
+
+
+@request_cached()
+def get_accessible_discussion_xblocks_by_course_id(course_id, user=None, include_all=False):  # pylint: disable=invalid-name
+    """
+    Return a list of all valid discussion xblocks in this course.
+    Checks for the given user's access if include_all is False.
+    """
+    all_xblocks = modulestore().get_items(course_id, qualifiers={'category': 'discussion'}, include_orphans=False)
+
+    return [
+        xblock for xblock in all_xblocks
+        if has_required_keys(xblock) and (include_all or has_access(user, 'load', xblock, course_id))
+    ]
 
 
 def get_discussion_id_map_entry(xblock):
@@ -347,7 +358,7 @@ def get_discussion_category_map(course, user, divided_only_if_explicit=False, ex
 
     xblocks = get_accessible_discussion_xblocks(course, user)
 
-    discussion_settings = CourseDiscussionSettings.get(course.id)
+    discussion_settings = get_course_discussion_settings(course.id)
     discussion_division_enabled = course_discussion_division_enabled(discussion_settings)
     divided_discussion_ids = discussion_settings.divided_discussions
 
@@ -411,7 +422,7 @@ def get_discussion_category_map(course, user, divided_only_if_explicit=False, ex
                 # If we've already seen this title, append an incrementing number to disambiguate
                 # the category from other categores sharing the same title in the course discussion UI.
                 dupe_counters[title] += 1
-                title = f"{title} ({dupe_counters[title]})"
+                title = "{title} ({counter})".format(title=title, counter=dupe_counters[title])
             node[level]["entries"][title] = {"id": entry["id"],
                                              "sort_key": entry["sort_key"],
                                              "start_date": entry["start_date"],
@@ -454,6 +465,23 @@ def discussion_category_id_access(course, user, discussion_id, xblock=None):
         return has_required_keys(xblock) and (include_all or has_access(user, 'load', xblock, course.id))
     except DiscussionIdMapIsNotCached:
         return discussion_id in get_discussion_categories_ids(course, user)
+
+
+def get_discussion_categories_ids(course, user, include_all=False):
+    """
+    Returns a list of available ids of categories for the course that
+    are accessible to the given user.
+
+    Args:
+        course: Course for which to get the ids.
+        user:  User to check for access.
+        include_all (bool): If True, return all ids. Used by configuration views.
+
+    """
+    accessible_discussion_ids = [
+        xblock.discussion_id for xblock in get_accessible_discussion_xblocks(course, user, include_all=include_all)
+    ]
+    return course.top_level_discussion_topic_ids + accessible_discussion_ids
 
 
 class JsonResponse(HttpResponse):
@@ -746,10 +774,6 @@ def prepare_content(content, course_key, is_staff=False, discussion_division_ena
 
     content = strip_none(extract(content, fields))
 
-    # Replace the content body with a sanitized version
-    if 'body' in content:
-        content['body'] = sanitize_body(content['body'])
-
     if content.get("endorsement"):
         endorsement = content["endorsement"]
         endorser = None
@@ -773,7 +797,7 @@ def prepare_content(content, course_key, is_staff=False, discussion_division_ena
             del endorsement["user_id"]
 
     if discussion_division_enabled is None:
-        discussion_division_enabled = course_discussion_division_enabled(CourseDiscussionSettings.get(course_key))
+        discussion_division_enabled = course_discussion_division_enabled(get_course_discussion_settings(course_key))
 
     for child_content_key in ["children", "endorsed_responses", "non_endorsed_responses"]:
         if child_content_key in content:
@@ -792,7 +816,7 @@ def prepare_content(content, course_key, is_staff=False, discussion_division_ena
     if discussion_division_enabled:
         # Augment the specified thread info to include the group name if a group id is present.
         if content.get('group_id') is not None:
-            course_discussion_settings = CourseDiscussionSettings.get(course_key)
+            course_discussion_settings = get_course_discussion_settings(course_key)
             if group_names_by_id:
                 content['group_name'] = group_names_by_id.get(content.get('group_id'))
             else:
@@ -819,7 +843,7 @@ def get_group_id_for_comments_service(request, course_key, commentable_id=None):
     Raises:
         ValueError if the requested group_id is invalid
     """
-    course_discussion_settings = CourseDiscussionSettings.get(course_key)
+    course_discussion_settings = get_course_discussion_settings(course_key)
     if commentable_id is None or is_commentable_divided(course_key, commentable_id, course_discussion_settings):
         if request.method == "GET":
             requested_group_id = request.GET.get('group_id')
@@ -846,7 +870,7 @@ def get_group_id_for_user_from_cache(user, course_id):
     Caches the results of get_group_id_for_user, but serializes the course_id
     instead of the course_discussions_settings object as cache keys.
     """
-    return get_group_id_for_user(user, CourseDiscussionSettings.get(course_id))
+    return get_group_id_for_user(user, get_course_discussion_settings(course_id))
 
 
 def get_group_id_for_user(user, course_discussion_settings):
@@ -855,7 +879,7 @@ def get_group_id_for_user(user, course_discussion_settings):
     If discussions are not divided, this method will return None.
     It will also return None if the user is in no group within the specified division_scheme.
     """
-    division_scheme = get_course_division_scheme(course_discussion_settings)
+    division_scheme = _get_course_division_scheme(course_discussion_settings)
     if division_scheme == CourseDiscussionSettings.COHORT:
         return get_cohort_id(user, course_discussion_settings.course_id)
     elif division_scheme == CourseDiscussionSettings.ENROLLMENT_TRACK:
@@ -898,9 +922,9 @@ def is_commentable_divided(course_key, commentable_id, course_discussion_setting
         Http404 if the course doesn't exist.
     """
     if not course_discussion_settings:
-        course_discussion_settings = CourseDiscussionSettings.get(course_key)
+        course_discussion_settings = get_course_discussion_settings(course_key)
 
-    course = get_course_by_id(course_key)
+    course = courses.get_course_by_id(course_key)
 
     if not course_discussion_division_enabled(course_discussion_settings) or get_team(commentable_id):
         # this is the easy case :)
@@ -934,7 +958,51 @@ def course_discussion_division_enabled(course_discussion_settings):
 
     Returns: True if discussion division is enabled for the course, else False
     """
-    return get_course_division_scheme(course_discussion_settings) != CourseDiscussionSettings.NONE
+    return _get_course_division_scheme(course_discussion_settings) != CourseDiscussionSettings.NONE
+
+
+def available_division_schemes(course_key):
+    """
+    Returns a list of possible discussion division schemes for this course.
+    This takes into account if cohorts are enabled and if there are multiple
+    enrollment tracks. If no schemes are available, returns an empty list.
+    Args:
+        course_key: CourseKey
+
+    Returns: list of possible division schemes (for example, CourseDiscussionSettings.COHORT)
+    """
+    available_schemes = []
+    if is_course_cohorted(course_key):
+        available_schemes.append(CourseDiscussionSettings.COHORT)
+    if enrollment_track_group_count(course_key) > 1:
+        available_schemes.append(CourseDiscussionSettings.ENROLLMENT_TRACK)
+    return available_schemes
+
+
+def enrollment_track_group_count(course_key):
+    """
+    Returns the count of possible enrollment track division schemes for this course.
+    Args:
+        course_key: CourseKey
+    Returns:
+        Count of enrollment track division scheme
+    """
+    return len(_get_enrollment_track_groups(course_key))
+
+
+def _get_course_division_scheme(course_discussion_settings):
+    division_scheme = course_discussion_settings.division_scheme
+    if (
+        division_scheme == CourseDiscussionSettings.COHORT and
+        not is_course_cohorted(course_discussion_settings.course_id)
+    ):
+        division_scheme = CourseDiscussionSettings.NONE
+    elif (
+        division_scheme == CourseDiscussionSettings.ENROLLMENT_TRACK and
+        enrollment_track_group_count(course_discussion_settings.course_id) <= 1
+    ):
+        division_scheme = CourseDiscussionSettings.NONE
+    return division_scheme
 
 
 def get_group_name(group_id, course_discussion_settings):
@@ -951,6 +1019,38 @@ def get_group_name(group_id, course_discussion_settings):
     """
     group_names_by_id = get_group_names_by_id(course_discussion_settings)
     return group_names_by_id[group_id] if group_id in group_names_by_id else None
+
+
+def get_group_names_by_id(course_discussion_settings):
+    """
+    Creates of a dict of group_id to learner-facing group names, for the division_scheme
+    in use as specified by course_discussion_settings.
+    Args:
+        course_discussion_settings: CourseDiscussionSettings model instance
+
+    Returns: dict of group_id to learner-facing group names. If no division_scheme
+    is in use, returns an empty dict.
+    """
+    division_scheme = _get_course_division_scheme(course_discussion_settings)
+    course_key = course_discussion_settings.course_id
+    if division_scheme == CourseDiscussionSettings.COHORT:
+        return get_cohort_names(courses.get_course_by_id(course_key))
+    elif division_scheme == CourseDiscussionSettings.ENROLLMENT_TRACK:
+        # We negate the group_ids from dynamic partitions so that they will not conflict
+        # with cohort IDs (which are an auto-incrementing integer field, starting at 1).
+        return {-1 * group.id: group.name for group in _get_enrollment_track_groups(course_key)}
+    else:
+        return {}
+
+
+def _get_enrollment_track_groups(course_key):
+    """
+    Helper method that returns an array of the Groups in the EnrollmentTrackUserPartition for the given course.
+    If no such partition exists on the course, an empty array is returned.
+    """
+    partition_service = PartitionService(course_key)
+    partition = partition_service.get_user_partition(ENROLLMENT_TRACK_PARTITION_ID)
+    return partition.groups if partition else []
 
 
 def _verify_group_exists(group_id, course_discussion_settings):
@@ -977,20 +1077,3 @@ def is_content_authored_by(content, user):
         return int(content.get('user_id')) == user.id
     except (ValueError, TypeError):
         return False
-
-
-def sanitize_body(body):
-    """
-    Return a sanitized version of the body with dangerous Markdown removed.
-
-    This is possibly overly broad, and might tamper with legitimate posts that
-    contain this code in fenced code blocks. As far as we can tell, this is an
-    extra layer of protection, and current handling in the front end and using
-    bleach for HTML rendering on the server side should cover these cases.
-    """
-    if not body:
-        return body
-
-    # This will remove the Markdown style links with data: URLs, and turn them
-    # into empty links.
-    return regex.sub(r'\]\(data:[^)]+\)', ']()', body)

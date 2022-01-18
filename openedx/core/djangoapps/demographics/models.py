@@ -1,7 +1,4 @@
-"""
-Demographics models
-"""
-
+# lint-amnesty, pylint: disable=missing-module-docstring
 from django.contrib.auth import get_user_model
 from django.db import models
 from model_utils.models import TimeStampedModel
@@ -14,8 +11,6 @@ class UserDemographics(TimeStampedModel):
     """
     A Users Demographics platform related data in support of the Demographics
     IDA and features
-
-    .. no_pii:
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     show_call_to_action = models.BooleanField(default=True)

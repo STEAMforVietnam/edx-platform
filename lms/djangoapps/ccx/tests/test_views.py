@@ -15,7 +15,7 @@ from django.conf import settings
 from django.test import RequestFactory
 from django.test.utils import override_settings
 from django.urls import resolve, reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_django_utils.cache import RequestCache
 from opaque_keys.edx.keys import CourseKey
 from pytz import UTC
@@ -31,6 +31,7 @@ from lms.djangoapps.ccx.tests.factories import CcxFactory
 from lms.djangoapps.ccx.tests.utils import CcxTestCase, flatten
 from lms.djangoapps.ccx.utils import ccx_course, is_email
 from lms.djangoapps.ccx.views import get_date
+from lms.djangoapps.courseware.courses import get_course_by_id
 from lms.djangoapps.courseware.tabs import get_course_tab_list
 from lms.djangoapps.courseware.tests.factories import StudentModuleFactory
 from lms.djangoapps.courseware.tests.helpers import LoginEnrollmentTestCase
@@ -41,16 +42,15 @@ from lms.djangoapps.instructor.access import allow_access, list_with_level
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_ADMINISTRATOR
 from openedx.core.djangoapps.django_comment_common.utils import are_permissions_roles_seeded
-from openedx.core.lib.courses import get_course_by_id
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import (
     TEST_DATA_SPLIT_MODULESTORE,
     ModuleStoreTestCase,
     SharedModuleStoreTestCase
 )
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, SampleCourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.x_module import XModuleMixin  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, SampleCourseFactory
+from xmodule.x_module import XModuleMixin
 
 
 def intercept_renderer(path, context):
@@ -405,15 +405,15 @@ class TestCoachDashboard(CcxTestCase, LoginEnrollmentTestCase):
         assert role.has_user(self.coach)
 
         # assert that staff and instructors of master course has staff and instructor roles on ccx
-        list_staff_master_course = list_with_level(self.course.id, 'staff')
-        list_instructor_master_course = list_with_level(self.course.id, 'instructor')
+        list_staff_master_course = list_with_level(self.course, 'staff')
+        list_instructor_master_course = list_with_level(self.course, 'instructor')
 
         # assert that forum roles are seeded
         assert are_permissions_roles_seeded(course_key)
         assert has_forum_access(self.coach.username, course_key, FORUM_ROLE_ADMINISTRATOR)
 
         with ccx_course(course_key) as course_ccx:
-            list_staff_ccx_course = list_with_level(course_ccx.id, 'staff')
+            list_staff_ccx_course = list_with_level(course_ccx, 'staff')
             # The "Coach" in the parent course becomes "Staff" on the CCX, so the CCX should have 1 "Staff"
             # user more than the parent course
             assert (len(list_staff_master_course) + 1) == len(list_staff_ccx_course)
@@ -421,7 +421,7 @@ class TestCoachDashboard(CcxTestCase, LoginEnrollmentTestCase):
             # Make sure the "Coach" on the parent course is "Staff" on the CCX
             assert self.coach in list_staff_ccx_course
 
-            list_instructor_ccx_course = list_with_level(course_ccx.id, 'instructor')
+            list_instructor_ccx_course = list_with_level(course_ccx, 'instructor')
             assert len(list_instructor_ccx_course) == len(list_instructor_master_course)
             assert list_instructor_ccx_course[0].email == list_instructor_master_course[0].email
 
@@ -605,7 +605,7 @@ class TestCoachDashboard(CcxTestCase, LoginEnrollmentTestCase):
         enrollment = CourseEnrollmentFactory(course_id=self.course.id)
         student = enrollment.user
         outbox = self.get_outbox()
-        assert not outbox
+        assert outbox == []
 
         url = reverse(
             view_name,
@@ -687,7 +687,7 @@ class TestCoachDashboard(CcxTestCase, LoginEnrollmentTestCase):
         enrollment = CourseEnrollmentFactory(course_id=course_key)
         student = enrollment.user
         outbox = self.get_outbox()
-        assert not outbox
+        assert outbox == []
 
         url = reverse(
             view_name,
@@ -729,7 +729,7 @@ class TestCoachDashboard(CcxTestCase, LoginEnrollmentTestCase):
         ccx = self.make_ccx()
         course_key = CCXLocator.from_course_locator(self.course.id, ccx.id)
         outbox = self.get_outbox()
-        assert not outbox
+        assert outbox == []
 
         url = reverse(
             view_name,
@@ -777,7 +777,7 @@ class TestCoachDashboard(CcxTestCase, LoginEnrollmentTestCase):
         course_key = CCXLocator.from_course_locator(course.id, ccx.id)
         outbox = self.get_outbox()
         CourseEnrollmentAllowed(course_id=course_key, email=identifier)
-        assert not outbox
+        assert outbox == []
 
         url = reverse(
             view_name,

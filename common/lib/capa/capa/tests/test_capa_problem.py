@@ -587,7 +587,7 @@ class CAPAProblemReportHelpersTest(unittest.TestCase):
         with patch.object(problem, 'problem_data', mock_problem_data):
             assert problem.find_question_label(answer_id) == stripped_label
 
-    @ddt.data(None, {}, [None])
+    @ddt.data(None, dict(), [None])
     def test_find_answer_test_not_implemented(self, current_answer):
         problem = new_loncapa_problem('<problem/>')
         self.assertRaises(NotImplementedError, problem.find_answer_text, '', current_answer)
@@ -617,43 +617,6 @@ class CAPAProblemReportHelpersTest(unittest.TestCase):
                         <choice correct="false">The iPad</choice>
                         <choice correct="false">Napster</choice>
                         <choice correct="true">The iPod</choice>
-                    </choicegroup>
-                </multiplechoiceresponse>
-                <optionresponse>
-                    <optioninput options="('yellow','blue','green')" correct="blue" label="Color_1"/>
-                </optionresponse>
-            </problem>
-            """
-        )
-        assert problem.find_answer_text(answer_id, choice_id) == answer_text
-
-    @ddt.data(
-        # Test for ChoiceResponse
-        ('1_2_1', 'choice_0', 'Answer Text Missing'),
-        ('1_2_1', 'choice_1', 'funny'),
-        # Test for MultipleChoiceResponse
-        ('1_3_1', 'choice_0', 'The iPad'),
-        ('1_3_1', 'choice_2', 'Answer Text Missing'),
-        ('1_3_1', ['choice_0', 'choice_1'], 'The iPad, Answer Text Missing'),
-        # Test for OptionResponse
-        ('1_4_1', '', 'Answer Text Missing'),
-    )
-    @ddt.unpack
-    def test_find_answer_text_choices_with_missing_text(self, answer_id, choice_id, answer_text):
-        problem = new_loncapa_problem(
-            """
-            <problem>
-                <choiceresponse>
-                    <checkboxgroup label="Select the correct synonym of paranoid?">
-                        <choice correct="true"></choice>
-                        <choice correct="false">funny</choice>
-                    </checkboxgroup>
-                </choiceresponse>
-                <multiplechoiceresponse>
-                    <choicegroup type="MultipleChoice">
-                        <choice correct="false">The iPad</choice>
-                        <choice correct="false"></choice>
-                        <choice correct="true"></choice>
                     </choicegroup>
                 </multiplechoiceresponse>
                 <optionresponse>

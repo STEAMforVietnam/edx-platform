@@ -2584,10 +2584,6 @@ input[name="subject"] {
       font-size: em(13);
     }
   }
-
-  .special-exam-header {
-    padding-left: 25px;
-  }
 }
 
 .special-allowance-container,
@@ -2669,11 +2665,6 @@ input[name="subject"] {
           width: 140px;
         }
 
-        &.attempt-ready-to-resume {
-          width: 60px;
-          @include text-align(center);
-        }
-
         &.email {
           width: ($baseline*8);
           word-wrap: break-word;
@@ -2720,8 +2711,7 @@ input[name="subject"] {
 
       td:nth-child(6),
       td:nth-child(5),
-      td:nth-child(7),
-      td:nth-child(8){
+      td:nth-child(7) {
         @include padding-left(0);
 
         text-align: center;
@@ -2732,7 +2722,7 @@ input[name="subject"] {
         text-align: center;
       }
 
-      td:nth-child(9) {
+      td:nth-child(8) {
         word-wrap: break-word;
         text-align: center;
       }
@@ -2930,7 +2920,8 @@ input[name="subject"] {
     width: 400px;
   }
 
-  #certificate-allowlist-editor {
+
+  #certificate-white-list-editor {
     padding-top: 5px;
 
     .certificate-exception-inputs {
@@ -2944,7 +2935,7 @@ input[name="subject"] {
     }
   }
 
-  .allowlisted-students,
+  .white-listed-students,
   .invalidation-history {
     margin-top: 10px;
     padding-top: 5px;
@@ -3031,11 +3022,11 @@ input[name="subject"] {
     }
   }
 
-  .bulk-allowlist-exception {
+  .bulk-white-list-exception {
     margin-top: 10px;
     padding-top: 5px;
 
-    .allowlist-csv {
+    .white-list-csv {
       .bulk-exception-results {
         margin-top: 10px;
         background-color: $gray-l4;

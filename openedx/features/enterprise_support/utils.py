@@ -7,12 +7,9 @@ import json
 
 from crum import get_current_request
 from django.conf import settings
-from django.contrib.auth import get_backends, login
-from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.cache import cache
-from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_django_utils.cache import TieredCache, get_cache_key
 from edx_toggles.toggles import LegacyWaffleFlag
 from enterprise.api.v1.serializers import EnterpriseCustomerBrandingConfigurationSerializer
@@ -20,14 +17,13 @@ from enterprise.models import EnterpriseCustomer, EnterpriseCustomerUser
 from social_django.models import UserSocialAuth
 
 from common.djangoapps import third_party_auth
-from common.djangoapps.student.helpers import get_next_url_for_login_page
 from lms.djangoapps.branding.api import get_privacy_url
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.user_authn.cookies import standard_cookie_settings
 from openedx.core.djangolib.markup import HTML, Text
-from openedx.features.course_experience.utils import get_course_outline_block_tree, get_resume_block
+from common.djangoapps.student.helpers import get_next_url_for_login_page
 
-ENTERPRISE_HEADER_LINKS = LegacyWaffleFlag('enterprise', 'enterprise_header_links', __name__)  # lint-amnesty, pylint: disable=toggle-missing-annotation
+ENTERPRISE_HEADER_LINKS = LegacyWaffleFlag('enterprise', 'enterprise_header_links', __name__)
 
 
 def get_data_consent_share_cache_key(user_id, course_id, enterprise_customer_uuid=None):
@@ -415,30 +411,19 @@ def is_enterprise_learner(user):
     Check if the given user belongs to an enterprise. Cache the value if an enterprise learner is found.
 
     Arguments:
-        user (User): Django User object or Django User object id.
+        user (User): Django User object.
 
     Returns:
         (bool): True if given user is an enterprise learner.
     """
-    # Prevent a circular import.
-    from openedx.features.enterprise_support.api import enterprise_enabled
-
-    if not enterprise_enabled():
-        return False
-
-    try:
-        user_id = int(user)
-    except TypeError:
-        user_id = user.id
-    cached_is_enterprise_key = get_is_enterprise_cache_key(user_id)
+    cached_is_enterprise_key = get_is_enterprise_cache_key(user.id)
     if cache.get(cached_is_enterprise_key):
         return True
 
-    if EnterpriseCustomerUser.objects.filter(user_id=user_id).exists():
+    if EnterpriseCustomerUser.objects.filter(user_id=user.id).exists():
         # Cache the enterprise user for one hour.
         cache.set(cached_is_enterprise_key, True, 3600)
         return True
-
     return False
 
 
@@ -469,43 +454,3 @@ def get_provider_login_url(request, provider_id, redirect_url=None):
 
 def fetch_enterprise_customer_by_id(enterprise_uuid):
     return EnterpriseCustomer.objects.get(uuid=enterprise_uuid)
-
-
-def _create_placeholder_request(user):
-    """
-    Helper method to create a placeholder request.
-
-    Arguments:
-        user (User): Django User object.
-
-    Returns:
-        request (HttpRequest): A placeholder request object.
-        """
-    request = HttpRequest()
-    middleware = SessionMiddleware()
-    middleware.process_request(request)
-    request.session.save()
-    backend = get_backends()[0]
-    user.backend = "%s.%s" % (backend.__module__, backend.__class__.__name__)
-    login(request, user)
-    request.user = user
-    request.META['SERVER_NAME'] = 'edx.org'
-    request.META['SERVER_PORT'] = '8080'
-    return request
-
-
-def is_course_accessed(user, course_id):
-    """
-    Check if the learner accessed the course.
-
-    Arguments:
-        user (User): Django User object.
-        course_id (String): The course identifier
-
-    Returns:
-        (bool): True if course has been accessed by the enterprise learner.
-    """
-    request = _create_placeholder_request(user)
-    course_outline_root_block = get_course_outline_block_tree(request, course_id, user)
-    resume_block = get_resume_block(course_outline_root_block) if course_outline_root_block else None
-    return bool(resume_block)

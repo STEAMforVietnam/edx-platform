@@ -11,7 +11,6 @@ from unittest import skip
 import ddt
 from django.test import TestCase  # lint-amnesty, pylint: disable=reimported
 
-from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.factories import check_mongo_calls
 from xmodule.modulestore.tests.utils import (
     TEST_DATA_DIR,
@@ -56,7 +55,7 @@ class CountMongoCallsXMLRoundtrip(TestCase):
                 with check_mongo_calls(import_reads, first_import_writes):
                     import_course_from_xml(
                         source_store,
-                        ModuleStoreEnum.UserID.test,
+                        'test_user',
                         TEST_DATA_DIR,
                         source_dirs=['manual-testing-complete'],
                         static_content_store=source_content,
@@ -77,7 +76,7 @@ class CountMongoCallsXMLRoundtrip(TestCase):
                 with check_mongo_calls(import_reads, second_import_writes):
                     import_course_from_xml(
                         dest_store,
-                        ModuleStoreEnum.UserID.test,
+                        'test_user',
                         self.export_dir,
                         source_dirs=['exported_source_course'],
                         static_content_store=dest_content,
@@ -124,7 +123,7 @@ class CountMongoCallsCourseTraversal(TestCase):
         course_key = modulestore.make_course_key('a', 'course', 'course')
         import_course_from_xml(
             modulestore,
-            ModuleStoreEnum.UserID.test,
+            'test_user',
             TEST_DATA_DIR,
             source_dirs=['manual-testing-complete'],
             static_content_store=content_store,
@@ -161,7 +160,7 @@ class CountMongoCallsCourseTraversal(TestCase):
         (MIXED_SPLIT_MODULESTORE_BUILDER, None, False, False, 3),
         (MIXED_SPLIT_MODULESTORE_BUILDER, None, True, False, 3),
         (MIXED_SPLIT_MODULESTORE_BUILDER, 0, False, False, 3),
-        (MIXED_SPLIT_MODULESTORE_BUILDER, 0, True, False, 3),
+        (MIXED_SPLIT_MODULESTORE_BUILDER, 0, True, False, 3)
     )
     @ddt.unpack
     def test_number_mongo_calls(self, store_builder, depth, lazy, access_all_block_fields, num_mongo_calls):

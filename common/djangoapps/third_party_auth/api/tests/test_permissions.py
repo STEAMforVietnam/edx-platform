@@ -40,7 +40,7 @@ class ThirdPartyAuthPermissionTest(TestCase):
 
     def _create_request(self, auth_header=None):
         url = '/'
-        extra = dict(HTTP_AUTHORIZATION=auth_header) if auth_header else {}
+        extra = dict(HTTP_AUTHORIZATION=auth_header) if auth_header else dict()
         return RequestFactory().get(url, **extra)
 
     def _create_session(self, request, user):

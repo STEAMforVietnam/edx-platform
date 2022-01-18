@@ -77,20 +77,11 @@ class TestGenerate(TestCase):
         .mo files should exist, and be recently created (modified
         after start of test suite)
         """
-        # Change dummy_locales to only contain Esperanto.
-        self.configuration.dummy_locales = ['eo']
+        # Change dummy_locales to not have Esperanto present.
+        self.configuration.dummy_locales = ['fake2']
 
-        # Clear previous files.
-        for locale in self.configuration.dummy_locales:
-            for filename in ('django', 'djangojs'):
-                mofile = filename + '.mo'
-                path = os.path.join(self.configuration.get_messages_dir(locale), mofile)
-                if os.path.exists(path):
-                    os.remove(path)
-
-        # Regenerate files.
         generate.main(verbosity=0, strict=False)
-        for locale in self.configuration.dummy_locales:
+        for locale in self.configuration.translated_locales:
             for filename in ('django', 'djangojs'):
                 mofile = filename + '.mo'
                 path = os.path.join(self.configuration.get_messages_dir(locale), mofile)
@@ -118,7 +109,7 @@ class TestGenerate(TestCase):
         pof = pofile(path)
         pattern = re.compile('^#-#-#-#-#', re.M)
         match = pattern.findall(pof.header)
-        assert len(match) == 3, (f'Found {len(match)} (should be 3) merge comments in the header for {path}')
+        assert len(match) == 3, ('Found {} (should be 3) merge comments in the header for {}'.format(len(match), path))
 
 
 def random_name(size=6):

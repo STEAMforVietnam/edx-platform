@@ -4,16 +4,21 @@ Course Goals Views - includes REST API
 
 
 from django.contrib.auth import get_user_model
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.http import JsonResponse
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
+from eventtracking import tracker
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 
-from lms.djangoapps.course_goals.api import get_course_goal_options
-from lms.djangoapps.course_goals.models import GOAL_KEY_CHOICES, CourseGoal
+from common.djangoapps.track import segment
 from openedx.core.lib.api.permissions import IsStaffOrOwner
+
+from .api import get_course_goal_options
+from .models import GOAL_KEY_CHOICES, CourseGoal
 
 User = get_user_model()
 
@@ -52,8 +57,7 @@ class CourseGoalViewSet(viewsets.ModelViewSet):
     queryset = CourseGoal.objects.all()
     serializer_class = CourseGoalSerializer
 
-    # Another version of this endpoint exists in ../course_home_api/outline/views.py
-    # This version is used by the legacy frontend and is deprecated
+    # Another version of this endpoint exists in ../course_home_api/outline/v1/views.py
     def create(self, post_data):  # lint-amnesty, pylint: disable=arguments-differ
         """ Create a new goal if one does not exist, otherwise update the existing goal. """
         # Ensure goal_key is valid
@@ -102,3 +106,16 @@ class CourseGoalViewSet(viewsets.ModelViewSet):
             'is_unsure': goal_key == GOAL_KEY_CHOICES.unsure,
         }
         return JsonResponse(data, content_type="application/json", status=(200 if goal else 201))  # lint-amnesty, pylint: disable=redundant-content-type-for-json-response
+
+
+@receiver(post_save, sender=CourseGoal, dispatch_uid="emit_course_goals_event")
+def emit_course_goal_event(sender, instance, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
+    """Emit events for both tracking logs and for Segment."""
+    name = 'edx.course.goal.added' if kwargs.get('created', False) else 'edx.course.goal.updated'
+    tracker.emit(
+        name,
+        {
+            'goal_key': instance.goal_key,
+        }
+    )
+    segment.track(instance.user.id, name)

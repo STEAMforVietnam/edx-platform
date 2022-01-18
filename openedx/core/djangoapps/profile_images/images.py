@@ -11,7 +11,7 @@ from io import BytesIO
 import piexif
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from PIL import Image
 
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_storage
@@ -244,4 +244,4 @@ def _user_friendly_size(size):
     while size >= 1024 and i < len(units):
         size //= 1024
         i += 1
-    return f'{size} {units[i]}'
+    return '{} {}'.format(size, units[i])

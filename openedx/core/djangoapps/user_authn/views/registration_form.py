@@ -13,7 +13,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.validators import RegexValidator, ValidationError, slug_re
 from django.forms import widgets
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django_countries import countries
 
 from common.djangoapps import third_party_auth
@@ -89,14 +89,6 @@ def contains_html(value):
     return bool(regex.search(value))
 
 
-def contains_url(value):
-    """
-    Validator method to check whether full name contains url
-    """
-    regex = re.findall(r'https|http?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+', value)
-    return bool(regex)
-
-
 def validate_name(name):
     """
     Verifies a Full_Name is valid, raises a ValidationError otherwise.
@@ -105,8 +97,6 @@ def validate_name(name):
     """
     if contains_html(name):
         raise forms.ValidationError(_('Full Name cannot contain the following characters: < >'))
-    if contains_url(name):
-        raise forms.ValidationError(_('Enter a valid name'))
 
 
 class UsernameField(forms.CharField):
@@ -208,6 +198,13 @@ class AccountCreationForm(forms.Form):
                                 "required": _("To enroll, you must follow the honor code.")
                             }
                         )
+                elif field_name == "confirm_password":
+                    if field_value == "required" and data.get("password"):
+                        self.fields[field_name] = forms.CharField(
+                            error_messages={
+                                "required": _("Please confirm password.")
+                            }
+                        )    
                 else:
                     required = field_value == "required"
                     min_length = 1
@@ -239,6 +236,16 @@ class AccountCreationForm(forms.Form):
             temp_user = User(username=username, email=email) if username else None
             validate_password(password, temp_user)
         return password
+
+    def clean_confirm_password(self):
+        """Enforce confirm password policies (if applicable)"""
+        confirm_password = self.cleaned_data["confirm_password"]
+        if (
+                "password" in self.cleaned_data and
+                self.cleaned_data["password"] != confirm_password
+        ):
+            raise ValidationError(_("The passwords must match."))
+        return confirm_password
 
     def clean_email(self):
         """ Enforce email restrictions (if applicable) """
@@ -307,6 +314,7 @@ class RegistrationFormFactory:
 
     EXTRA_FIELDS = [
         "confirm_email",
+        "confirm_password",
         "first_name",
         "last_name",
         "city",
@@ -324,25 +332,17 @@ class RegistrationFormFactory:
         "terms_of_service",
         "profession",
         "specialty",
-        "marketing_emails_opt_in",
     ]
 
     def _is_field_visible(self, field_name):
         """Check whether a field is visible based on Django settings. """
-        return self._extra_fields_setting.get(field_name) in ["required", "optional", "optional-exposed"]
+        return self._extra_fields_setting.get(field_name) in ["required", "optional"]
 
     def _is_field_required(self, field_name):
         """Check whether a field is required based on Django settings. """
         return self._extra_fields_setting.get(field_name) == "required"
 
-    def _is_field_exposed(self, field_name):
-        """Check whether a field is optional and should be toggled. """
-        return self._extra_fields_setting.get(field_name) in ["required", "optional-exposed"]
-
     def __init__(self):
-
-        if settings.ENABLE_COPPA_COMPLIANCE and 'year_of_birth' in self.EXTRA_FIELDS:
-            self.EXTRA_FIELDS.remove('year_of_birth')
 
         # Backwards compatibility: Honor code is required by default, unless
         # explicitly set to "optional" in Django settings.
@@ -350,9 +350,6 @@ class RegistrationFormFactory:
         if not self._extra_fields_setting:
             self._extra_fields_setting = copy.deepcopy(settings.REGISTRATION_EXTRA_FIELDS)
         self._extra_fields_setting["honor_code"] = self._extra_fields_setting.get("honor_code", "required")
-
-        if settings.MARKETING_EMAILS_OPT_IN:
-            self._extra_fields_setting['marketing_emails_opt_in'] = 'optional'
 
         # Check that the setting is configured correctly
         for field_name in self.EXTRA_FIELDS:
@@ -367,11 +364,6 @@ class RegistrationFormFactory:
             handler = getattr(self, f"_add_{field_name}_field")
             self.field_handlers[field_name] = handler
 
-        custom_form = get_registration_extension_form()
-        if custom_form:
-            custom_form_field_names = [field_name for field_name, field in custom_form.fields.items()]
-            valid_fields.extend(custom_form_field_names)
-
         field_order = configuration_helpers.get_value('REGISTRATION_FIELD_ORDER')
         if not field_order:
             field_order = settings.REGISTRATION_FIELD_ORDER or valid_fields
@@ -379,8 +371,7 @@ class RegistrationFormFactory:
         # if not append missing fields at end of field order
         if set(valid_fields) != set(field_order):
             difference = set(valid_fields).difference(set(field_order))
-            # sort the additional fields so we have could have a deterministic result when presenting them
-            field_order.extend(sorted(difference))
+            field_order.extend(difference)
 
         self.field_order = field_order
 
@@ -404,58 +395,57 @@ class RegistrationFormFactory:
 
         # Custom form fields can be added via the form set in settings.REGISTRATION_EXTENSION_FORM
         custom_form = get_registration_extension_form()
+
         if custom_form:
-            custom_form_field_names = [field_name for field_name, field in custom_form.fields.items()]
-        else:
-            custom_form_field_names = []
-
-        # Go through the fields in the fields order and add them if they are required or visible
-        for field_name in self.field_order:
-            if field_name in self.DEFAULT_FIELDS:
+            # Default fields are always required
+            for field_name in self.DEFAULT_FIELDS:
                 self.field_handlers[field_name](form_desc, required=True)
-            elif self._is_field_visible(field_name) and self.field_handlers.get(field_name):
-                self.field_handlers[field_name](
-                    form_desc,
-                    required=self._is_field_required(field_name)
-                )
-            elif field_name in custom_form_field_names:
-                for custom_field_name, field in custom_form.fields.items():
-                    if field_name == custom_field_name:
-                        restrictions = {}
-                        if getattr(field, 'max_length', None):
-                            restrictions['max_length'] = field.max_length
-                        if getattr(field, 'min_length', None):
-                            restrictions['min_length'] = field.min_length
-                        field_options = getattr(
-                            getattr(custom_form, 'Meta', None), 'serialization_options', {}
-                        ).get(field_name, {})
-                        field_type = field_options.get(
-                            'field_type',
-                            FormDescription.FIELD_TYPE_MAP.get(field.__class__))
-                        if not field_type:
-                            raise ImproperlyConfigured(
-                                "Field type '{}' not recognized for registration extension field '{}'.".format(
-                                    field_type,
-                                    field_name
-                                )
-                            )
-                        if self._is_field_visible(field_name) or field.required:
-                            form_desc.add_field(
-                                field_name,
-                                label=field.label,
-                                default=field_options.get('default'),
-                                field_type=field_options.get(
-                                    'field_type',
-                                    FormDescription.FIELD_TYPE_MAP.get(field.__class__)),
-                                placeholder=field.initial,
-                                instructions=field.help_text,
-                                exposed=self._is_field_exposed(field_name),
-                                required=(self._is_field_required(field_name) or field.required),
-                                restrictions=restrictions,
-                                options=getattr(field, 'choices', None), error_messages=field.error_messages,
-                                include_default_option=field_options.get('include_default_option'),
-                            )
 
+            for field_name, field in custom_form.fields.items():
+                restrictions = {}
+                if getattr(field, 'max_length', None):
+                    restrictions['max_length'] = field.max_length
+                if getattr(field, 'min_length', None):
+                    restrictions['min_length'] = field.min_length
+                field_options = getattr(
+                    getattr(custom_form, 'Meta', None), 'serialization_options', {}
+                ).get(field_name, {})
+                field_type = field_options.get('field_type', FormDescription.FIELD_TYPE_MAP.get(field.__class__))
+                if not field_type:
+                    raise ImproperlyConfigured(
+                        "Field type '{}' not recognized for registration extension field '{}'.".format(
+                            field_type,
+                            field_name
+                        )
+                    )
+                form_desc.add_field(
+                    field_name, label=field.label,
+                    default=field_options.get('default'),
+                    field_type=field_options.get('field_type', FormDescription.FIELD_TYPE_MAP.get(field.__class__)),
+                    placeholder=field.initial, instructions=field.help_text, required=field.required,
+                    restrictions=restrictions,
+                    options=getattr(field, 'choices', None), error_messages=field.error_messages,
+                    include_default_option=field_options.get('include_default_option'),
+                )
+
+            # Extra fields configured in Django settings
+            # may be required, optional, or hidden
+            for field_name in self.EXTRA_FIELDS:
+                if self._is_field_visible(field_name):
+                    self.field_handlers[field_name](
+                        form_desc,
+                        required=self._is_field_required(field_name)
+                    )
+        else:
+            # Go through the fields in the fields order and add them if they are required or visible
+            for field_name in self.field_order:
+                if field_name in self.DEFAULT_FIELDS:
+                    self.field_handlers[field_name](form_desc, required=True)
+                elif self._is_field_visible(field_name):
+                    self.field_handlers[field_name](
+                        form_desc,
+                        required=self._is_field_required(field_name)
+                    )
         # remove confirm_email form v1 registration form
         if is_api_v1(request):
             for index, field in enumerate(form_desc.fields):
@@ -590,6 +580,25 @@ class RegistrationFormFactory:
             required=required
         )
 
+    def _add_confirm_password_field(self, form_desc, required=True):
+        """Add a password confirmation field to a form description
+        Args:
+            form_desc: A form description
+            required: Whether this field is required. Defaults to True.
+        """
+        confirm_password_label = _(u"Confirm Password")
+
+        error_msg = _(u"Please confirm password.")
+
+        form_desc.add_field(
+            "confirm_password",
+            label=confirm_password_label,
+            field_type="password",
+            instructions=password_validators_instruction_texts(),
+            restrictions=password_validators_restrictions(),
+            required=required
+        )        
+
     def _add_level_of_education_field(self, form_desc, required=True):
         """Add a level of education field to a form description.
         Arguments:
@@ -604,10 +613,7 @@ class RegistrationFormFactory:
 
         # The labels are marked for translation in UserProfile model definition.
         # pylint: disable=translation-of-non-string
-
         options = [(name, _(label)) for name, label in UserProfile.LEVEL_OF_EDUCATION_CHOICES]
-        if settings.ENABLE_COPPA_COMPLIANCE:
-            options = filter(lambda op: op[0] != 'el', options)
         form_desc.add_field(
             "level_of_education",
             label=education_level_label,
@@ -662,27 +668,6 @@ class RegistrationFormFactory:
             options=options,
             include_default_option=True,
             required=required
-        )
-
-    def _add_marketing_emails_opt_in_field(self, form_desc, required=False):
-        """Add a marketing email checkbox to form description.
-        Arguments:
-            form_desc: A form description
-        Keyword Arguments:
-            required (bool): Whether this field is required; defaults to False
-        """
-        opt_in_label = _(
-            'I agree that {platform_name} may send me marketing messages.').format(
-                platform_name=configuration_helpers.get_value('PLATFORM_NAME', settings.PLATFORM_NAME),
-        )
-
-        form_desc.add_field(
-            'marketing_emails_opt_in',
-            label=opt_in_label,
-            field_type="checkbox",
-            exposed=True,
-            default=True,  # the checkbox will automatically be checked; meaning user has opted in
-            required=required,
         )
 
     def _add_field_with_configurable_select_options(self, field_name, field_label, form_desc, required=False):

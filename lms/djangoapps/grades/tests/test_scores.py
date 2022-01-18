@@ -16,7 +16,7 @@ import lms.djangoapps.grades.scores as scores
 from lms.djangoapps.grades.models import BlockRecord
 from lms.djangoapps.grades.transformer import GradesTransformer
 from openedx.core.djangoapps.content.block_structure.block_structure import BlockData
-from xmodule.graders import ProblemScore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.graders import ProblemScore
 
 NOW = now()
 
@@ -46,7 +46,7 @@ def expected_result_repr(self):
     for consistency of ddt-generated test methods across pytest-xdist workers.
     """
     included = ('raw_earned', 'raw_possible', 'weighted_earned', 'weighted_possible', 'weight', 'graded')
-    attributes = [f'{name}={getattr(self, name)}' for name in included]
+    attributes = ['{}={}'.format(name, getattr(self, name)) for name in included]
     return '<ExpectedResult {}>'.format(' '.join(attributes))
 
 

@@ -43,8 +43,8 @@ from common.djangoapps.student.roles import CourseStaffRole
 from common.djangoapps.student.tests.factories import AdminFactory, SuperuserFactory, UserFactory
 from common.djangoapps.util.models import RateLimitConfiguration
 from common.djangoapps.util.testing import UrlResetMixin
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, check_mongo_calls_range  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, check_mongo_calls_range
 
 
 class EnrollmentTestMixin:
@@ -1260,7 +1260,7 @@ def cross_domain_config(func):
         'ENABLE_CROSS_DOMAIN_CSRF_COOKIE': True
     })
     settings_decorator = override_settings(
-        CORS_ORIGIN_WHITELIST=["https://www.edx.org"],
+        CORS_ORIGIN_WHITELIST=["www.edx.org"],
         CROSS_DOMAIN_CSRF_COOKIE_NAME="prod-edx-csrftoken",
         CROSS_DOMAIN_CSRF_COOKIE_DOMAIN=".edx.org"
     )

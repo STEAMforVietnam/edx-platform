@@ -4,8 +4,10 @@ Models for the ccxcon
 
 
 from django.db import models
+from django.utils.encoding import python_2_unicode_compatible
 
 
+@python_2_unicode_compatible
 class CCXCon(models.Model):
     """
     Definition of the CCXCon model.

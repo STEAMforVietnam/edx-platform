@@ -25,7 +25,7 @@ from openedx.core.djangoapps.django_comment_common.models import ForumsConfig
 from openedx.core.djangoapps.django_comment_common.signals import comment_created
 from openedx.core.djangoapps.site_configuration.tests.factories import SiteConfigurationFactory
 from openedx.core.lib.celery.task_utils import emulate_http_request
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 
 NOW = datetime.utcnow()
 ONE_HOUR_AGO = NOW - timedelta(hours=1)
@@ -212,7 +212,7 @@ class TaskTestCase(ModuleStoreTestCase):  # lint-amnesty, pylint: disable=missin
                 'thread_title': 'thread-title',
                 'thread_username': self.thread_author.username,
                 'thread_commentable_id': self.thread['commentable_id'],
-                'post_link': f'https://{site.domain}{self.mock_permalink.return_value}',
+                'post_link': 'https://{}{}'.format(site.domain, self.mock_permalink.return_value),
                 'site': site,
                 'site_id': site.id
             })

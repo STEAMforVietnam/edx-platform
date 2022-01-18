@@ -1,6 +1,8 @@
 """
 Test audit user's access to various content based on content-gating features.
 """
+
+
 import os
 from datetime import datetime, timedelta
 
@@ -10,26 +12,29 @@ from django.test.client import RequestFactory, Client
 from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
-from django.contrib.auth import get_user_model
-from unittest.mock import patch, Mock  # lint-amnesty, pylint: disable=wrong-import-order
+from django.contrib.auth.models import User
+from unittest.mock import patch, Mock
 from pyquery import PyQuery as pq
 
 from lms.djangoapps.course_api.blocks.api import get_blocks
 from common.djangoapps.course_modes.tests.factories import CourseModeFactory
-from common.djangoapps.student.tests.factories import BetaTesterFactory
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import InstructorFactory
-from common.djangoapps.student.tests.factories import OrgInstructorFactory
-from common.djangoapps.student.tests.factories import OrgStaffFactory
-from common.djangoapps.student.tests.factories import StaffFactory
 from lms.djangoapps.courseware.module_render import load_single_xblock
+from lms.djangoapps.courseware.tests.factories import (
+    BetaTesterFactory,
+    GlobalStaffFactory,
+    InstructorFactory,
+    OrgInstructorFactory,
+    OrgStaffFactory,
+    StaffFactory
+)
 from lms.djangoapps.courseware.tests.helpers import MasqueradeMixin
 from lms.djangoapps.discussion.django_comment_client.tests.factories import RoleFactory
 from openedx.core.djangoapps.django_comment_common.models import (
     FORUM_ROLE_ADMINISTRATOR,
     FORUM_ROLE_COMMUNITY_TA,
     FORUM_ROLE_GROUP_MODERATOR,
-    FORUM_ROLE_MODERATOR
+    FORUM_ROLE_MODERATOR,
+    Role
 )
 from openedx.core.djangoapps.user_api.tests.factories import UserCourseTagFactory
 from openedx.core.djangoapps.util.testing import TestConditionalContent
@@ -42,16 +47,15 @@ from openedx.features.content_type_gating.services import ContentTypeGatingServi
 from common.djangoapps.student.models import CourseEnrollment, FBEEnrollmentExclusion
 from common.djangoapps.student.roles import CourseInstructorRole
 from common.djangoapps.student.tests.factories import TEST_PASSWORD, CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID
 
 METADATA = {
     'group_access': {
         CONTENT_GATING_PARTITION_ID: [CONTENT_TYPE_GATE_GROUP_IDS['full_access']]
     }
 }
-User = get_user_model()
 
 
 @patch("crum.get_current_request")
@@ -114,7 +118,7 @@ def _assert_block_is_gated(block, is_gated, user, course, request_factory, has_u
     checkout_link = '#' if has_upgrade_link else None
     for content_getter in (_get_content_from_fragment, _get_content_from_lms_index):
         with patch.object(ContentTypeGatingPartition, '_get_checkout_link', return_value=checkout_link):
-            content = content_getter(block, user.id, course, request_factory)  # pylint: disable=no-value-for-parameter
+            content = content_getter(block, user.id, course, request_factory)
         if is_gated:
             assert 'content-paywall' in content
             if has_upgrade_link:
@@ -125,23 +129,20 @@ def _assert_block_is_gated(block, is_gated, user, course, request_factory, has_u
             assert 'content-paywall' not in content
 
     fake_request = request_factory.get('')
-    requested_fields = ['block_id', 'contains_gated_content', 'display_name', 'student_view_data', 'student_view_url']
-    blocks = get_blocks(fake_request, course.location, user=user, requested_fields=requested_fields,
-                        student_view_data=['html'])
-    course_api_block = blocks['blocks'][str(block.location)]
-
-    assert course_api_block.get('contains_gated_content', False) == is_gated
-
-    if is_gated:
-        assert 'authorization_denial_reason' in course_api_block
-        assert 'block_id' in course_api_block
-        assert 'display_name' in course_api_block
-        assert 'student_view_data' not in course_api_block
-        assert 'student_view_url' in course_api_block
-    else:
-        assert 'authorization_denial_reason' not in course_api_block
-        if block.category == 'html':
-            assert 'student_view_data' in course_api_block
+    with patch('lms.djangoapps.course_api.blocks.api.is_request_from_mobile_app', return_value=False):
+        requested_fields = ['display_name', 'block_id', 'student_view_url', 'student_view_data']
+        blocks = get_blocks(fake_request, course.location, user=user, requested_fields=requested_fields, student_view_data=['html'])
+        course_api_block = blocks['blocks'][str(block.location)]
+        if is_gated:
+            assert 'authorization_denial_reason' in course_api_block
+            assert "display_name" in course_api_block
+            assert "block_id" in course_api_block
+            assert "student_view_url" in course_api_block
+            assert "student_view_data" not in course_api_block
+        else:
+            assert 'authorization_denial_reason' not in course_api_block
+            if block.category == 'html':
+                assert 'student_view_data' in course_api_block
 
 
 def _assert_block_is_empty(block, user_id, course, request_factory):
@@ -161,7 +162,7 @@ def _assert_block_is_empty(block, user_id, course, request_factory):
 @override_settings(FIELD_OVERRIDE_PROVIDERS=(
     'openedx.features.content_type_gating.field_override.ContentTypeGatingFieldOverride',
 ))
-class TestProblemTypeAccess(SharedModuleStoreTestCase, MasqueradeMixin):  # pylint: disable=missing-class-docstring
+class TestProblemTypeAccess(SharedModuleStoreTestCase, MasqueradeMixin):
 
     PROBLEM_TYPES = ['problem', 'openassessment', 'drag-and-drop-v2', 'done', 'edx_sga']
     # 'html' is a component that just displays html, in these tests it is used to test that users who do not have access
@@ -801,13 +802,9 @@ class TestConditionalContentAccess(TestConditionalContent):
         self.student_audit_b = self.student_b
 
         # Create verified students
-        self.student_verified_a = UserFactory.create(
-            username='student_verified_a', email='student_verified_a@example.com'
-        )
+        self.student_verified_a = UserFactory.create(username='student_verified_a', email='student_verified_a@example.com')
         CourseEnrollmentFactory.create(user=self.student_verified_a, course_id=self.course.id, mode='verified')
-        self.student_verified_b = UserFactory.create(
-            username='student_verified_b', email='student_verified_b@example.com'
-        )
+        self.student_verified_b = UserFactory.create(username='student_verified_b', email='student_verified_b@example.com')
         CourseEnrollmentFactory.create(user=self.student_verified_b, course_id=self.course.id, mode='verified')
 
         # Put students into content gating groups
@@ -837,8 +834,7 @@ class TestConditionalContentAccess(TestConditionalContent):
 
     def test_access_based_on_conditional_content(self):
         """
-        If a user is enrolled as an audit user they should not have access to graded problems,
-        including conditional content.
+        If a user is enrolled as an audit user they should not have access to graded problems, including conditional content.
         All paid type tracks should have access graded problems including conditional content.
         """
 
@@ -898,7 +894,7 @@ class TestMessageDeduplication(ModuleStoreTestCase):
         self.request_factory = RequestFactory()
         ContentTypeGatingConfig.objects.create(enabled=True, enabled_as_of=datetime(2018, 1, 1))
 
-    def _create_course(self):  # pylint: disable=missing-function-docstring
+    def _create_course(self):
         course = CourseFactory.create(run='test', display_name='test')
         CourseModeFactory.create(course_id=course.id, mode_slug='audit')
         CourseModeFactory.create(course_id=course.id, mode_slug='verified')
@@ -1107,7 +1103,7 @@ class TestContentTypeGatingService(ModuleStoreTestCase):
         self.request_factory = RequestFactory()
         ContentTypeGatingConfig.objects.create(enabled=True, enabled_as_of=datetime(2018, 1, 1))
 
-    def _create_course(self):  # pylint: disable=missing-function-docstring
+    def _create_course(self):
         course = CourseFactory.create(run='test', display_name='test')
         CourseModeFactory.create(course_id=course.id, mode_slug='audit')
         CourseModeFactory.create(course_id=course.id, mode_slug='verified')
@@ -1156,14 +1152,10 @@ class TestContentTypeGatingService(ModuleStoreTestCase):
         )
 
         # The method returns a content type gate for blocks that should be gated
-        assert 'content-paywall' in ContentTypeGatingService()._content_type_gate_for_block(  # pylint: disable=protected-access
-            self.user, blocks_dict['graded_1'], course['course'].id
-        ).content
+        assert 'content-paywall' in ContentTypeGatingService()._content_type_gate_for_block(self.user, blocks_dict['graded_1'], course['course'].id).content
 
         # The method returns None for blocks that should not be gated
-        assert ContentTypeGatingService()._content_type_gate_for_block(  # pylint: disable=protected-access
-            self.user, blocks_dict['not_graded_1'], course['course'].id
-        ) is None
+        assert ContentTypeGatingService()._content_type_gate_for_block(self.user, blocks_dict['not_graded_1'], course['course'].id) is None
 
     @patch.object(ContentTypeGatingService, '_get_user', return_value=UserFactory.build())
     def test_check_children_for_content_type_gating_paywall(self, mocked_user):  # pylint: disable=unused-argument
@@ -1183,9 +1175,7 @@ class TestContentTypeGatingService(ModuleStoreTestCase):
         )
 
         # The method returns a content type gate for blocks that should be gated
-        assert ContentTypeGatingService().check_children_for_content_type_gating_paywall(
-            blocks_dict['vertical'], course['course'].id
-        ) is None
+        assert ContentTypeGatingService().check_children_for_content_type_gating_paywall(blocks_dict['vertical'], course['course'].id) is None
 
         blocks_dict['graded_1'] = ItemFactory.create(
             parent=blocks_dict['vertical'],
@@ -1195,6 +1185,4 @@ class TestContentTypeGatingService(ModuleStoreTestCase):
         )
 
         # The method returns None for blocks that should not be gated
-        assert 'content-paywall' in ContentTypeGatingService().check_children_for_content_type_gating_paywall(
-            blocks_dict['vertical'], course['course'].id
-        )
+        assert 'content-paywall' in ContentTypeGatingService().check_children_for_content_type_gating_paywall(blocks_dict['vertical'], course['course'].id)

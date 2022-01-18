@@ -14,7 +14,6 @@ from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.course_modes.tests.factories import CourseModeFactory
 from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.courseware.models import DynamicUpgradeDeadlineConfiguration
-from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 from openedx.core.djangoapps.schedules.models import Schedule
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
@@ -37,7 +36,6 @@ class TestAccess(CacheIsolationTestCase):
 
         CourseDurationLimitConfig.objects.create(enabled=True, enabled_as_of=datetime(2018, 1, 1, tzinfo=UTC))
         DynamicUpgradeDeadlineConfiguration.objects.create(enabled=True)
-        self.course = CourseOverviewFactory.create(start=datetime(2018, 1, 1, tzinfo=UTC), self_paced=True)
 
     def assertDateInMessage(self, date, message):  # lint-amnesty, pylint: disable=missing-function-docstring
         # First, check that the formatted version is in there
@@ -102,7 +100,10 @@ class TestAccess(CacheIsolationTestCase):
         else:
             course_upgrade_deadline = None
 
-        enrollment = CourseEnrollmentFactory.create(course=self.course)
+        enrollment = CourseEnrollmentFactory.create(
+            course__start=datetime(2018, 1, 1, tzinfo=UTC),
+            course__self_paced=True,
+        )
         CourseModeFactory.create(
             course_id=enrollment.course.id,
             mode_slug=CourseMode.VERIFIED,
@@ -139,7 +140,10 @@ class TestAccess(CacheIsolationTestCase):
         enrollment date, content_availability_date is set to max of course start
         or enrollment date
         """
-        enrollment = CourseEnrollmentFactory.create(course=self.course)
+        enrollment = CourseEnrollmentFactory.create(
+            course__start=datetime(2018, 1, 1, tzinfo=UTC),
+            course__self_paced=True,
+        )
         CourseModeFactory.create(
             course_id=enrollment.course.id,
             mode_slug=CourseMode.VERIFIED,

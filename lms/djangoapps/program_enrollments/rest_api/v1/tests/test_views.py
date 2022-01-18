@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import ddt
 from django.conf import settings
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.core.cache import cache
 from django.test import override_settings
 from django.urls import reverse
@@ -25,12 +26,11 @@ from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.roles import CourseStaffRole
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import InstructorFactory
 from common.djangoapps.third_party_auth.tests.factories import SAMLProviderConfigFactory
 from lms.djangoapps.bulk_email.models import BulkEmailFlag, Optout
-from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.certificates.models import CertificateStatuses
 from lms.djangoapps.certificates.tests.factories import GeneratedCertificateFactory
+from lms.djangoapps.courseware.tests.factories import GlobalStaffFactory, InstructorFactory
 from lms.djangoapps.grades.api import CourseGradeFactory
 from lms.djangoapps.program_enrollments.constants import ProgramCourseOperationStatuses as CourseStatuses
 from lms.djangoapps.program_enrollments.constants import ProgramOperationStatuses as ProgramStatuses
@@ -52,9 +52,9 @@ from openedx.core.djangoapps.catalog.tests.factories import (
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 from openedx.core.djangolib.testing.utils import CacheIsolationMixin
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory as ModulestoreCourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory as ModulestoreCourseFactory
+from xmodule.modulestore.tests.factories import ItemFactory
 
 from .. import views
 from ..constants import (
@@ -498,7 +498,7 @@ class ProgramEnrollmentsPostTests(ProgramEnrollmentsWriteMixin, APITestCase):
                 'curriculum_uuid': str(self.curriculum_uuid)
             }
         ]
-        user = UserFactory.create(username='test_user', email='test@example.com', password='password')
+        user = User.objects.create_user('test_user', 'test@example.com', 'password')
         url = self.get_url()
         with mock.patch(
                 _get_users_patch_path,
@@ -2095,7 +2095,7 @@ class ProgramCourseEnrollmentOverviewGetTests(
     def test_course_run_url(self):
         self.log_in()
 
-        course_run_url = f'http://testserver/courses/{str(self.course_id)}/course/'
+        course_run_url = 'http://testserver/courses/{}/course/'.format(str(self.course_id))
 
         response_status_code, response_course_runs = self.get_status_and_course_runs()
         assert status.HTTP_200_OK == response_status_code
@@ -2129,7 +2129,7 @@ class ProgramCourseEnrollmentOverviewGetTests(
         course_run_overview = response_course_runs[0]
 
         assert course_run_overview['course_run_id'] == str(self.course_id)
-        assert course_run_overview['display_name'] == f'{str(self.course_id)} Course'
+        assert course_run_overview['display_name'] == '{} Course'.format(str(self.course_id))
 
     def test_emails_enabled(self):
         self.log_in()
@@ -2408,25 +2408,6 @@ class EnrollmentDataResetViewTests(ProgramCacheMixin, APITestCase):
         assert response.status_code == status.HTTP_200_OK
         mock_call_command.assert_has_calls([
             mock.call(self.reset_users_cmd, self.provider.slug, force=True),
-            mock.call(self.reset_enrollments_cmd, ','.join(programs), force=True),
-        ])
-
-    @override_settings(FEATURES=FEATURES_WITH_ENABLED)
-    @patch_call_command
-    def test_reset_with_multiple_idp(self, mock_call_command):
-        programs = [str(uuid4()), str(uuid4())]
-        self.set_org_in_catalog_cache(self.organization, programs)
-        provider_2 = SAMLProviderConfigFactory(
-            organization=self.organization,
-            slug='test-shib-2',
-            enabled=True,
-        )
-
-        response = self.request(self.organization.short_name)
-        assert response.status_code == status.HTTP_200_OK
-        mock_call_command.assert_has_calls([
-            mock.call(self.reset_users_cmd, self.provider.slug, force=True),
-            mock.call(self.reset_users_cmd, provider_2.slug, force=True),
             mock.call(self.reset_enrollments_cmd, ','.join(programs), force=True),
         ])
 

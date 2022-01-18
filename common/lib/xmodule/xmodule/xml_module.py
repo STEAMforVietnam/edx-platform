@@ -5,7 +5,9 @@ import copy
 import json
 import logging
 import os
+import sys
 
+import six
 from lxml import etree
 from lxml.etree import Element, ElementTree, XMLParser
 from xblock.core import XML_NAMESPACES
@@ -18,7 +20,9 @@ from xmodule.x_module import XModuleDescriptor  # lint-amnesty, pylint: disable=
 log = logging.getLogger(__name__)
 
 # assume all XML files are persisted as utf-8.
-EDX_XML_PARSER = XMLParser(dtd_validation=False, load_dtd=False, remove_blank_text=True, encoding='utf-8')
+EDX_XML_PARSER = XMLParser(dtd_validation=False, load_dtd=False,
+                           remove_comments=True, remove_blank_text=True,
+                           encoding='utf-8')
 
 
 def name_to_pathname(name):
@@ -209,7 +213,9 @@ class XmlParserMixin:
                 return cls.file_to_xml(xml_file)
         except Exception as err:  # lint-amnesty, pylint: disable=broad-except
             # Add info about where we are, but keep the traceback
-            raise Exception(f'Unable to load file contents at path {filepath} for item {def_id}: {err}') from err
+            msg = 'Unable to load file contents at path {} for item {}: {} '.format(
+                filepath, def_id, err)
+            six.reraise(Exception, msg, sys.exc_info()[2])
 
     @classmethod
     def load_definition(cls, xml_object, system, def_id, id_generator):

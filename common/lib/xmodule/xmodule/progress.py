@@ -9,7 +9,7 @@ frac() and __str__().
 import numbers
 
 
-class Progress:
+class Progress:  # pylint: disable=eq-without-hash
     '''Represents a progress of a/b (a out of b done)
 
     a and b must be numeric, but not necessarily integer, with
@@ -31,10 +31,10 @@ class Progress:
                 isinstance(b, numbers.Number)):
             raise TypeError(f'a and b must be numbers.  Passed {a}/{b}')
 
-        if a > b:  # lint-amnesty, pylint: disable=consider-using-min-builtin
+        if a > b:
             a = b
 
-        if a < 0:  # lint-amnesty, pylint: disable=consider-using-max-builtin
+        if a < 0:
             a = 0
 
         if b <= 0:
@@ -117,7 +117,7 @@ class Progress:
         '''
         (a, b) = self.frac()
         display = lambda n: f'{n:.2f}'.rstrip('0').rstrip('.')
-        return f"{display(a)}/{display(b)}"
+        return "{}/{}".format(display(a), display(b))
 
     @staticmethod
     def add_counts(a, b):

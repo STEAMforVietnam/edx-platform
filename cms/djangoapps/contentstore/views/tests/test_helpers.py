@@ -6,7 +6,7 @@ Unit tests for helpers.py.
 from django.utils import http
 
 from cms.djangoapps.contentstore.tests.utils import CourseTestCase
-from xmodule.modulestore.tests.factories import ItemFactory, LibraryFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import ItemFactory, LibraryFactory
 
 from ..helpers import xblock_studio_url, xblock_type_display_name
 
@@ -19,7 +19,7 @@ class HelpersTestCase(CourseTestCase):
     def test_xblock_studio_url(self):
 
         # Verify course URL
-        course_url = f'/course/{str(self.course.id)}'
+        course_url = '/course/{}'.format(str(self.course.id))
         self.assertEqual(xblock_studio_url(self.course), course_url)
 
         # Verify chapter URL
@@ -27,7 +27,7 @@ class HelpersTestCase(CourseTestCase):
                                      display_name="Week 1")
         self.assertEqual(
             xblock_studio_url(chapter),
-            f'{course_url}?show={http.urlquote(str(chapter.location).encode())}'
+            '{}?show={}'.format(course_url, http.urlquote(str(chapter.location).encode()))
         )
 
         # Verify sequential URL
@@ -35,7 +35,7 @@ class HelpersTestCase(CourseTestCase):
                                         display_name="Lesson 1")
         self.assertEqual(
             xblock_studio_url(sequential),
-            f'{course_url}?show={http.urlquote(str(sequential.location).encode())}'
+            '{}?show={}'.format(course_url, http.urlquote(str(sequential.location).encode()))
         )
 
         # Verify unit URL
@@ -55,7 +55,7 @@ class HelpersTestCase(CourseTestCase):
 
         # Verify library URL
         library = LibraryFactory.create()
-        expected_url = f'/library/{str(library.location.library_key)}'
+        expected_url = '/library/{}'.format(str(library.location.library_key))
         self.assertEqual(xblock_studio_url(library), expected_url)
 
     def test_xblock_type_display_name(self):

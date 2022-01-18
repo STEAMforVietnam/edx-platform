@@ -11,7 +11,6 @@ import HeaderView from './program_header_view';
 import SidebarView from './program_details_sidebar_view';
 
 import pageTpl from '../../../templates/learner_dashboard/program_details_view.underscore';
-import tabPageTpl from '../../../templates/learner_dashboard/program_details_tab_view.underscore';
 import trackECommerceEvents from '../../commerce/track_ecommerce_events';
 
 class ProgramDetailsView extends Backbone.View {
@@ -27,11 +26,7 @@ class ProgramDetailsView extends Backbone.View {
 
   initialize(options) {
     this.options = options;
-    if (this.options.programTabViewEnabled) {
-      this.tpl = HtmlUtils.template(tabPageTpl);
-    } else {
-      this.tpl = HtmlUtils.template(pageTpl);
-    }
+    this.tpl = HtmlUtils.template(pageTpl);
     this.programModel = new Backbone.Model(this.options.programData);
     this.courseData = new Backbone.Model(this.options.courseData);
     this.certificateCollection = new Backbone.Collection(this.options.certificateData);
@@ -79,10 +74,6 @@ class ProgramDetailsView extends Backbone.View {
       remainingCount,
       completedCount,
       completeProgramURL: buyButtonUrl,
-      programTabViewEnabled: this.options.programTabViewEnabled,
-      industryPathways: this.options.industryPathways,
-      creditPathways: this.options.creditPathways,
-      discussionFragment: this.options.discussionFragment,
     };
     data = $.extend(data, this.programModel.toJSON());
     HtmlUtils.setHtml(this.$el, this.tpl(data));
@@ -132,7 +123,6 @@ class ProgramDetailsView extends Backbone.View {
       programRecordUrl: this.options.urls.program_record_url,
       industryPathways: this.options.industryPathways,
       creditPathways: this.options.creditPathways,
-      programTabViewEnabled: this.options.programTabViewEnabled,
     });
   }
 

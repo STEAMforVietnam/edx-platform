@@ -214,6 +214,7 @@ intersphinx_mapping = {
 # Mock out these external modules during code import to avoid errors
 autodoc_mock_imports = [
     'MySQLdb',
+    'contracts',
     'django_mysql',
     'pymongo',
 ]

@@ -6,18 +6,17 @@ Implementation of "Instructor" service
 import logging
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey, UsageKey
 
 import lms.djangoapps.instructor.enrollment as enrollment
 from common.djangoapps.student import auth
-from common.djangoapps.student.models import get_user_by_username_or_email
 from common.djangoapps.student.roles import CourseStaffRole
 from lms.djangoapps.commerce.utils import create_zendesk_ticket
 from lms.djangoapps.courseware.models import StudentModule
-from lms.djangoapps.instructor.tasks import update_exam_completion_task
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from lms.djangoapps.instructor.views.tools import get_student_from_identifier
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)
 
@@ -45,12 +44,15 @@ class InstructorService:
         course_id = CourseKey.from_string(course_id)
 
         try:
-            student = get_user_by_username_or_email(student_identifier)
+            student = get_student_from_identifier(student_identifier)
         except ObjectDoesNotExist:
             err_msg = (
                 'Error occurred while attempting to reset student attempts for user '
-                f'{student_identifier} for content_id {content_id}. '
-                'User does not exist!'
+                '{student_identifier} for content_id {content_id}. '
+                'User does not exist!'.format(
+                    student_identifier=student_identifier,
+                    content_id=content_id
+                )
             )
             log.error(err_msg)
             return
@@ -76,31 +78,12 @@ class InstructorService:
             except (StudentModule.DoesNotExist, enrollment.sub_api.SubmissionError):
                 err_msg = (
                     'Error occurred while attempting to reset student attempts for user '
-                    f'{student_identifier} for content_id {content_id}.'
+                    '{student_identifier} for content_id {content_id}.'.format(
+                        student_identifier=student_identifier,
+                        content_id=content_id
+                    )
                 )
                 log.error(err_msg)
-
-            # In some cases, reset_student_attempts does not clear the entire exam's completion state.
-            # One example of this is an exam with multiple units (verticals) within it and the learner
-            # never viewing one of the units. All of the content in that unit will still be marked complete,
-            # but the reset code is unable to handle clearing the completion in that scenario.
-            update_exam_completion_task.apply_async((student_identifier, content_id, 0.0))
-
-    def complete_student_attempt(self, user_identifier: str, content_id: str) -> None:
-        """
-        Calls the update_exam_completion_task, marking the exam as complete.
-
-        The task submits all completable xblocks inside of the content_id block to the
-        Completion Service to mark them as complete. One use case of this function is
-        for special exams (timed/proctored) where regardless of submission status on
-        individual problems, we want to mark the entire exam as complete when the exam
-        is finished.
-
-        params:
-            user_identifier (str): username or email of a user
-            content_id (str): the block key for a piece of content
-        """
-        update_exam_completion_task.apply_async((user_identifier, content_id, 1.0))
 
     def is_course_staff(self, user, course_id):
         """

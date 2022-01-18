@@ -4,22 +4,23 @@ Views for login / logout and associated functionality
 Much of this file was broken out from views.py, previous history can be found there.
 """
 
-import hashlib
 import json
 import logging
+import hashlib
 import re
 import urllib
 
 from django.conf import settings
-from django.contrib import admin
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import authenticate
 from django.contrib.auth import login as django_login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
+from django.contrib import admin
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import csrf_exempt, csrf_protect, ensure_csrf_cookie
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_http_methods
@@ -27,40 +28,32 @@ from edx_django_utils.monitoring import set_custom_attribute
 from ratelimit.decorators import ratelimit
 from rest_framework.views import APIView
 
-from openedx_events.learning.data import UserData, UserPersonalData
-from openedx_events.learning.signals import SESSION_LOGIN_COMPLETED
-
-from common.djangoapps import third_party_auth
 from common.djangoapps.edxmako.shortcuts import render_to_response
+from openedx.core.djangoapps.password_policy import compliance as password_policy_compliance
+from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+from openedx.core.djangoapps.user_authn.views.login_form import get_login_session_form
+from openedx.core.djangoapps.user_authn.cookies import get_response_with_refreshed_jwt_cookies, set_logged_in_cookies
+from openedx.core.djangoapps.user_authn.exceptions import AuthFailedError
+from openedx.core.djangoapps.user_authn.toggles import should_redirect_to_authn_microfrontend
+from openedx.core.djangoapps.util.user_messages import PageLevelMessages
+from openedx.core.djangoapps.user_authn.views.password_reset import send_password_reset_email_for_user
+from openedx.core.djangoapps.user_authn.views.utils import ENTERPRISE_ENROLLMENT_URL_REGEX, UUID4_REGEX
+from openedx.core.djangoapps.user_authn.toggles import is_require_third_party_auth_enabled
+from openedx.core.djangoapps.user_authn.config.waffle import ENABLE_LOGIN_USING_THIRDPARTY_AUTH_ONLY
+from openedx.core.djangolib.markup import HTML, Text
+from openedx.core.lib.api.view_utils import require_post_params
+from openedx.features.enterprise_support.api import activate_learner_enterprise, get_enterprise_learner_data_from_api
 from common.djangoapps.student.helpers import get_next_url_for_login_page, get_redirect_url_with_host
-from common.djangoapps.student.models import AllowedAuthUser, LoginFailures, UserProfile
+from common.djangoapps.student.models import LoginFailures, AllowedAuthUser, UserProfile
 from common.djangoapps.student.views import compose_and_send_activation_email
 from common.djangoapps.third_party_auth import pipeline, provider
+from common.djangoapps import third_party_auth
 from common.djangoapps.track import segment
 from common.djangoapps.util.json_request import JsonResponse
 from common.djangoapps.util.password_policy_validators import normalize_password
-from openedx.core.djangoapps.password_policy import compliance as password_policy_compliance
-from openedx.core.djangoapps.safe_sessions.middleware import mark_user_change_as_expected
-from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
-from openedx.core.djangoapps.user_authn.config.waffle import ENABLE_LOGIN_USING_THIRDPARTY_AUTH_ONLY
-from openedx.core.djangoapps.user_authn.cookies import get_response_with_refreshed_jwt_cookies, set_logged_in_cookies
-from openedx.core.djangoapps.user_authn.exceptions import AuthFailedError
-from openedx.core.djangoapps.user_authn.toggles import (
-    is_require_third_party_auth_enabled,
-    should_redirect_to_authn_microfrontend
-)
-from openedx.core.djangoapps.user_authn.views.login_form import get_login_session_form
-from openedx.core.djangoapps.user_authn.views.password_reset import send_password_reset_email_for_user
-from openedx.core.djangoapps.user_authn.views.utils import API_V1, ENTERPRISE_ENROLLMENT_URL_REGEX, UUID4_REGEX
-from openedx.core.djangoapps.user_authn.tasks import check_pwned_password_and_send_track_event
-from openedx.core.djangoapps.util.user_messages import PageLevelMessages
-from openedx.core.djangolib.markup import HTML, Text
-from openedx.core.lib.api.view_utils import require_post_params  # lint-amnesty, pylint: disable=unused-import
-from openedx.features.enterprise_support.api import activate_learner_enterprise, get_enterprise_learner_data_from_api
 
 log = logging.getLogger("edx.student")
 AUDIT_LOG = logging.getLogger("audit")
-USER_MODEL = get_user_model()
 
 
 def _do_third_party_auth(request):
@@ -76,7 +69,7 @@ def _do_third_party_auth(request):
 
     try:
         return pipeline.get_authenticated_user(requested_provider, username, third_party_uid)
-    except USER_MODEL.DoesNotExist:
+    except User.DoesNotExist:
         AUDIT_LOG.info(
             "Login failed - user with username {username} has no social auth "
             "with backend_name {backend_name}".format(
@@ -101,50 +94,20 @@ def _do_third_party_auth(request):
         raise AuthFailedError(message, error_code='third-party-auth-with-no-linked-account')  # lint-amnesty, pylint: disable=raise-missing-from
 
 
-def _get_user_by_email(email):
+def _get_user_by_email(request):
     """
-    Finds a user object in the database based on the given email, ignores all fields except for email.
+    Finds a user object in the database based on the given request, ignores all fields except for email.
     """
-    try:
-        return USER_MODEL.objects.get(email=email)
-    except USER_MODEL.DoesNotExist:
-        return None
-
-
-def _get_user_by_username(username):
-    """
-    Finds a user object in the database based on the given username.
-    """
-    try:
-        return USER_MODEL.objects.get(username=username)
-    except USER_MODEL.DoesNotExist:
-        return None
-
-
-def _get_user_by_email_or_username(request, api_version):
-    """
-    Finds a user object in the database based on the given request, ignores all fields except for email and username.
-    """
-    is_api_v2 = api_version != API_V1
-    login_fields = ['email', 'password']
-    if is_api_v2:
-        login_fields = ['email_or_username', 'password']
-
-    if any(f not in request.POST.keys() for f in login_fields):
+    if 'email' not in request.POST or 'password' not in request.POST:
         raise AuthFailedError(_('There was an error receiving your login information. Please email us.'))
 
-    email_or_username = request.POST.get('email', None) or request.POST.get('email_or_username', None)
-    user = _get_user_by_email(email_or_username)
+    email = request.POST['email']
 
-    if not user and is_api_v2:
-        # If user not found with email and API_V2, try username lookup
-        user = _get_user_by_username(email_or_username)
-
-    if not user:
-        digest = hashlib.shake_128(email_or_username.encode('utf-8')).hexdigest(16)  # pylint: disable=too-many-function-args
-        AUDIT_LOG.warning(f"Login failed - Unknown user email or username {digest}")
-
-    return user
+    try:
+        return User.objects.get(email=email)
+    except User.DoesNotExist:
+        digest = hashlib.shake_128(email.encode('utf-8')).hexdigest(16)  # pylint: disable=too-many-function-args
+        AUDIT_LOG.warning(f"Login failed - Unknown user email {digest}")
 
 
 def _check_excessive_login_attempts(user):
@@ -188,14 +151,8 @@ def _enforce_password_policy_compliance(request, user):  # lint-amnesty, pylint:
         # Allow login, but warn the user that they will be required to reset their password soon.
         PageLevelMessages.register_warning_message(request, str(e))
     except password_policy_compliance.NonCompliantPasswordException as e:
-        # Increment the lockout counter to safguard from further brute force requests
-        # if user's password has been compromised.
-        if LoginFailures.is_feature_enabled():
-            LoginFailures.increment_lockout_counter(user)
-
         AUDIT_LOG.info("Password reset initiated for email %s.", user.email)
         send_password_reset_email_for_user(user, request)
-
         # Prevent the login attempt.
         raise AuthFailedError(HTML(str(e)), error_code=e.__class__.__name__)  # lint-amnesty, pylint: disable=raise-missing-from
 
@@ -251,7 +208,6 @@ def _handle_failed_authentication(user, authenticated_user):
     """
     Handles updating the failed login count, inactive user notifications, and logging failed authentications.
     """
-    failure_count = 0
     if user:
         if LoginFailures.is_feature_enabled():
             LoginFailures.increment_lockout_counter(user)
@@ -287,18 +243,12 @@ def _handle_failed_authentication(user, authenticated_user):
                     error_code='failed-login-attempt',
                     context={
                         'remaining_attempts': remaining_attempts,
-                        'allowed_failure_attempts': max_failures_allowed,
-                        'failure_count': failure_count,
                     }
                 )
 
             _generate_locked_out_error_message()
 
-    raise AuthFailedError(
-        _('Email or password is incorrect.'),
-        error_code='incorrect-email-or-password',
-        context={'failure_count': failure_count},
-    )
+    raise AuthFailedError(_('Email or password is incorrect.'), error_code='incorrect-email-or-password')
 
 
 def _handle_successful_authentication_and_login(user, request):
@@ -314,19 +264,6 @@ def _handle_successful_authentication_and_login(user, request):
         django_login(request, user)
         request.session.set_expiry(604800 * 4)
         log.debug("Setting user session expiry to 4 weeks")
-
-        # .. event_implemented_name: SESSION_LOGIN_COMPLETED
-        SESSION_LOGIN_COMPLETED.send_event(
-            user=UserData(
-                pii=UserPersonalData(
-                    username=user.username,
-                    email=user.email,
-                    name=user.profile.name,
-                ),
-                id=user.id,
-                is_active=user.is_active,
-            ),
-        )
     except Exception as exc:
         AUDIT_LOG.critical("Login failed - Could not create session. Is memcached running?")
         log.critical("Login failed - Could not create session. Is memcached running?")
@@ -491,7 +428,7 @@ def enterprise_selection_page(request, user, next_url):
     rate=settings.LOGISTRATION_RATELIMIT_RATE,
     method='POST',
 )  # lint-amnesty, pylint: disable=too-many-statements
-def login_user(request, api_version='v1'):
+def login_user(request):
     """
     AJAX request to log in the user.
 
@@ -534,7 +471,6 @@ def login_user(request, api_version='v1'):
         return HttpResponseForbidden(
             "Third party authentication is required to login. Username and password were received instead."
         )
-    possibly_authenticated_user = None
     try:
         if third_party_auth_requested and not first_party_auth_requested:
             # The user has already authenticated via third-party auth and has not
@@ -558,7 +494,7 @@ def login_user(request, api_version='v1'):
                 response_content = e.get_response()
                 return JsonResponse(response_content, status=403)
         else:
-            user = _get_user_by_email_or_username(request, api_version)
+            user = _get_user_by_email(request)
 
         _check_excessive_login_attempts(user)
 
@@ -569,11 +505,8 @@ def login_user(request, api_version='v1'):
             if possibly_authenticated_user and password_policy_compliance.should_enforce_compliance_on_login():
                 # Important: This call must be made AFTER the user was successfully authenticated.
                 _enforce_password_policy_compliance(request, possibly_authenticated_user)
-                check_pwned_password_and_send_track_event.delay(user.id, request.POST.get('password'), user.is_staff)
 
-        if possibly_authenticated_user is None or not (
-            possibly_authenticated_user.is_active or settings.MARKETING_EMAILS_OPT_IN
-        ):
+        if possibly_authenticated_user is None or not possibly_authenticated_user.is_active:
             _handle_failed_authentication(user, possibly_authenticated_user)
 
         _handle_successful_authentication_and_login(possibly_authenticated_user, request)
@@ -605,7 +538,6 @@ def login_user(request, api_version='v1'):
         set_custom_attribute('login_user_auth_failed_error', False)
         set_custom_attribute('login_user_response_status', response.status_code)
         set_custom_attribute('login_user_redirect_url', redirect_url)
-        mark_user_change_as_expected(response, user.id)
         return response
     except AuthFailedError as error:
         response_content = error.get_response()
@@ -614,11 +546,10 @@ def login_user(request, api_version='v1'):
         error_code = response_content.get('error_code')
         if error_code:
             set_custom_attribute('login_error_code', error_code)
-        email_or_username_key = 'email' if api_version == API_V1 else 'email_or_username'
-        email_or_username = request.POST.get(email_or_username_key, None)
-        email_or_username = possibly_authenticated_user.email \
-            if possibly_authenticated_user else email_or_username
-        response_content['email'] = email_or_username
+
+        if error_code == 'inactive-user':
+            response_content['email'] = user.email
+
         response = JsonResponse(response_content, status=400)
         set_custom_attribute('login_user_auth_failed_error', True)
         set_custom_attribute('login_user_response_status', response.status_code)
@@ -661,7 +592,7 @@ class LoginSessionView(APIView):
     authentication_classes = []
 
     @method_decorator(ensure_csrf_cookie)
-    def get(self, request, *args, **kwargs):
+    def get(self, request):
         return HttpResponse(get_login_session_form(request).to_json(), content_type="application/json")  # lint-amnesty, pylint: disable=http-response-with-content-type-json
 
     @method_decorator(require_post_params(["email", "password"]))
@@ -679,7 +610,7 @@ class LoginSessionView(APIView):
             200 {'success': true}
 
         """
-        return login_user(request, api_version)
+        return login_user(request)
 
     @method_decorator(sensitive_post_parameters("password"))
     def dispatch(self, request, *args, **kwargs):

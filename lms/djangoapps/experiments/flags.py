@@ -76,7 +76,7 @@ class ExperimentWaffleFlag(CourseWaffleFlag):
         self.num_buckets = num_buckets
         self.experiment_id = experiment_id
         self.bucket_flags = [
-            CourseWaffleFlag(waffle_namespace, f'{flag_name}.{bucket}', module_name)  # lint-amnesty, pylint: disable=toggle-missing-annotation
+            CourseWaffleFlag(waffle_namespace, f'{flag_name}.{bucket}', module_name)
             for bucket in range(num_buckets)
         ]
         self.use_course_aware_bucketing = use_course_aware_bucketing
@@ -174,8 +174,6 @@ class ExperimentWaffleFlag(CourseWaffleFlag):
 
         Arguments:
             course_key (Optional[CourseKey])
-                This argument should always be passed in a course-aware context even if
-                course aware bucketing is False.
             track (bool):
                 Whether an analytics event should be generated if the user is
                 bucketed for the first time.

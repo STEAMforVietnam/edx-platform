@@ -14,17 +14,18 @@ from django.urls import reverse
 from django.utils.formats import date_format
 from django.utils.functional import cached_property
 from django.utils.translation import get_language, to_locale
-from django.utils.translation import gettext as _
-from django.utils.translation import gettext_lazy
+from django.utils.translation import ugettext as _
+from django.utils.translation import ugettext_lazy
 from lazy import lazy
 from pytz import utc
 
 from common.djangoapps.course_modes.models import CourseMode, get_cosmetic_verified_display_price
-from lms.djangoapps.certificates.api import get_active_web_certificate, can_show_certificate_available_date_field
+from lms.djangoapps.certificates.api import get_active_web_certificate
 from lms.djangoapps.courseware.utils import verified_upgrade_deadline_link, can_show_verified_upgrade
 from lms.djangoapps.verify_student.models import VerificationDeadline
 from lms.djangoapps.verify_student.services import IDVerificationService
-from openedx.core.djangoapps.agreements.toggles import is_integrity_signature_enabled
+from openedx.core.djangoapps.catalog.utils import get_course_run_details
+from openedx.core.djangoapps.certificates.api import can_show_certificate_available_date_field
 from openedx.core.djangolib.markup import HTML, Text
 from openedx.features.course_duration_limits.access import get_user_course_expiration_date
 from openedx.features.course_experience import RELATIVE_DATES_FLAG, UPGRADE_DEADLINE_MESSAGE, CourseHomeMessages
@@ -278,8 +279,8 @@ class CourseStartDate(DateSummary):
     def title(self):
         enrollment = CourseEnrollment.get_enrollment(self.user, self.course_id)
         if enrollment and self.course.end and enrollment.created > self.course.end:
-            return gettext_lazy('Enrollment Date')
-        return gettext_lazy('Course starts')
+            return ugettext_lazy('Enrollment Date')
+        return ugettext_lazy('Course Starts')
 
     def register_alerts(self, request, course):
         """
@@ -316,45 +317,28 @@ class CourseEndDate(DateSummary):
     Displays the end date of the course.
     """
     css_class = 'end-date'
-    title = gettext_lazy('Course ends')
+    title = ugettext_lazy('Course End')
     is_enabled = True
 
     @property
     def description(self):
-        """
-        Returns a description for what experience changes a learner encounters when the course end date passes.
-        Note that this currently contains 4 scenarios:
-            1. End date is in the future and learner is enrolled in a certificate earning mode
-            2. End date is in the future and learner is not enrolled at all or not enrolled
-                in a certificate earning mode
-            3. End date is in the past
-            4. End date does not exist (and now neither does the description)
-        """
-        if self.date and self.current_time <= self.date:
+        if self.current_time <= self.date:
             mode, is_active = CourseEnrollment.enrollment_mode_for_user(self.user, self.course_id)
             if is_active and CourseMode.is_eligible_for_certificate(mode):
-                return _('After this date, the course will be archived, which means you can review the '
-                         'course content but can no longer participate in graded assignments or work towards earning '
-                         'a certificate.')
+                return _('To earn a certificate, you must complete all requirements before this date.')
             else:
-                return _('After the course ends, the course content will be archived and no longer active.')
-        elif self.date:
-            return _('This course is archived, which means you can review course content but it is no longer active.')
-        else:
-            return ''
+                return _('After this date, course content will be archived.')
+        return _('This course is archived, which means you can review course content but it is no longer active.')
 
     @property
     def date(self):
-        """
-        Returns the course end date, if applicable.
-        For self-paced courses using Personalized Learner Schedules, the end date is only displayed
-        if it is within 365 days.
-        """
         if self.course.self_paced and RELATIVE_DATES_FLAG.is_enabled(self.course_id):
-            one_year = datetime.timedelta(days=365)
-            if self.course.end and self.course.end < (self.current_time + one_year):
-                return self.course.end
-            return None
+            weeks_to_complete = get_course_run_details(self.course.id, ['weeks_to_complete']).get('weeks_to_complete')
+            if weeks_to_complete:
+                course_duration = datetime.timedelta(weeks=weeks_to_complete)
+                if self.course.end and self.course.end < (self.current_time + course_duration):
+                    return self.course.end
+                return None
 
         return self.course.end
 
@@ -483,7 +467,7 @@ class CertificateAvailableDate(DateSummary):
     Displays the certificate available date of the course.
     """
     css_class = 'certificate-available-date'
-    title = gettext_lazy('Certificate Available')
+    title = ugettext_lazy('Certificate Available')
 
     @lazy
     def is_allowed(self):
@@ -545,7 +529,7 @@ class VerifiedUpgradeDeadlineDate(DateSummary):
     Verified track.
     """
     css_class = 'verified-upgrade-deadline'
-    link_text = gettext_lazy('Upgrade to Verified Certificate')
+    link_text = ugettext_lazy('Upgrade to Verified Certificate')
 
     @property
     def link(self):
@@ -720,8 +704,7 @@ class VerificationDeadlineDate(DateSummary):
         return (
             is_active and
             mode == 'verified' and
-            self.verification_status in ('expired', 'none', 'must_reverify') and
-            not is_integrity_signature_enabled(self.course_id)
+            self.verification_status in ('expired', 'none', 'must_reverify')
         )
 
     @lazy

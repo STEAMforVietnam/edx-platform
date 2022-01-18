@@ -34,7 +34,6 @@ show_verbose() {
     echo "Files linted is based on the following:"
     echo "- Current commit: ${current_branch_hash}"
     echo "- Main commit: ${MAIN_COMMIT}"
-    echo "- Target branch: ${TARGET_BRANCH}"
     echo "- Merge base command: ${merge_base_command}"
     echo "- Merge base: ${merge_base}"
     echo "- Diff command: ${diff_command}"
@@ -48,7 +47,7 @@ for i in "$@"; do
             shift # past argument=value
             ;;
         -v|--verbose)
-            show_verbose
+            VERBOSE=true
             ;;
         -h|--help|*)
             # help or unknown option
@@ -85,6 +84,9 @@ if [ "$diff_files" = "" ]; then
     echo ""
     echo "No files linted."
 else
+    if [ ${VERBOSE} ] ; then
+        show_verbose
+    fi
     for f in $diff_files; do
         echo ""
         echo "Linting $f:"

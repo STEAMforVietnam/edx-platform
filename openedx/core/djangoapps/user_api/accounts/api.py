@@ -10,8 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import ValidationError, validate_email
 from django.utils.translation import override as override_language
-from django.utils.translation import gettext as _
-from edx_name_affirmation.name_change_validator import NameChangeValidator
+from django.utils.translation import ugettext as _
 from pytz import UTC
 from common.djangoapps.student import views as student_views
 from common.djangoapps.student.models import (
@@ -23,10 +22,7 @@ from common.djangoapps.student.models import (
 )
 from common.djangoapps.util.model_utils import emit_settings_changed_event
 from common.djangoapps.util.password_policy_validators import validate_password
-from lms.djangoapps.certificates.api import get_certificates_for_user
-from lms.djangoapps.certificates.data import CertificateStatuses
 
-from openedx.core.djangoapps.enrollments.api import get_verified_enrollments
 from openedx.core.djangoapps.user_api import accounts, errors, helpers
 from openedx.core.djangoapps.user_api.errors import (
     AccountUpdateError,
@@ -34,7 +30,6 @@ from openedx.core.djangoapps.user_api.errors import (
     PreferenceValidationError
 )
 from openedx.core.djangoapps.user_api.preferences.api import update_user_preferences
-from openedx.core.djangoapps.user_authn.utils import check_pwned_password
 from openedx.core.djangoapps.user_authn.views.registration_form import validate_name, validate_username
 from openedx.core.lib.api.view_utils import add_serializer_errors
 from openedx.features.enterprise_support.utils import get_enterprise_readonly_account_fields
@@ -168,7 +163,7 @@ def update_account_settings(requesting_user, update, username=None):
         raise err
     except Exception as err:
         raise AccountUpdateError(  # lint-amnesty, pylint: disable=raise-missing-from
-            f"Error thrown when saving account updates: '{str(err)}'"
+            "Error thrown when saving account updates: '{}'".format(str(err))
         )
 
     _send_email_change_requests_if_needed(update, user)
@@ -205,7 +200,7 @@ def _validate_email_change(user, data, field_errors):
         student_views.validate_new_email(user, new_email)
     except ValueError as err:
         field_errors["email"] = {
-            "developer_message": f"Error thrown from validate_new_email: '{str(err)}'",
+            "developer_message": "Error thrown from validate_new_email: '{}'".format(str(err)),
             "user_message": str(err)
         }
         return
@@ -227,7 +222,7 @@ def _validate_secondary_email(user, data, field_errors):
         student_views.validate_secondary_email(user, secondary_email)
     except ValueError as err:
         field_errors["secondary_email"] = {
-            "developer_message": f"Error thrown from validate_secondary_email: '{str(err)}'",
+            "developer_message": "Error thrown from validate_secondary_email: '{}'".format(str(err)),
             "user_message": str(err)
         }
     else:
@@ -245,13 +240,8 @@ def _validate_name_change(user_profile, data, field_errors):
         return None
 
     old_name = user_profile.name
-    new_name = data['name']
-
-    if old_name == new_name:
-        return None
-
     try:
-        validate_name(new_name)
+        validate_name(data['name'])
     except ValidationError as err:
         field_errors["name"] = {
             "developer_message": f"Error thrown from validate_name: '{err.message}'",
@@ -259,44 +249,7 @@ def _validate_name_change(user_profile, data, field_errors):
         }
         return None
 
-    if _does_name_change_require_verification(user_profile, old_name, new_name):
-        err_msg = 'This name change requires ID verification.'
-        field_errors['name'] = {
-            'developer_message': err_msg,
-            'user_message': err_msg
-        }
-        return None
-
     return old_name
-
-
-def _does_name_change_require_verification(user_profile, old_name, new_name):
-    """
-    If name change requires ID verification, do not update it through this API.
-    """
-    profile_meta = user_profile.get_meta()
-    old_names_list = profile_meta['old_names'] if 'old_names' in profile_meta else []
-
-    user = user_profile.user
-
-    # We only want to validate on a list of passing certificates for the learner. A learner may have
-    # a certificate in a non-passing status, and we do not have to require ID verification based on certificates
-    # that are not passing.
-    passing_certs = filter(
-        lambda cert: CertificateStatuses.is_passing_status(cert["status"]),
-        get_certificates_for_user(user.username)
-    )
-    num_passing_certs = len(list(passing_certs))
-
-    # We check whether the learner has active verified enrollments because we do not want to
-    # require the learner to perform ID verification if the learner is not enrolled in a verified mode
-    # in any courses. The learner will not be able to complete ID verification without being enrolled in
-    # at least one seat.
-    has_verified_enrollments = len(get_verified_enrollments(user.username)) > 0
-
-    validator = NameChangeValidator(old_names_list, num_passing_certs, old_name, new_name)
-
-    return not validator.validate() and has_verified_enrollments
 
 
 def _get_old_language_proficiencies_if_updating(user_profile, data):
@@ -368,7 +321,7 @@ def _send_email_change_requests_if_needed(data, user):
             student_views.do_email_change_request(user, new_email)
         except ValueError as err:
             raise AccountUpdateError(  # lint-amnesty, pylint: disable=raise-missing-from
-                f"Error thrown from do_email_change_request: '{str(err)}'",
+                "Error thrown from do_email_change_request: '{}'".format(str(err)),
                 user_message=str(err)
             )
 
@@ -382,7 +335,7 @@ def _send_email_change_requests_if_needed(data, user):
             )
         except ValueError as err:
             raise AccountUpdateError(  # lint-amnesty, pylint: disable=raise-missing-from
-                f"Error thrown from do_email_change_request: '{str(err)}'",
+                "Error thrown from do_email_change_request: '{}'".format(str(err)),
                 user_message=str(err)
             )
 
@@ -410,17 +363,16 @@ def get_username_validation_error(username):
     return _validate(_validate_username, errors.AccountUsernameInvalid, username)
 
 
-def get_email_validation_error(email, api_version='v1'):
+def get_email_validation_error(email):
     """Get the built-in validation error message for when
     the email is invalid in some way.
 
     :param email: The proposed email (unicode).
-    :param api_version: registration validation api version
     :param default: The message to default to in case of no error.
     :return: Validation error message.
 
     """
-    return _validate(_validate_email, errors.AccountEmailInvalid, email, api_version)
+    return _validate(_validate_email, errors.AccountEmailInvalid, email)
 
 
 def get_secondary_email_validation_error(email):
@@ -449,19 +401,23 @@ def get_confirm_email_validation_error(confirm_email, email):
     return _validate(_validate_confirm_email, errors.AccountEmailInvalid, confirm_email, email)
 
 
-def get_password_validation_error(password, username=None, email=None, reset_password_page=False):
+def get_password_validation_error(password, username=None, email=None):
     """Get the built-in validation error message for when
     the password is invalid in some way.
 
     :param password: The proposed password (unicode).
     :param username: The username associated with the user's account (unicode).
     :param email: The email associated with the user's account (unicode).
-    :param reset_password_page: The flag that determines the validation page (bool).
     :return: Validation error message.
 
     """
-    return _validate(_validate_password, errors.AccountPasswordInvalid, password, username, email, reset_password_page)
+    return _validate(_validate_password, errors.AccountPasswordInvalid, password, username, email)
 
+def get_confirm_password_validation_error(confirm_password, password):
+    """Get the built-in validation error message for when
+    the confirmation password is invalid in some way
+    """
+    return _validate(_validate_confirm_password, errors.AccountPasswordInvalid, confirm_password, password)
 
 def get_country_validation_error(country):
     """Get the built-in validation error message for when
@@ -474,30 +430,28 @@ def get_country_validation_error(country):
     return _validate(_validate_country, errors.AccountCountryInvalid, country)
 
 
-def get_username_existence_validation_error(username, api_version='v1'):
+def get_username_existence_validation_error(username):
     """Get the built-in validation error message for when
     the username has an existence conflict.
 
     :param username: The proposed username (unicode).
-    :param api_version: registration validation api version
     :param default: The message to default to in case of no error.
     :return: Validation error message.
 
     """
-    return _validate(_validate_username_doesnt_exist, errors.AccountUsernameAlreadyExists, username, api_version)
+    return _validate(_validate_username_doesnt_exist, errors.AccountUsernameAlreadyExists, username)
 
 
-def get_email_existence_validation_error(email, api_version='v1'):
+def get_email_existence_validation_error(email):
     """Get the built-in validation error message for when
     the email has an existence conflict.
 
     :param email: The proposed email (unicode).
-    :param api_version: registration validation api version
     :param default: The message to default to in case of no error.
     :return: Validation error message.
 
     """
-    return _validate(_validate_email_doesnt_exist, errors.AccountEmailAlreadyExists, email, api_version)
+    return _validate(_validate_email_doesnt_exist, errors.AccountEmailAlreadyExists, email)
 
 
 def _get_user_and_profile(username):
@@ -564,12 +518,11 @@ def _validate_username(username):
         raise errors.AccountUsernameInvalid(validation_err.message)
 
 
-def _validate_email(email, api_version='v1'):
+def _validate_email(email):
     """Validate the format of the email address.
 
     Arguments:
         email (unicode): The proposed email.
-        api_version(str): Validation API version; it is used to determine the error message
 
     Returns:
         None
@@ -582,9 +535,7 @@ def _validate_email(email, api_version='v1'):
         _validate_unicode(email)
         _validate_type(email, str, accounts.EMAIL_BAD_TYPE_MSG)
         _validate_length(email, accounts.EMAIL_MIN_LENGTH, accounts.EMAIL_MAX_LENGTH, accounts.EMAIL_BAD_LENGTH_MSG)
-        validate_email.message = (
-            accounts.EMAIL_INVALID_MSG.format(email=email) if api_version == 'v1' else accounts.AUTHN_EMAIL_INVALID_MSG
-        )
+        validate_email.message = accounts.EMAIL_INVALID_MSG.format(email=email)
         validate_email(email)
     except (UnicodeError, errors.AccountDataBadType, errors.AccountDataBadLength) as invalid_email_err:
         raise errors.AccountEmailInvalid(str(invalid_email_err))
@@ -604,7 +555,7 @@ def _validate_confirm_email(confirm_email, email):
         raise errors.AccountEmailInvalid(accounts.REQUIRED_FIELD_CONFIRM_EMAIL_MSG)
 
 
-def _validate_password(password, username=None, email=None, reset_password_page=False):
+def _validate_password(password, username=None, email=None):
     """Validate the format of the user's password.
 
     Passwords cannot be the same as the username of the account,
@@ -615,7 +566,6 @@ def _validate_password(password, username=None, email=None, reset_password_page=
         password (unicode): The proposed password.
         username (unicode): The username associated with the user's account.
         email (unicode): The email associated with the user's account.
-        reset_password_page (bool): The flag that determines the validation page.
 
     Returns:
         None
@@ -633,12 +583,12 @@ def _validate_password(password, username=None, email=None, reset_password_page=
     except ValidationError as validation_err:
         raise errors.AccountPasswordInvalid(' '.join(validation_err.messages))
 
-    # TODO: VAN-666 - Restrict this feature to reset password page for now until it is
-    #  enabled on account sign in and register.
-    if settings.ENABLE_AUTHN_RESET_PASSWORD_HIBP_POLICY and reset_password_page:
-        pwned_response = check_pwned_password(password)
-        if pwned_response.get('vulnerability', 'no') == 'yes':
-            raise errors.AccountPasswordInvalid(accounts.AUTHN_PASSWORD_COMPROMISED_MSG)
+
+def _validate_confirm_password(confirm_password, password):
+    if not confirm_password:
+        raise errors.AccountPasswordInvalid('Password confirmation is required.')
+    if confirm_password != password:
+        raise errors.AccountPasswordInvalid('Passwords do not match.')
 
 
 def _validate_country(country):
@@ -652,37 +602,26 @@ def _validate_country(country):
         raise errors.AccountCountryInvalid(accounts.REQUIRED_FIELD_COUNTRY_MSG)
 
 
-def _validate_username_doesnt_exist(username, api_version='v1'):
+def _validate_username_doesnt_exist(username):
     """Validate that the username is not associated with an existing user.
 
     :param username: The proposed username (unicode).
-    :param api_version: Validation API version; it is used to determine the error message
     :return: None
     :raises: errors.AccountUsernameAlreadyExists
     """
-    if api_version == 'v1':
-        error_message = accounts.USERNAME_CONFLICT_MSG.format(username=username)
-    else:
-        error_message = accounts.AUTHN_USERNAME_CONFLICT_MSG
     if username is not None and username_exists_or_retired(username):
-        raise errors.AccountUsernameAlreadyExists(_(error_message))  # lint-amnesty, pylint: disable=translation-of-non-string
+        raise errors.AccountUsernameAlreadyExists(_(accounts.USERNAME_CONFLICT_MSG).format(username=username))  # lint-amnesty, pylint: disable=translation-of-non-string
 
 
-def _validate_email_doesnt_exist(email, api_version='v1'):
+def _validate_email_doesnt_exist(email):
     """Validate that the email is not associated with an existing user.
 
     :param email: The proposed email (unicode).
-    :param api_version: Validation API version; it is used to determine the error message
     :return: None
     :raises: errors.AccountEmailAlreadyExists
     """
-    if api_version == 'v1':
-        error_message = accounts.EMAIL_CONFLICT_MSG.format(email_address=email)
-    else:
-        error_message = accounts.AUTHN_EMAIL_CONFLICT_MSG
-
     if email is not None and email_exists_or_retired(email):
-        raise errors.AccountEmailAlreadyExists(_(error_message))  # lint-amnesty, pylint: disable=translation-of-non-string
+        raise errors.AccountEmailAlreadyExists(_(accounts.EMAIL_CONFLICT_MSG).format(email_address=email))  # lint-amnesty, pylint: disable=translation-of-non-string
 
 
 def _validate_secondary_email_doesnt_exist(email):

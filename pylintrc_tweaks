@@ -1,7 +1,6 @@
 # pylintrc tweaks for use with edx_lint.
 [MASTER]
 ignore+ = ,.git,.tox,migrations,node_modules,.pycharm_helpers
-load-plugins = edx_lint.pylint,pylint_django_settings,pylint_django,pylint_celery,pylint_pytest
 
 [MESSAGES CONTROL]
 disable+ =
@@ -16,19 +15,6 @@ disable+ =
     useless-suppression,
     cyclic-import,
     logging-format-interpolation,
-    wrong-import-order,
-    consider-using-dict-items,
-    unnecessary-dict-index-lookup,
-    arguments-renamed,
-    consider-using-from-import,
-    consider-using-enumerate,
-    no-member,
-    consider-using-with,
-    unspecified-encoding,
-    unused-variable,
-    unused-argument,
-    unsubscriptable-object,
-    abstract-method,
 
 [BASIC]
 attr-rgx = [a-z_][a-z0-9_]{2,40}$

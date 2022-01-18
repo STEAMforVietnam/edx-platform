@@ -13,10 +13,10 @@ from edx_toggles.toggles.testutils import override_waffle_switch
 from common.djangoapps.student.tests.factories import UserFactory
 from openedx.core.djangoapps.content.block_structure.api import clear_course_from_cache
 from openedx.core.djangoapps.content.block_structure.config import STORAGE_BACKING_FOR_CACHE
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import SampleCourseFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.sample_courses import BlockInfo  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import SampleCourseFactory, check_mongo_calls
+from xmodule.modulestore.tests.sample_courses import BlockInfo
 
 from ..api import get_blocks
 
@@ -108,10 +108,11 @@ class TestGetBlocks(SharedModuleStoreTestCase):
             assert block['type'] == 'problem'
 
 
-class TestGetBlocksVideoUrls(SharedModuleStoreTestCase):
+# TODO: Remove this class after REVE-52 lands and old-mobile-app traffic falls to < 5% of mobile traffic
+@ddt.ddt
+class TestGetBlocksMobileHack(SharedModuleStoreTestCase):
     """
-    Tests the video blocks returned have their URL re-written for
-    encoded videos.
+    Tests that requests from the mobile app don't receive empty containers.
     """
 
     @classmethod
@@ -141,6 +142,19 @@ class TestGetBlocksVideoUrls(SharedModuleStoreTestCase):
         self.user = UserFactory.create()
         self.request = RequestFactory().get("/dummy")
         self.request.user = self.user
+
+    @ddt.data(
+        *product([True, False], ['chapter', 'sequential', 'vertical'])
+    )
+    @ddt.unpack
+    def test_empty_containers(self, is_mobile, container_type):
+        with patch('lms.djangoapps.course_api.blocks.api.is_request_from_mobile_app', return_value=is_mobile):
+            blocks = get_blocks(self.request, self.course.location)
+        full_container_key = self.course.id.make_usage_key(container_type, f'full_{container_type}')
+        assert str(full_container_key) in blocks['blocks']
+        empty_container_key = self.course.id.make_usage_key(container_type, f'empty_{container_type}')
+        assert_containment = self.assertNotIn if is_mobile else self.assertIn
+        assert_containment(str(empty_container_key), blocks['blocks'])
 
     @patch('xmodule.video_module.VideoBlock.student_view_data')
     def test_video_urls_rewrite(self, video_data_patch):
@@ -220,20 +234,26 @@ class TestGetBlocksQueryCounts(TestGetBlocksQueryCountsBase):
             self._get_blocks(
                 course,
                 expected_mongo_queries=0,
-                expected_sql_queries=14 if with_storage_backing else 13,
+                expected_sql_queries=11 if with_storage_backing else 10,
             )
 
     @ddt.data(
-        (ModuleStoreEnum.Type.mongo, 5, True, 24),
-        (ModuleStoreEnum.Type.mongo, 5, False, 14),
-        (ModuleStoreEnum.Type.split, 2, True, 24),
-        (ModuleStoreEnum.Type.split, 2, False, 14),
+        *product(
+            ((ModuleStoreEnum.Type.mongo, 5), (ModuleStoreEnum.Type.split, 3)),
+            (True, False),
+        )
     )
     @ddt.unpack
-    def test_query_counts_uncached(self, store_type, expected_mongo_queries, with_storage_backing, num_sql_queries):
+    def test_query_counts_uncached(self, store_type_tuple, with_storage_backing):
+        store_type, expected_mongo_queries = store_type_tuple
         with override_waffle_switch(STORAGE_BACKING_FOR_CACHE, active=with_storage_backing):
             course = self._create_course(store_type)
             clear_course_from_cache(course.id)
+
+            if with_storage_backing:
+                num_sql_queries = 21
+            else:
+                num_sql_queries = 11
 
             self._get_blocks(
                 course,

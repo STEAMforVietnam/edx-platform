@@ -14,13 +14,12 @@ from django.db import IntegrityError
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from django.http import Http404
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_django_utils.cache import RequestCache
 from eventtracking import tracker
 
 from lms.djangoapps.courseware import courses
 from openedx.core.lib.cache_utils import request_cached
-from openedx.core.lib.courses import get_course_by_id
 from common.djangoapps.student.models import get_user_by_username_or_email
 
 from .models import (
@@ -388,7 +387,7 @@ def add_cohort(course_key, name, assignment_type):
         raise ValueError(_("You cannot create two cohorts with the same name"))
 
     try:
-        course = get_course_by_id(course_key)
+        course = courses.get_course_by_id(course_key)
     except Http404:
         raise ValueError("Invalid course_key")  # lint-amnesty, pylint: disable=raise-missing-from
 
@@ -594,7 +593,7 @@ def _get_course_cohort_settings(course_key):
     try:
         course_cohort_settings = CourseCohortsSettings.objects.get(course_id=course_key)
     except CourseCohortsSettings.DoesNotExist:
-        course = get_course_by_id(course_key)
+        course = courses.get_course_by_id(course_key)
         course_cohort_settings = migrate_cohort_settings(course)
     return course_cohort_settings
 
@@ -609,7 +608,7 @@ def get_legacy_discussion_settings(course_key):  # lint-amnesty, pylint: disable
             'always_cohort_inline_discussions': course_cohort_settings.always_cohort_inline_discussions
         }
     except CourseCohortsSettings.DoesNotExist:
-        course = get_course_by_id(course_key)
+        course = courses.get_course_by_id(course_key)
         return _get_cohort_settings_from_modulestore(course)
 
 

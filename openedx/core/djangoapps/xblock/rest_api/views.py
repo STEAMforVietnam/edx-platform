@@ -7,16 +7,14 @@ Studio APIs cover use cases like adding/deleting/editing blocks.
 
 from corsheaders.signals import check_request_enabled
 from django.contrib.auth import get_user_model
-from django.http import Http404
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import permissions
 from rest_framework.decorators import api_view, permission_classes  # lint-amnesty, pylint: disable=unused-import
-from rest_framework.exceptions import PermissionDenied, AuthenticationFailed, NotFound
+from rest_framework.exceptions import PermissionDenied, AuthenticationFailed
 from rest_framework.response import Response
 from xblock.django.request import DjangoWebobRequest, webob_to_django_response
 
-from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.lib.api.view_utils import view_auth_classes
 from ..api import (
@@ -24,14 +22,11 @@ from ..api import (
     get_handler_url as _get_handler_url,
     load_block,
     render_block_view as _render_block_view,
+
 )
 from ..utils import validate_secure_token_for_xblock_handler
 
 User = get_user_model()
-
-
-class InvalidNotFound(NotFound):
-    default_detail = "Invalid XBlock key"
 
 
 @api_view(['GET'])
@@ -44,11 +39,7 @@ def block_metadata(request, usage_key_str):
     Accepts an "include" query parameter which must be a comma separated list of keys to include. Valid keys are
     "index_dictionary" and "student_view_data".
     """
-    try:
-        usage_key = UsageKey.from_string(usage_key_str)
-    except InvalidKeyError as e:
-        raise InvalidNotFound from e
-
+    usage_key = UsageKey.from_string(usage_key_str)
     block = load_block(usage_key, request.user)
     includes = request.GET.get("include", "").split(",")
     metadata_dict = get_block_metadata(block, includes=includes)
@@ -66,11 +57,7 @@ def render_block_view(request, usage_key_str, view_name):
     """
     Get the HTML, JS, and CSS needed to render the given XBlock.
     """
-    try:
-        usage_key = UsageKey.from_string(usage_key_str)
-    except InvalidKeyError as e:
-        raise InvalidNotFound from e
-
+    usage_key = UsageKey.from_string(usage_key_str)
     block = load_block(usage_key, request.user)
     fragment = _render_block_view(block, view_name, request.user)
     response_data = get_block_metadata(block)
@@ -87,11 +74,7 @@ def get_handler_url(request, usage_key_str, handler_name):
 
     The URL will expire but is guaranteed to be valid for a minimum of 2 days.
     """
-    try:
-        usage_key = UsageKey.from_string(usage_key_str)
-    except InvalidKeyError as e:
-        raise InvalidNotFound from e
-
+    usage_key = UsageKey.from_string(usage_key_str)
     handler_url = _get_handler_url(usage_key, handler_name, request.user)
     return Response({"handler_url": handler_url})
 
@@ -102,7 +85,7 @@ def get_handler_url(request, usage_key_str, handler_name):
 # and https://github.com/edx/XBlock/pull/383 for context.
 @csrf_exempt
 @xframe_options_exempt
-def xblock_handler(request, user_id, secure_token, usage_key_str, handler_name, suffix=None):
+def xblock_handler(request, user_id, secure_token, usage_key_str, handler_name, suffix):
     """
     Run an XBlock's handler and return the result
 
@@ -110,10 +93,7 @@ def xblock_handler(request, user_id, secure_token, usage_key_str, handler_name, 
     auth token included in the URL (see below). As a result it can be exempt
     from CSRF, session auth, and JWT/OAuth.
     """
-    try:
-        usage_key = UsageKey.from_string(usage_key_str)
-    except InvalidKeyError as e:
-        raise Http404 from e
+    usage_key = UsageKey.from_string(usage_key_str)
 
     # To support sandboxed XBlocks, custom frontends, and other use cases, we
     # authenticate requests using a secure token in the URL. see
@@ -165,6 +145,5 @@ def cors_allow_xblock_handler(sender, request, **kwargs):  # lint-amnesty, pylin
     just a specific view/URL.
     """
     return request.path.startswith('/api/xblock/v2/xblocks/') and '/handler/' in request.path
-
 
 check_request_enabled.connect(cors_allow_xblock_handler)

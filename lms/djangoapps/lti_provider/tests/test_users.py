@@ -69,7 +69,7 @@ class UserManagementHelperTest(TestCase):
             # Check that the username contains only allowable characters
             for char in range(len(username)):  # lint-amnesty, pylint: disable=consider-using-enumerate
                 assert username[char] in (string.ascii_letters + string.digits), \
-                    f"Username has forbidden character '{username[char]}'"
+                    "Username has forbidden character '{}'".format(username[char])
 
 
 @patch('lms.djangoapps.lti_provider.users.switch_user', autospec=True)

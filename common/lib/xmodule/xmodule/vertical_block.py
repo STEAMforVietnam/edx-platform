@@ -11,55 +11,28 @@ from functools import reduce
 import pytz
 from lxml import etree
 from web_fragments.fragment import Fragment
+
+from common.lib.xmodule.xmodule.util.misc import is_xblock_an_assignment
 from xblock.core import XBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xblock.fields import Boolean, Scope
 from xmodule.mako_module import MakoTemplateBlockBase
 from xmodule.progress import Progress
 from xmodule.seq_module import SequenceFields
 from xmodule.studio_editable import StudioEditableBlock
-from xmodule.util.misc import is_xblock_an_assignment
 from xmodule.util.xmodule_django import add_webpack_to_fragment
 from xmodule.x_module import PUBLIC_VIEW, STUDENT_VIEW, XModuleFields
 from xmodule.xml_module import XmlParserMixin
 
 log = logging.getLogger(__name__)
 
-# Make '_' a no-op so we can scrape strings. Using lambda instead of
-#  `django.utils.translation.ugettext_noop` because Django cannot be imported in this file
-_ = lambda text: text
-
 # HACK: This shouldn't be hard-coded to two types
 # OBSOLETE: This obsoletes 'type'
 CLASS_PRIORITY = ['video', 'problem']
 
 
-class VerticalFields:
-    """
-    A mixin to introduce fields in the Vertical Block.
-    """
-
-    discussion_enabled = Boolean(
-        display_name=_("Enable in-context discussions for the Unit"),
-        help=_(
-            "Add discussion for the Unit."
-        ),
-        default=False,
-        scope=Scope.settings,
-    )
-
-
-@XBlock.needs('user', 'bookmarks', 'mako')
+@XBlock.needs('user', 'bookmarks')
 @XBlock.wants('completion')
 @XBlock.wants('call_to_action')
-class VerticalBlock(
-    SequenceFields,
-    VerticalFields,
-    XModuleFields,
-    StudioEditableBlock,
-    XmlParserMixin,
-    MakoTemplateBlockBase,
-    XBlock
-):
+class VerticalBlock(SequenceFields, XModuleFields, StudioEditableBlock, XmlParserMixin, MakoTemplateBlockBase, XBlock):
     """
     Layout XBlock for rendering subblocks vertically.
     """
@@ -109,8 +82,7 @@ class VerticalBlock(
 
         # pylint: disable=no-member
         for child in child_blocks:
-            child_has_access_error = self.block_has_access_error(child)
-            if context.get('hide_access_error_blocks') and child_has_access_error:
+            if context.get('hide_access_error_blocks') and getattr(child, 'has_access_error', False):
                 continue
             child_block_context = copy(child_context)
             if child in list(child_blocks_to_complete_on_view):
@@ -128,7 +100,7 @@ class VerticalBlock(
         completed = self.is_block_complete_for_assignments(completion_service)
         past_due = completed is False and self.due and self.due < datetime.now(pytz.UTC)
         cta_service = self.runtime.service(self, 'call_to_action')
-        vertical_banner_ctas = cta_service.get_ctas(self, 'vertical_banner', completed) if cta_service else []
+        vertical_banner_ctas = (cta_service and cta_service.get_ctas(self, 'vertical_banner', completed)) or []  # lint-amnesty, pylint: disable=consider-using-ternary
 
         fragment_context = {
             'items': contents,
@@ -151,29 +123,12 @@ class VerticalBlock(
                     child_context['username'], str(self.location)),  # pylint: disable=no-member
             })
 
-        fragment.add_content(self.runtime.service(self, 'mako').render_template('vert_module.html', fragment_context))
+        fragment.add_content(self.system.render_template('vert_module.html', fragment_context))
 
         add_webpack_to_fragment(fragment, 'VerticalStudentView')
         fragment.initialize_js('VerticalStudentView')
 
         return fragment
-
-    def block_has_access_error(self, block):
-        """
-        Returns whether has_access_error is True for the given block (itself or any child)
-        """
-        # Check its access attribute (regular question will have it set)
-        has_access_error = getattr(block, 'has_access_error', False)
-        if has_access_error:
-            return True
-
-        # Check child nodes if they exist (e.g. randomized library question aka LibraryContentBlock)
-        for child in block.get_children():
-            has_access_error = getattr(child, 'has_access_error', False)
-            if has_access_error:
-                return True
-            has_access_error = self.block_has_access_error(child)
-        return has_access_error
 
     def student_view(self, context):
         """

@@ -13,6 +13,7 @@ import pytest
 import ddt
 from ccx_keys.locator import CCXLocator
 from django.conf import settings
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.urls import Resolver404, resolve, reverse
 from django.utils.timezone import now
 from oauth2_provider import models as dot_models
@@ -31,7 +32,6 @@ from lms.djangoapps.ccx.utils import ccx_course as ccx_course_cm
 from lms.djangoapps.courseware import courses
 from lms.djangoapps.instructor.access import allow_access, list_with_level
 from lms.djangoapps.instructor.enrollment import enroll_email, get_email_params
-from openedx.core.lib.courses import get_course_by_id
 
 USER_PASSWORD = 'test'
 
@@ -141,7 +141,7 @@ class CcxListTest(CcxRestApiTest):
         self.list_url = reverse('ccx_api:v0:ccx:list')
         self.list_url_master_course = urllib.parse.urljoin(
             self.list_url,
-            f'?master_course_id={urllib.parse.quote_plus(self.master_course_key_str)}'
+            '?master_course_id={}'.format(urllib.parse.quote_plus(self.master_course_key_str))
         )
 
     def test_authorization(self):
@@ -362,7 +362,7 @@ class CcxListTest(CcxRestApiTest):
         assert resp.data['previous'] is not None
 
         # last page + 1
-        url = f'{self.list_url_master_course}&page={num_pages + 1}'
+        url = '{}&page={}'.format(self.list_url_master_course, num_pages + 1)
         resp = self.client.get(url, {}, HTTP_AUTHORIZATION=self.auth)
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 
@@ -422,7 +422,7 @@ class CcxListTest(CcxRestApiTest):
         self.mstore.update_item(self.course, self.coach.id)
 
         # case with deprecated  master_course_id
-        with mock.patch('lms.djangoapps.ccx.api.v0.views.get_course_by_id', autospec=True) as mocked:
+        with mock.patch('lms.djangoapps.courseware.courses.get_course_by_id', autospec=True) as mocked:
             mocked.return_value.id.deprecated = True
             resp = self.client.post(self.list_url, data, format='json', HTTP_AUTHORIZATION=self.auth)
 
@@ -594,7 +594,7 @@ class CcxListTest(CcxRestApiTest):
         coach_role_on_master_course = CourseCcxCoachRole(self.master_course_key)
         assert coach_role_on_master_course.has_user(self.coach)
         # check that the coach has been enrolled in the ccx
-        ccx_course_object = get_course_by_id(course_key)
+        ccx_course_object = courses.get_course_by_id(course_key)
         assert CourseEnrollment.objects.filter(course_id=ccx_course_object.id, user=self.coach).exists()
         # check that an email has been sent to the coach
         assert len(outbox) == 1
@@ -660,12 +660,12 @@ class CcxListTest(CcxRestApiTest):
         assert len(outbox) == 1
         assert self.coach.email in outbox[0].recipients()
 
-        list_staff_master_course = list_with_level(self.course.id, 'staff')
-        list_instructor_master_course = list_with_level(self.course.id, 'instructor')
+        list_staff_master_course = list_with_level(self.course, 'staff')
+        list_instructor_master_course = list_with_level(self.course, 'instructor')
         course_key = CourseKey.from_string(resp.data.get('ccx_course_id'))
         with ccx_course_cm(course_key) as course_ccx:
-            list_staff_ccx_course = list_with_level(course_ccx.id, 'staff')
-            list_instructor_ccx_course = list_with_level(course_ccx.id, 'instructor')
+            list_staff_ccx_course = list_with_level(course_ccx, 'staff')
+            list_instructor_ccx_course = list_with_level(course_ccx, 'instructor')
 
         # The "Coach" in the parent course becomes "Staff" on the CCX, so the CCX should have 1 "Staff"
         # user more than the parent course
@@ -759,9 +759,7 @@ class CcxDetailTest(CcxRestApiTest):
         Check authorization for staff users logged in without oauth
         """
         # create a staff user
-        staff_user = UserFactory.create(
-            username='test_staff_user', email='test_staff_user@openedx.org', password='test',
-        )
+        staff_user = User.objects.create_user('test_staff_user', 'test_staff_user@openedx.org', 'test')
         # add staff role to the staff user
         CourseStaffRole(self.master_course_key).add_users(staff_user)
 
@@ -778,9 +776,7 @@ class CcxDetailTest(CcxRestApiTest):
         Check authorization for users logged in without oauth
         """
         # create an instructor user
-        instructor_user = UserFactory.create(
-            username='test_instructor_user', email='test_instructor_user@openedx.org', password='test',
-        )
+        instructor_user = User.objects.create_user('test_instructor_user', 'test_instructor_user@openedx.org', 'test')
         # add instructor role to the instructor user
         CourseInstructorRole(self.master_course_key).add_users(instructor_user)
 
@@ -797,9 +793,7 @@ class CcxDetailTest(CcxRestApiTest):
         Check authorization for other coach users logged in without oauth
         """
         # create an coach user
-        coach_user = UserFactory.create(
-            username='test_coach_user', email='test_coach_user@openedx.org', password='test',
-        )
+        coach_user = User.objects.create_user('test_coach_user', 'test_coach_user@openedx.org', 'test')
         # add coach role to the coach user
         CourseCcxCoachRole(self.master_course_key).add_users(coach_user)
 
@@ -1059,7 +1053,7 @@ class CcxDetailTest(CcxRestApiTest):
         coach_role_on_master_course = CourseCcxCoachRole(self.master_course_key)
         assert coach_role_on_master_course.has_user(new_coach)
         # check that the coach has been enrolled in the ccx
-        ccx_course_object = get_course_by_id(self.ccx_key)
+        ccx_course_object = courses.get_course_by_id(self.ccx_key)
         assert CourseEnrollment.objects.filter(course_id=ccx_course_object.id, user=new_coach).exists()
         # check that an email has been sent to the coach
         assert len(outbox) == 1

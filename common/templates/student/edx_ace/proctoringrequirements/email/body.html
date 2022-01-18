@@ -7,12 +7,11 @@
     <tr>
         <td>
             <h1>
-                {% autoescape off %}
-                {# xss-lint: disable=django-blocktrans-missing-escape-filter #}
+                {% filter force_escape %}
                 {% blocktrans %}
                     Proctoring requirements for {{ course_name }}
                 {% endblocktrans %}
-                {% endautoescape %}
+                {% endfilter %}
             </h1>
 
             <p style="color: rgba(0,0,0,.75);">
@@ -24,21 +23,19 @@
             </p>
 
             <p style="color: rgba(0,0,0,.75);">
-                {% autoescape off %}
-                {# xss-lint: disable=django-blocktrans-missing-escape-filter #}
+                {% filter force_escape %}
                 {% blocktrans %}
                     You are enrolled in {{ course_name }} at {{ platform_name }}. This course contains proctored exams.
                 {% endblocktrans %}
-                {% endautoescape %}
+                {% endfilter %}
             </p>
 
             <p style="color: rgba(0,0,0,.75);">
-                {% autoescape off %}
-                {# xss-lint: disable=django-blocktrans-missing-escape-filter #}
+                {% filter force_escape %}
                 {% blocktrans %}
                     Proctored exams are timed exams that you take while proctoring software monitors your computer's desktop, webcam video, and audio. Your course uses {{ proctoring_provider }} software for proctoring.
                 {% endblocktrans %}
-                {% endautoescape %}
+                {% endfilter %}
             </p>
 
             <p style="color: rgba(0,0,0,.75);">
@@ -56,11 +53,10 @@
             {% endfilter %}
             {% include "ace_common/edx_ace/common/return_to_course_cta.html" with course_cta_text=course_cta_text course_cta_url=proctoring_requirements_url %}
 
-            {% if idv_required %}
             <p style="color: rgba(0,0,0,.75);">
                 {% filter force_escape %}
                 {% blocktrans %}
-                    Before taking a graded proctored exam, you must have approved ID verification photos.
+                    Before taking a graded proctored exam, you must have approved ID verification photos. 
                 {% endblocktrans %}
                 {% endfilter %}
                 <a href="{{ id_verification_url }}">
@@ -71,7 +67,6 @@
                     {% endfilter %}
                 </a>
             </p>
-            {% endif %}
 
             <p>
                 {% trans "Thank you," as tmsg %}{{ tmsg | force_escape }}

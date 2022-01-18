@@ -4,8 +4,7 @@ Course API Serializers.  Representing course catalog data
 
 from rest_framework import serializers
 
-from lms.djangoapps.course_home_api.progress.serializers import CertificateDataSerializer
-from lms.djangoapps.course_home_api.outline.serializers import CourseGoalsSerializer
+from lms.djangoapps.course_home_api.progress.v1.serializers import CertificateDataSerializer
 from openedx.core.lib.api.fields import AbsoluteURLField
 
 
@@ -82,7 +81,6 @@ class CourseInfoSerializer(serializers.Serializer):  # pylint: disable=abstract-
     access_expiration = serializers.DictField()
     can_show_upgrade_sock = serializers.BooleanField()
     content_type_gating_enabled = serializers.BooleanField()
-    course_goals = CourseGoalsSerializer()
     effort = serializers.CharField()
     end = serializers.DateTimeField()
     enrollment = serializers.DictField()
@@ -106,9 +104,8 @@ class CourseInfoSerializer(serializers.Serializer):  # pylint: disable=abstract-
     verified_mode = serializers.DictField()
     show_calculator = serializers.BooleanField()
     original_user_is_staff = serializers.BooleanField()
-    can_view_legacy_courseware = serializers.BooleanField()
     is_staff = serializers.BooleanField()
-    course_access = serializers.DictField()
+    can_load_courseware = serializers.DictField()
     notes = serializers.DictField()
     marketing_url = serializers.CharField()
     celebrations = serializers.DictField()
@@ -118,9 +115,6 @@ class CourseInfoSerializer(serializers.Serializer):  # pylint: disable=abstract-
     verify_identity_url = AbsoluteURLField()
     verification_status = serializers.CharField()
     linkedin_add_to_profile_url = serializers.URLField()
-    is_integrity_signature_enabled = serializers.BooleanField()
-    user_needs_integrity_signature = serializers.BooleanField()
-    username = serializers.CharField()
 
     def __init__(self, *args, **kwargs):
         """

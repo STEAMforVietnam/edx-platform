@@ -2,15 +2,14 @@
 Support tool for changing course enrollments.
 """
 
+
+import csv
+from uuid import UUID
+
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.views.generic import View
-from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework.views import APIView
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from social_django.models import UserSocialAuth
 
 from common.djangoapps.edxmako.shortcuts import render_to_response
@@ -18,15 +17,16 @@ from common.djangoapps.third_party_auth.models import SAMLProviderConfig
 from lms.djangoapps.program_enrollments.api import (
     fetch_program_enrollments_by_student,
     get_users_by_external_keys_and_org_key,
+    link_program_enrollments
 )
 from lms.djangoapps.program_enrollments.exceptions import (
     BadOrganizationShortNameException,
+    ProviderConfigurationException,
     ProviderDoesNotExistException
 )
 from lms.djangoapps.support.decorators import require_support_permission
 from lms.djangoapps.support.serializers import ProgramEnrollmentSerializer, serialize_user_info
 from lms.djangoapps.verify_student.services import IDVerificationService
-from lms.djangoapps.support.views.utils import validate_and_link_program_enrollments
 
 TEMPLATE_PATH = 'support/link_program_enrollments.html'
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
@@ -61,7 +61,7 @@ class LinkProgramEnrollmentSupportView(View):
         """
         program_uuid = request.POST.get('program_uuid', '').strip()
         text = request.POST.get('text', '')
-        successes, errors = validate_and_link_program_enrollments(program_uuid, text)
+        successes, errors = self._validate_and_link(program_uuid, text)
         return render_to_response(
             TEMPLATE_PATH,
             {
@@ -72,48 +72,48 @@ class LinkProgramEnrollmentSupportView(View):
             }
         )
 
-
-class LinkProgramEnrollmentSupportAPIView(APIView):
-    """
-    Support-only API View for linking learner enrollments by support staff.
-    """
-    authentication_classes = (
-        JwtAuthentication, SessionAuthentication
-    )
-    permission_classes = (
-        IsAuthenticated,
-    )
-
-    @method_decorator(require_support_permission)
-    def post(self, request):
+    @staticmethod
+    def _validate_and_link(program_uuid_string, linkage_text):
         """
-        Links learner enrollments by support staff
-        * Example Request:
-            - POST / support / link_program_enrollments_details/
-            * Sample Payload
-            {
-                program_uuid: < program_uuid > ,
-                username_pair_text: 'external_user_key,lms_username'
-            }
-        * Example Response:
-            {
-                program_uuid: < program_uuid>,
-                username_pair_text: 'external_user_key,lms_username'
-                successes: 'Success messages if Linkages are created',
-                errors: 'Error messages if there is no linkages'
-            }
-        """
+        Validate arguments, and if valid, call `link_program_enrollments`.
 
-        program_uuid = request.POST.get('program_uuid', '').strip()
-        username_pair_text = request.POST.get('username_pair_text', '')
-        successes, errors = validate_and_link_program_enrollments(program_uuid, username_pair_text)
-        data = {
-            'successes': successes,
-            'errors': errors,
-            'program_uuid': program_uuid,
-            'username_pair_text': username_pair_text,
+        Returns: (successes, errors)
+            where successes and errors are both list[str]
+        """
+        if not (program_uuid_string and linkage_text):
+            error = (
+                "You must provide both a program uuid "
+                "and a series of lines with the format "
+                "'external_user_key,lms_username'."
+            )
+            return [], [error]
+        try:
+            program_uuid = UUID(program_uuid_string)
+        except ValueError:
+            return [], [
+                f"Supplied program UUID '{program_uuid_string}' is not a valid UUID."
+            ]
+        reader = csv.DictReader(
+            linkage_text.splitlines(), fieldnames=('external_key', 'username')
+        )
+        ext_key_to_username = {
+            (item.get('external_key') or '').strip(): (item['username'] or '').strip()
+            for item in reader
         }
-        return Response(data)
+        if not (all(ext_key_to_username.keys()) and all(ext_key_to_username.values())):
+            return [], [
+                "All linking lines must be in the format 'external_user_key,lms_username'"
+            ]
+        link_errors = link_program_enrollments(
+            program_uuid, ext_key_to_username
+        )
+        successes = [
+            str(item)
+            for item in ext_key_to_username.items()
+            if item not in link_errors
+        ]
+        errors = [message for message in link_errors.values()]  # lint-amnesty, pylint: disable=unnecessary-comprehension
+        return successes, errors
 
 
 class ProgramEnrollmentsInspectorView(View):
@@ -225,11 +225,10 @@ class ProgramEnrollmentsInspectorView(View):
                 [external_user_key],
                 org_key
             )
-            # Remove entries with no corresponding user and convert keys to lowercase
-            users_by_key_lower = {key.lower(): value for key, value in users_by_key.items() if value}
-            found_user = users_by_key_lower.get(external_user_key.lower())
+            found_user = users_by_key.get(external_user_key)
         except (
             BadOrganizationShortNameException,
+            ProviderConfigurationException,
             ProviderDoesNotExistException
         ):
             # We cannot identify edX user from external_user_key and org_key pair
@@ -262,38 +261,3 @@ class ProgramEnrollmentsInspectorView(View):
         ).prefetch_related('program_course_enrollments')
         serialized = ProgramEnrollmentSerializer(program_enrollments, many=True)
         return serialized.data
-
-
-class SAMLProvidersWithOrg(APIView):
-    """
-    Support-only API View for fetching a list of all
-    organizations names which will be utilized as keys.
-    """
-    @method_decorator(require_support_permission)
-    def get(self, request):
-        """
-        The get request returns a list of all
-        organizations names which will be utilized as keys.
-        * Example Request:
-            - GET /support/get_saml_providers/
-        * Example Response:
-            [
-                'test_org',
-                'donut_org',
-                'tri_org'
-            ]
-        """
-        org_key_names = self._get_org_key_names()
-        return Response(data=org_key_names)
-
-    def _get_org_key_names(self):
-        """
-        From our Third_party_auth models, return a list of
-        of organizations names which will be utilized as keys.
-        """
-        saml_providers = SAMLProviderConfig.objects.current_set().filter(
-            enabled=True,
-            organization__isnull=False
-        ).select_related('organization')
-
-        return [saml_provider.organization.short_name for saml_provider in saml_providers]

@@ -20,7 +20,7 @@ from openedx.core.djangoapps.django_comment_common.models import (
     Role
 )
 from openedx.core.djangoapps.django_comment_common.utils import seed_permissions_roles
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 
 
 class AutoAuthTestCase(UrlResetMixin, TestCase):
@@ -210,7 +210,7 @@ class AutoAuthEnabledTestCase(AutoAuthTestCase, ModuleStoreTestCase):
         if settings.ROOT_URLCONF == 'lms.urls':
             url_pattern = '/course/'
         else:
-            url_pattern = f'/course/{str(course_key)}'
+            url_pattern = '/course/{}'.format(str(course_key))
 
         assert response.url.endswith(url_pattern)
 

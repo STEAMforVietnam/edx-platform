@@ -12,10 +12,10 @@ from django.core.management.base import BaseCommand, CommandError
 from cms.djangoapps.contentstore.management.commands.utils import user_from_str
 from cms.djangoapps.contentstore.views.course import create_new_course_in_store
 from openedx.core.djangoapps.credit.models import CreditProvider
-from xmodule.course_module import CourseFields  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.fields import Date  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.exceptions import DuplicateCourseError  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.tabs import CourseTabList  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.course_module import CourseFields
+from xmodule.fields import Date
+from xmodule.modulestore.exceptions import DuplicateCourseError
+from xmodule.tabs import CourseTabList
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class Command(BaseCommand):
             # Create the course
             try:
                 new_course = create_new_course_in_store("split", user, org, num, run, fields)
-                logger.info(f"Created {str(new_course.id)}")
+                logger.info("Created {}".format(str(new_course.id)))
             except DuplicateCourseError:
                 logger.warning("Course already exists for %s, %s, %s", org, num, run)
 

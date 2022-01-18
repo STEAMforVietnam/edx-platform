@@ -10,15 +10,17 @@ import hashlib
 import json
 import logging
 
+import six
 from celery.result import AsyncResult
 from celery.states import FAILURE, READY_STATES, REVOKED, SUCCESS
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from opaque_keys.edx.keys import UsageKey
 
 from common.djangoapps.util.db import outer_atomic
 from lms.djangoapps.courseware.courses import get_problems_in_section
+from lms.djangoapps.courseware.module_render import get_xqueue_callback_url_prefix
 from lms.djangoapps.instructor_task.models import PROGRESS, InstructorTask
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +33,7 @@ class AlreadyRunningError(Exception):
     def __init__(self, message=None):
 
         if not message:
-            message = self.message
+            message = self.message  # pylint: disable=exception-message-attribute
         super().__init__(message)
 
 
@@ -43,7 +45,7 @@ class QueueConnectionError(Exception):
 
     def __init__(self, message=None):
         if not message:
-            message = self.message
+            message = self.message  # pylint: disable=exception-message-attribute
         super().__init__(message)
 
 
@@ -130,7 +132,8 @@ def _get_xmodule_instance_args(request, task_id):
     Calculate parameters needed for instantiating xmodule instances.
 
     The `request_info` will be passed to a tracking log function, to provide information
-    about the source of the task request.
+    about the source of the task request.   The `xqueue_callback_url_prefix` is used to
+    permit old-style xqueue callbacks directly to the appropriate module in the LMS.
     The `task_id` is also passed to the tracking log function.
     """
     request_info = {'username': request.user.username,
@@ -140,7 +143,8 @@ def _get_xmodule_instance_args(request, task_id):
                     'host': request.META['SERVER_NAME'],
                     }
 
-    xmodule_instance_args = {'request_info': request_info,
+    xmodule_instance_args = {'xqueue_callback_url_prefix': get_xqueue_callback_url_prefix(request),
+                             'request_info': request_info,
                              'task_id': task_id,
                              }
     return xmodule_instance_args
@@ -386,13 +390,13 @@ def encode_problem_and_student_input(usage_key, student=None):
     assert isinstance(usage_key, UsageKey)
     if student is not None:
         task_input = {'problem_url': str(usage_key), 'student': student.username}
-        task_key_stub = f"{student.id}_{str(usage_key)}"
+        task_key_stub = "{student}_{problem}".format(student=student.id, problem=str(usage_key))
     else:
         task_input = {'problem_url': str(usage_key)}
-        task_key_stub = f"_{str(usage_key)}"
+        task_key_stub = "_{problem}".format(problem=str(usage_key))
 
     # create the key value by using MD5 hash:
-    task_key = hashlib.md5(task_key_stub.encode()).hexdigest()
+    task_key = hashlib.md5(six.b(task_key_stub)).hexdigest()
 
     return task_input, task_key
 
@@ -408,10 +412,10 @@ def encode_entrance_exam_and_student_input(usage_key, student=None):
     assert isinstance(usage_key, UsageKey)
     if student is not None:
         task_input = {'entrance_exam_url': str(usage_key), 'student': student.username}
-        task_key_stub = f"{student.id}_{str(usage_key)}"
+        task_key_stub = "{student}_{entranceexam}".format(student=student.id, entranceexam=str(usage_key))
     else:
         task_input = {'entrance_exam_url': str(usage_key)}
-        task_key_stub = f"_{str(usage_key)}"
+        task_key_stub = "_{entranceexam}".format(entranceexam=str(usage_key))
 
     # create the key value by using MD5 hash:
     task_key = hashlib.md5(task_key_stub.encode('utf-8')).hexdigest()

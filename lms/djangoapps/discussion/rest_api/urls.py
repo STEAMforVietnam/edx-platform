@@ -5,7 +5,7 @@ Discussion API URLs
 
 
 from django.conf import settings
-from django.urls import include, path, re_path
+from django.conf.urls import include, url
 from rest_framework.routers import SimpleRouter
 
 from lms.djangoapps.discussion.rest_api.views import (
@@ -16,8 +16,7 @@ from lms.djangoapps.discussion.rest_api.views import (
     CourseView,
     ReplaceUsernamesView,
     RetireUserView,
-    ThreadViewSet,
-    UploadFileView,
+    ThreadViewSet
 )
 
 ROUTER = SimpleRouter()
@@ -25,36 +24,31 @@ ROUTER.register("threads", ThreadViewSet, basename="thread")
 ROUTER.register("comments", CommentViewSet, basename="comment")
 
 urlpatterns = [
-    re_path(
+    url(
         r"^v1/courses/{}/settings$".format(
             settings.COURSE_ID_PATTERN
         ),
         CourseDiscussionSettingsAPIView.as_view(),
         name="discussion_course_settings",
     ),
-    re_path(
-        fr"^v1/courses/{settings.COURSE_ID_PATTERN}/upload$",
-        UploadFileView.as_view(),
-        name="upload_file",
-    ),
-    re_path(
+    url(
         r"^v1/courses/{}/roles/(?P<rolename>[A-Za-z0-9+ _-]+)/?$".format(
             settings.COURSE_ID_PATTERN
         ),
         CourseDiscussionRolesAPIView.as_view(),
         name="discussion_course_roles",
     ),
-    re_path(
+    url(
         fr"^v1/courses/{settings.COURSE_ID_PATTERN}",
         CourseView.as_view(),
         name="discussion_course"
     ),
-    path('v1/accounts/retire_forum', RetireUserView.as_view(), name="retire_discussion_user"),
-    path('v1/accounts/replace_username', ReplaceUsernamesView.as_view(), name="replace_discussion_username"),
-    re_path(
+    url(r"^v1/accounts/retire_forum", RetireUserView.as_view(), name="retire_discussion_user"),
+    url(r"^v1/accounts/replace_username", ReplaceUsernamesView.as_view(), name="replace_discussion_username"),
+    url(
         fr"^v1/course_topics/{settings.COURSE_ID_PATTERN}",
         CourseTopicsView.as_view(),
         name="course_topics"
     ),
-    path('v1/', include(ROUTER.urls)),
+    url("^v1/", include(ROUTER.urls)),
 ]

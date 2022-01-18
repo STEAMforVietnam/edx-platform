@@ -40,8 +40,8 @@ class StubYouTubeHandler(StubHttpRequestHandler):
         """
         Allow callers to delete all the server configurations using the /del_config URL.
         """
-        if self.path in ("/del_config", "/del_config/"):
-            self.server.config = {}
+        if self.path == "/del_config" or self.path == "/del_config/":
+            self.server.config = dict()
             self.log_message("Reset Server Configuration.")
             self.send_response(200)
         else:
@@ -134,7 +134,7 @@ class StubYouTubeHandler(StubHttpRequestHandler):
                 })
             )
         })
-        response = f"{callback}({json.dumps(data)})".encode('utf-8')
+        response = "{cb}({data})".format(cb=callback, data=json.dumps(data)).encode('utf-8')
 
         self.send_response(200, content=response, headers={'Content-type': 'text/html'})
         self.log_message(f"Youtube: sent response {message}")
@@ -158,7 +158,7 @@ class StubYouTubeHandler(StubHttpRequestHandler):
                 "message": message,
             })
         })
-        response = f"{callback}({json.dumps(data)})".encode('utf-8')
+        response = "{cb}({data})".format(cb=callback, data=json.dumps(data)).encode('utf-8')
 
         self.send_response(200, content=response, headers={'Content-type': 'text/html'})
         self.log_message(f"Youtube: sent response {message}")

@@ -34,9 +34,6 @@ define([
                 collapsedClass: 'is-collapsed'
             },
 
-            // Extracting this to a variable allows comprehensive themes to replace or extend `CourseOutlineView`.
-            outlineViewClass: CourseOutlineView,
-
             initialize: function() {
                 var self = this;
                 this.initialState = this.options.initialState;
@@ -93,7 +90,7 @@ define([
                     this.highlightsEnableView.render();
                 }
 
-                this.outlineView = new this.outlineViewClass({
+                this.outlineView = new CourseOutlineView({
                     el: this.$('.outline'),
                     model: this.model,
                     isRoot: true,

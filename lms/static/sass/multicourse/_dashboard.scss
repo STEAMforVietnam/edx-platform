@@ -778,11 +778,6 @@
 
     // TYPE: upsell
     &.message-upsell {
-      padding-left: $baseline;
-      padding-top: $baseline;
-      padding-bottom: $baseline;
-      background-color: #F2F0EF;
-
       .wrapper-tip {
         @include clearfix();
 
@@ -806,61 +801,13 @@
       }
 
       .wrapper-extended {
-        display: flex;
-        flex-flow: column wrap;
-        color: #00262B;
+        padding: ($baseline/4) 0;
 
-        .wrapper-icon-message {
-          width: 100%;
-          display: inline-flex;
-          flex-wrap: wrap;
+        .message-copy {
+          display: inline-block;
 
-          svg {
-            flex-shrink: 0;
-            width: 43px;
-            height: 43px;
-            margin-left: -5px;
-          }
-
-          .message-copy {
-            margin-left: $baseline/2;
-            min-width: 15rem;
-            flex: 2;
-
-            .message-copy-bold {
-              font-weight: $font-weight-bold;
-            }
-          }
-
-          a.verified-info {
-            color: #00262B;
-            text-decoration: underline;
-          }
-        }
-
-        .action-upgrade-container {
-          flex-shrink: 0;
-          flex-grow: 1;
-          align-self: flex-end;
-        }
-
-        @include media-breakpoint-down(xs) {
-          .action-upgrade-container {
-            width: 100%;
-            margin-top: $baseline;
-          }
-
-          .action-upgrade {
-            width: 100%;
-            flex: 2 100%;
-          }
-        }
-
-        @include media-breakpoint-up(xl) {
-          flex-flow: nowrap;
-
-          .action-upgrade-container {
-            margin-left: 16px;
+          .message-copy-bold {
+            font-weight: 600;
           }
         }
       }
@@ -1067,15 +1014,6 @@
         }
       }
 
-      &.course-status-processing {
-        color: theme-color('error');
-      }
-
-      &.course-status-earned-not-available,
-      &.course-status-certavailable {
-        color: theme-color('success');
-      }
-
       &.course-status-certavailable {
         .message-copy {
           width: flex-grid(6, 12);
@@ -1173,41 +1111,36 @@
       padding: $baseline/2;
       margin-bottom: 0;
 
-      .related-programs-preface  {
+      .related-programs-preface {
         @include float(left);
 
         margin: 0 $baseline/2;
         font-weight: bold;
       }
 
-      .related-program-container {
+      ul {
         display: inline;
         padding: 0;
         margin: 0;
       }
 
-      .related-program-element {
-        &.important-element {
-          @include float(left);
-
-          display: inline;
-          padding: 0 0.5em !important;
-
-          .category-icon {
-            @include float(left);
-            @include margin-right($baseline/4);
-
-            margin-top: ($baseline/10);
-            background-color: transparent;
-            background-size: 100%;
-            width: ($baseline*0.7);
-            height: ($baseline*0.7);
-          }
-        }
-      }
-
       li {
+        @include float(left);
+
+        display: inline;
+        padding: 0 0.5em;
         border-right: 1px solid;
+
+        .category-icon {
+          @include float(left);
+          @include margin-right($baseline/4);
+
+          margin-top: ($baseline/10);
+          background-color: transparent;
+          background-size: 100%;
+          width: ($baseline*0.7);
+          height: ($baseline*0.7);
+        }
       }
 
       // Remove separator from last list item.
@@ -1648,60 +1581,6 @@ a.fade-cover {
     margin-left: $baseline;
     margin-right: $baseline;
   }
-}
-
-#activate-account-modal {
-    display: block;
-    position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    margin-top: -60px;
-    text-align: left;
-    height: 252px;
-    width: 450px;
-    box-shadow: none;
-    background: none;
-    outline: 0;
-
-    .inner-wrapper {
-      h3 {
-          font-family: inherit;
-          padding: 1.5rem 1rem 1rem 1rem;
-          text-align: left;
-          font-weight: bold;
-          font-size: 1.3rem;
-          line-height: 1.75rem;
-      }
-        border: none;
-        border-radius: 5px;
-    }
-}
-
-@media (max-width: 460px) and (min-width: 360px) {
-    #activate-account-modal {
-        width: 350px;
-    }
-}
-
-@media (max-width: 360px) {
-    #activate-account-modal {
-        width: 300px;
-    }
-}
-
-.activate-account-modal-button {
-    text-align: right;
-    display: block;
-    padding: 1rem 1rem 1rem 0;
-
-    .btn-primary {
-        text-transform: none;
-        font-weight: 500;
-    }
-}
-.activate-account-modal-body {
-    padding: 0 1rem;
 }
 
 .reasons_survey {

@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = (n != 1);
-    if (typeof v === 'boolean') {
+    var v=(n != 1);
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,7 +19,7 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
     " ${price} {currency} )": " ${price} {currency} )",
     " and ": "eta",
     " and {num_of_minutes} minute": "eta {num_of_minutes} minutu",
@@ -78,6 +77,7 @@
     "6 a.m.": "6 a.m.",
     "6 p.m.": "6 p.m.",
     ": video upload complete.": ": bideo-Igoera osatu da.",
+    "<%= user %> already in exception list.": "<%= user %> dagoeneko salbuespenen zerrendan dago.",
     "A Password is required": "Pasahitza beharrezkoa da",
     "A name that identifies your team (maximum 255 characters).": "Zure taldea identifikatzen duen izena (gehienez 255 karaktere).",
     "A valid email address is required": "E-posta helbide baliagarria beharrezkoa da",
@@ -331,6 +331,7 @@
     "Could not retrieve upload url.": "Ezin izan da igotzeko URLa lortu.",
     "Could not submit order": "Ezin izan da ordena bidali",
     "Could not submit photos": "Ezin da argazkirik bidali",
+    "Couldn't Save This Assignment": "Ezin izan da gorde zeregin hau",
     "Country": "Estatua",
     "Country of residence": "Bizi zaren estatua",
     "Country or Region of Residence": "Bizi zaren estatua edo eskualdea",
@@ -770,6 +771,7 @@
     "No description available": "Deskribapena ez dago eskuragarri",
     "No prerequisite": "Ez dago aurrebaldintzarik",
     "No results": "Ez dago emaitzarik",
+    "No results found for \"%(query_string)s\". Please try searching again.": "Ez da emaitzarik aurkitu honetarako: \"%(query_string)s\". Mesedez, saiatu berriz bilatzen.",
     "No tasks currently running.": "Ez dago atazarik martxan.",
     "No transcript uploaded.": "Ez da transkripzioa kargatu.",
     "Nonbreaking space": "Espazio zuria",
@@ -853,6 +855,7 @@
     "Please add at least one chapter": "Gehitu gutxienez atal bat",
     "Please add the instructor's biography": "Gehitu irakaslearen biografia",
     "Please address the errors on this page first, and then save your progress.": "Mesedez, konpondu lehenengoz orri honetako erroreak, eta gero gorde zure aurrerapena.",
+    "Please correct the outlined fields.": "Mesedez, zuzendu markatutako eremuak.",
     "Please do not use any spaces in this field.": "Mesedez, ez erabili espaziorik eremu honetan.",
     "Please do not use any spaces or special characters in this field.": "Mesedez, ez erabili espaziorik edo karaktere berezirik eremu honetan.",
     "Please enter a problem location.": "Mesedez, idatzi ariketaren kokapena.",
@@ -953,6 +956,7 @@
     "Right": "Eskubia",
     "Right to left": "Eskubitik ezkerretara",
     "Robots": "Robotak",
+    "Role field should not be left unselected.": "Rolaren eremua ezin da aukeratu gabe utzi.",
     "Row": "Lerroa",
     "Row group": "Errenkada-taldea",
     "Row properties": "Lerroaren ezarpenak",
@@ -970,9 +974,11 @@
     "Search Results": "Bilaketaren emaitzak",
     "Search all posts": "Bilatu mezu guztiak",
     "Search teams": "Bilatu taldeak",
+    "Search the {platform} Help Center": "Bilatu {platform} plataformako Laguntza-zentroa",
     "Section": "Atala",
     "Section Visibility": "Atalaren ikusgarritasuna",
     "Sections": "Atalak",
+    "Security": "Segurtasuna",
     "Select": "Aukeratu",
     "Select Session": "Aukeratu saioa",
     "Select a Content Group": "Aukeratu eduki-multzoa",
@@ -1183,6 +1189,7 @@
     "This post is visible to everyone.": "Mezu hau guztiek ikus dezakete.",
     "This post will be visible to everyone.": "Mezu hau guztiek ikusiko dute.",
     "This problem could not be saved.": "Ariketa hau ezin izan da gorde.",
+    "This problem has already been released. Any changes will apply only to future assessments.": "Ariketa hau dagoeneko argitaratu da. Beste edozein aldaketa geroagoko ebaluazioetan agertuko da.",
     "This problem has been reset.": "Ariketa hau berrabiarazi da.",
     "This response could not be saved.": "Erantzun hau ezin izan da gorde.",
     "This response could not be submitted.": "Erantzun hau ezin izan da bidali.",
@@ -1535,24 +1542,24 @@
     "{type} Progress": "{type} Aurrerapena",
     "\u2026": "\u2026"
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1562,16 +1569,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1594,12 +1601,15 @@
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
+      "%Y-%m-%d",
       "%m/%d/%Y %H:%M:%S",
       "%m/%d/%Y %H:%M:%S.%f",
       "%m/%d/%Y %H:%M",
+      "%m/%d/%Y",
       "%m/%d/%y %H:%M:%S",
       "%m/%d/%y %H:%M:%S.%f",
-      "%m/%d/%y %H:%M"
+      "%m/%d/%y %H:%M",
+      "%m/%d/%y"
     ],
     "DATE_FORMAT": "Y\\k\\o N j\\a",
     "DATE_INPUT_FORMATS": [
@@ -1632,8 +1642,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1652,5 +1662,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

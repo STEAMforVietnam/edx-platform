@@ -4,12 +4,12 @@ LTI Provider API endpoint urls.
 
 
 from django.conf import settings
-from django.urls import re_path
+from django.conf.urls import url
 
 from lms.djangoapps.lti_provider import views
 
 urlpatterns = [
-    re_path(
+    url(
         r'^courses/{course_id}/{usage_id}$'.format(
             course_id=settings.COURSE_ID_PATTERN,
             usage_id=settings.USAGE_ID_PATTERN

@@ -33,7 +33,7 @@ ROLES = {
 }
 
 
-def list_with_level(course_id, level):
+def list_with_level(course, level):
     """
     List users who have 'level' access.
 
@@ -41,7 +41,7 @@ def list_with_level(course_id, level):
     There could be other levels specific to the course.
     If there is no Group for that course-level, returns an empty list
     """
-    return ROLES[level](course_id).users_with_role()
+    return ROLES[level](course.id).users_with_role()
 
 
 def allow_access(course, user, level, send_email=True):
@@ -112,11 +112,3 @@ def update_forum_role(course_id, user, rolename, action):
         role.users.remove(user)
     else:
         raise ValueError(f"unrecognized action '{action}'")
-
-
-def is_beta_tester(user, course_id):
-    """
-    Returns True if the user is a beta tester in this course, and False if not
-    """
-    beta_testers_queryset = list_with_level(course_id, 'beta')
-    return beta_testers_queryset.filter(username=user.username).exists()

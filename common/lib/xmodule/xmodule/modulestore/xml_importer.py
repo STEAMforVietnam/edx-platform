@@ -21,6 +21,7 @@ Modulestore virtual   |          XML physical (draft, published)
              (a, b)   |  (a, b) | (x, b) | (x, x) | (x, y) | (a, x)
 """
 
+
 import json
 import logging
 import mimetypes
@@ -29,7 +30,7 @@ import re
 from abc import abstractmethod
 
 import xblock
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from lxml import etree
 from opaque_keys.edx.keys import UsageKey
 from opaque_keys.edx.locator import LibraryLocator
@@ -61,46 +62,12 @@ log = logging.getLogger(__name__)
 DEFAULT_STATIC_CONTENT_SUBDIR = 'static'
 
 
-class CourseImportException(Exception):
-    """
-    Base exception class for course import workflows.
-    """
-
-    def __init__(self):
-        super().__init__(self.description)  # pylint: disable=no-member
-
-
-class ErrorReadingFileException(CourseImportException):
-    """
-    Raised when error occurs while trying to read a file.
-    """
-
-    MESSAGE_TEMPLATE = _('Error while reading {}. Check file for XML errors.')
-
-    def __init__(self, filename, **kwargs):
-        self.description = self.MESSAGE_TEMPLATE.format(filename)
-        super().__init__(**kwargs)
-
-
-class ModuleFailedToImport(CourseImportException):
-    """
-    Raised when a module is failed to import.
-    """
-
-    MESSAGE_TEMPLATE = _('Failed to import module: {} at location: {}')
-
-    def __init__(self, display_name, location, **kwargs):
-        self.description = self.MESSAGE_TEMPLATE.format(display_name, location)
-        super().__init__(**kwargs)
-
-
 class LocationMixin(XBlockMixin):
     """
     Adds a `location` property to an :class:`XBlock` so it is more compatible
     with old-style :class:`XModule` API. This is a simplified version of
     :class:`XModuleMixin`.
     """
-
     @property
     def location(self):
         """ Get the UsageKey of this block. """
@@ -267,6 +234,7 @@ class ImportManager:
             create_if_not_present=False, raise_on_failure=False,
             static_content_subdir=DEFAULT_STATIC_CONTENT_SUBDIR,
             python_lib_filename='python_lib.zip',
+            status=None
     ):
         self.store = store
         self.user_id = user_id
@@ -291,6 +259,7 @@ class ImportManager:
             xblock_select=store.xblock_select,
             target_course_id=target_id,
         )
+        self.status = status
         self.logger, self.errors = make_error_tracker()
 
     def preflight(self):
@@ -393,10 +362,12 @@ class ImportManager:
             logging.info(f'Course import {course_id}: No {assets_filename} file present.')
             return
         except Exception as exc:  # pylint: disable=W0703
+            monitor_import_failure(course_id, 'Updating', exception=exc)
+            logging.exception(f'Course import {course_id}: Error while parsing {assets_filename}.')
             if self.raise_on_failure:  # lint-amnesty, pylint: disable=no-else-raise
-                monitor_import_failure(course_id, 'Updating', exception=exc)
-                logging.exception(f'Course import {course_id}: Error while parsing {assets_filename}.')
-                raise ErrorReadingFileException(assets_filename)  # pylint: disable=raise-missing-from
+                if self.status:
+                    self.status.fail(_('Error while reading {}. Check file for XML errors.').format(assets_filename))
+                raise
             else:
                 return
 
@@ -513,7 +484,13 @@ class ImportManager:
                         log.exception(
                             f'Course import {dest_id}: failed to import module location {child.location}'
                         )
-                        raise ModuleFailedToImport(child.display_name, child.location)  # pylint: disable=raise-missing-from
+                        if self.status:
+                            self.status.fail(
+                                _('Failed to import module: {} at location: {}').format(
+                                    child.display_name, child.location
+                                )
+                            )
+                        raise
 
                     depth_first(child)
 
@@ -534,11 +511,15 @@ class ImportManager:
                     runtime=courselike.runtime,
                 )
             except Exception:
-                log.exception(
-                    f'Course import {dest_id}: failed to import module location {leftover}'
-                )
-                # pylint: disable=raise-missing-from
-                raise ModuleFailedToImport(leftover.display_name, leftover.location)
+                msg = f'Course import {dest_id}: failed to import module location {leftover}'
+                log.error(msg)
+                if self.status:
+                    self.status.fail(
+                        _('Failed to import module: {} at location: {}').format(
+                            leftover.display_name, leftover.location
+                        )
+                    )
+                raise
 
     def run_imports(self):
         """
@@ -624,6 +605,10 @@ class CourseImportManager(ImportManager):
                     "Skipping import of course with id, %s, "
                     "since it collides with an existing one", dest_id
                 )
+                if self.status:
+                    self.status.fail(
+                        _('Aborting import because a course with this id: {} already exists.').format(dest_id)
+                    )
                 raise
 
         return dest_id, runtime
@@ -647,7 +632,7 @@ class CourseImportManager(ImportManager):
                 courselike_key.course,
                 courselike_key.run
             )
-            if course.wiki_slug in (original_unique_wiki_slug, courselike_key.course):
+            if course.wiki_slug == original_unique_wiki_slug or course.wiki_slug == courselike_key.course:
                 course.wiki_slug = '{}.{}.{}'.format(
                     course.id.org,
                     course.id.course,
@@ -733,6 +718,8 @@ class LibraryImportManager(ImportManager):
                     "Skipping import of Library with id %s, "
                     "since it collides with an existing one", dest_id
                 )
+                if self.status:
+                    self.status.fail(_('Aborting import since a library with this id already exists.'))
                 raise
 
         return dest_id, runtime
@@ -797,7 +784,6 @@ def _update_and_import_module(
         """
         Move the module to a new course.
         """
-
         def _convert_ref_fields_to_new_namespace(reference):
             """
             Convert a reference to the new namespace, but only
@@ -878,7 +864,7 @@ def _update_and_import_module(
     if block.location.block_type == 'library_content':
         # If library exists, update source_library_version and children
         # according to this existing library and library content block.
-        if block.source_library_id and store.get_library(block.source_library_key):
+        if store.get_library(block.source_library_key):
             # If the library content block is already in the course, then don't
             # refresh the children when we re-import it. This lets us address
             # TNL-7507 (Randomized Content Block Settings Lost in Course Import)
@@ -897,20 +883,16 @@ def _update_and_import_module(
             if lib_content_block_already_published:
                 return block
 
-            try:
-                # Update library content block's children on draft branch
-                with store.branch_setting(branch_setting=ModuleStoreEnum.Branch.draft_preferred):
-                    LibraryToolsService(store, user_id).update_children(
-                        block,
-                        version=block.source_library_version,
-                    )
-            except ValueError as err:
-                # The specified library version does not exist.
-                log.error(err)
-            else:
-                # Publish it if importing the course for branch setting published_only.
-                if store.get_branch_setting() == ModuleStoreEnum.Branch.published_only:
-                    store.publish(block.location, user_id)
+            # Update library content block's children on draft branch
+            with store.branch_setting(branch_setting=ModuleStoreEnum.Branch.draft_preferred):
+                LibraryToolsService(store, user_id).update_children(
+                    block,
+                    version=block.source_library_version,
+                )
+
+            # Publish it if importing the course for branch setting published_only.
+            if store.get_branch_setting() == ModuleStoreEnum.Branch.published_only:
+                store.publish(block.location, user_id)
 
     return block
 
@@ -1008,7 +990,7 @@ def _import_course_draft(
                 # Skip any OSX quarantine files, prefixed with a '._'.
                 continue
             module_path = os.path.join(rootdir, filename)
-            with open(module_path) as f:
+            with open(module_path, 'r') as f:
                 try:
                     xml = f.read()
 
@@ -1055,7 +1037,7 @@ def allowed_metadata_by_category(category):
     return {
         'vertical': [],
         'chapter': ['start'],
-        'sequential': ['due', 'relative_weeks_due', 'format', 'start', 'graded']
+        'sequential': ['due', 'format', 'start', 'graded']
     }.get(category, ['*'])
 
 

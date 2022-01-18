@@ -27,11 +27,11 @@ from common.djangoapps.student.roles import (
 )
 from common.djangoapps.student.tests.factories import UserFactory
 from common.djangoapps.xblock_django.user_service import DjangoXBlockUserService
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.x_module import STUDIO_VIEW  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.x_module import STUDIO_VIEW
 
 
 class LibraryTestCase(ModuleStoreTestCase):
@@ -188,7 +188,7 @@ class TestLibraries(LibraryTestCase):
         # Create many blocks in the library and add them to a course:
         for num in range(8):
             ItemFactory.create(
-                data=f"This is #{num + 1}",
+                data="This is #{}".format(num + 1),
                 category="html", parent_location=self.library.location, user_id=self.user.id, publish_item=False
             )
 

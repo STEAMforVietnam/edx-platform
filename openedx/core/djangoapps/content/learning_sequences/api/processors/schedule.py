@@ -2,18 +2,17 @@
 import logging
 from collections import defaultdict  # lint-amnesty, pylint: disable=unused-import
 from datetime import datetime, timedelta
-from typing import Dict
 
+from django.contrib.auth import get_user_model
 from edx_when.api import get_dates_for_course
 from opaque_keys.edx.keys import CourseKey  # lint-amnesty, pylint: disable=unused-import
-from openedx.core import types
-
 from common.djangoapps.student.auth import user_has_role
 from common.djangoapps.student.roles import CourseBetaTesterRole
 
 from ...data import ScheduleData, ScheduleItemData, UserCourseOutlineData
 from .base import OutlineProcessor
 
+User = get_user_model()
 log = logging.getLogger(__name__)
 
 
@@ -34,24 +33,19 @@ class ScheduleOutlineProcessor(OutlineProcessor):
     * Things that are made inaccessible after they're due.
     """
 
-    def __init__(self, course_key: CourseKey, user: types.User, at_time: datetime):
+    def __init__(self, course_key: CourseKey, user: User, at_time: datetime):
         super().__init__(course_key, user, at_time)
         self.dates = None
-        self.keys_to_schedule_fields: Dict[str, Dict[str, datetime]] = defaultdict(dict)
+        self.keys_to_schedule_fields = defaultdict(dict)
         self._course_start = None
         self._course_end = None
         self._is_beta_tester = False
 
-    def load_data(self, full_course_outline):
-        """
-        Pull dates information from edx-when.
-
-        Return data format: (usage_key, 'due'): datetime.datetime(2019, 12, 11, 15, 0, tzinfo=<UTC>)
-        """
-        self.dates = get_dates_for_course(
-            self.course_key, self.user, subsection_and_higher_only=True,
-            published_version=full_course_outline.published_version
-        )
+    def load_data(self):
+        """Pull dates information from edx-when."""
+        # (usage_key, 'due'): datetime.datetime(2019, 12, 11, 15, 0, tzinfo=<UTC>)
+        # TODO: Merge https://github.com/edx/edx-when/pull/48 and add `outline_only=True`
+        self.dates = get_dates_for_course(self.course_key, self.user)
 
         for (usage_key, field_name), date in self.dates.items():
             self.keys_to_schedule_fields[usage_key][field_name] = date

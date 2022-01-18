@@ -24,8 +24,8 @@ from django.conf import settings
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.core.files.base import ContentFile
 from django.db import models, transaction
-
-from django.utils.translation import gettext as _
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext as _
 from opaque_keys.edx.django.models import CourseKeyField
 
 from openedx.core.storage import get_storage
@@ -38,6 +38,7 @@ PROGRESS = 'PROGRESS'
 TASK_INPUT_LENGTH = 10000
 
 
+@python_2_unicode_compatible
 class InstructorTask(models.Model):
     """
     Stores information about background tasks that have been submitted to
@@ -263,13 +264,13 @@ class DjangoStorageReportStore(ReportStore):
             getattr(settings, config_name).get('STORAGE_KWARGS'),
         )
 
-    def store(self, course_id, filename, buff, parent_dir=''):
+    def store(self, course_id, filename, buff):
         """
         Store the contents of `buff` in a directory determined by hashing
         `course_id`, and name the file `filename`. `buff` can be any file-like
         object, ready to be read from the beginning.
         """
-        path = self.path_to(course_id, filename, parent_dir)
+        path = self.path_to(course_id, filename)
         # See https://github.com/boto/boto/issues/2868
         # Boto doesn't play nice with unicode in python3
         buff_contents = buff.read()
@@ -281,7 +282,7 @@ class DjangoStorageReportStore(ReportStore):
 
         self.storage.save(path, buff)
 
-    def store_rows(self, course_id, filename, rows, parent_dir=''):
+    def store_rows(self, course_id, filename, rows):
         """
         Given a course_id, filename, and rows (each row is an iterable of
         strings), write the rows to the storage backend in csv format.
@@ -290,7 +291,7 @@ class DjangoStorageReportStore(ReportStore):
         csvwriter = csv.writer(output_buffer)
         csvwriter.writerows(self._get_utf8_encoded_rows(rows))
         output_buffer.seek(0)
-        self.store(course_id, filename, output_buffer, parent_dir)
+        self.store(course_id, filename, output_buffer)
 
     def links_for(self, course_id):
         """
@@ -320,10 +321,9 @@ class DjangoStorageReportStore(ReportStore):
             for filename, full_path in files
         ]
 
-    def path_to(self, course_id, filename='', parent_dir=''):
+    def path_to(self, course_id, filename=''):
         """
         Return the full path to a given file for a given course.
         """
         hashed_course_id = hashlib.sha1(str(course_id).encode('utf-8')).hexdigest()
-        directory = parent_dir if bool(parent_dir) else hashed_course_id
-        return os.path.join(directory, filename)
+        return os.path.join(hashed_course_id, filename)

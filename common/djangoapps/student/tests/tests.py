@@ -38,7 +38,7 @@ from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, U
 from common.djangoapps.student.views import complete_course_mode_info
 from common.djangoapps.util.model_utils import USER_SETTINGS_CHANGED_EVENT_NAME
 from common.djangoapps.util.testing import EventTestMixin
-from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.certificates.models import CertificateStatuses
 from lms.djangoapps.certificates.tests.factories import GeneratedCertificateFactory
 from lms.djangoapps.verify_student.tests import TestVerificationBase
 from openedx.core.djangoapps.catalog.tests.factories import CourseFactory as CatalogCourseFactory
@@ -47,14 +47,10 @@ from openedx.core.djangoapps.content.course_overviews.tests.factories import Cou
 from openedx.core.djangoapps.programs.tests.mixins import ProgramsApiConfigMixin
 from openedx.core.djangoapps.site_configuration.tests.mixins import SiteMixin
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase, skip_unless_lms
-from xmodule.modulestore.tests.django_utils import ModuleStoreEnum, ModuleStoreTestCase, SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.data import CertificatesDisplayBehaviors  # lint-amnesty, pylint: disable=wrong-import-order
-
+from xmodule.modulestore.tests.django_utils import ModuleStoreEnum, ModuleStoreTestCase, SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, check_mongo_calls
 
 log = logging.getLogger(__name__)
-
-BETA_TESTER_METHOD = 'common.djangoapps.student.helpers.access.is_beta_tester'
 
 
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
@@ -79,8 +75,7 @@ class CourseEndingTest(ModuleStoreTestCase):
         survey_url = "http://a_survey.com"
         course = CourseOverviewFactory.create(
             end_of_course_survey_url=survey_url,
-            certificates_display_behavior=CertificatesDisplayBehaviors.END,
-            end=datetime.now(pytz.UTC) - timedelta(days=2)
+            certificates_display_behavior='end',
         )
         cert = GeneratedCertificateFactory.create(
             user=user,
@@ -90,28 +85,25 @@ class CourseEndingTest(ModuleStoreTestCase):
             grade='67',
             download_url='http://s3.edx/cert'
         )
-        enrollment = CourseEnrollmentFactory(user=user, course_id=course.id, mode=CourseMode.VERIFIED)
 
-        assert _cert_info(user, enrollment, None) ==\
+        assert _cert_info(user, course, None) ==\
                {'status': 'processing', 'show_survey_button': False, 'can_unenroll': True}
 
         cert_status = {'status': 'unavailable', 'mode': 'honor', 'uuid': None}
-        assert _cert_info(user, enrollment, cert_status) == {'status': 'processing', 'show_survey_button': False,
-                                                             'mode': 'honor', 'linked_in_url': None,
-                                                             'can_unenroll': True}
+        assert _cert_info(user, course, cert_status) == {'status': 'processing', 'show_survey_button': False,
+                                                         'mode': 'honor', 'linked_in_url': None, 'can_unenroll': True}
 
         cert_status = {'status': 'generating', 'grade': '0.67', 'mode': 'honor', 'uuid': None}
         with patch('lms.djangoapps.grades.course_grade_factory.CourseGradeFactory.read') as patch_persisted_grade:
             patch_persisted_grade.return_value = Mock(percent=1.0)
-            assert _cert_info(user, enrollment, cert_status) == {'status': 'generating', 'show_survey_button': True,
-                                                                 'survey_url': survey_url, 'grade': '1.0',
-                                                                 'mode': 'honor', 'linked_in_url': None,
-                                                                 'can_unenroll': False}
+            assert _cert_info(user, course, cert_status) == {'status': 'generating', 'show_survey_button': True,
+                                                             'survey_url': survey_url, 'grade': '1.0', 'mode': 'honor',
+                                                             'linked_in_url': None, 'can_unenroll': False}
 
         cert_status = {'status': 'generating', 'grade': '0.67', 'mode': 'honor', 'uuid': None}
-        assert _cert_info(user, enrollment, cert_status) == {'status': 'generating', 'show_survey_button': True,
-                                                             'survey_url': survey_url, 'grade': '0.67', 'mode': 'honor',
-                                                             'linked_in_url': None, 'can_unenroll': False}
+        assert _cert_info(user, course, cert_status) == {'status': 'generating', 'show_survey_button': True,
+                                                         'survey_url': survey_url, 'grade': '0.67', 'mode': 'honor',
+                                                         'linked_in_url': None, 'can_unenroll': False}
 
         cert_status = {
             'status': 'downloadable',
@@ -120,11 +112,10 @@ class CourseEndingTest(ModuleStoreTestCase):
             'mode': 'honor',
             'uuid': 'fakeuuidbutitsfine',
         }
-        assert _cert_info(user, enrollment, cert_status) == {'status': 'downloadable',
-                                                             'download_url': cert.download_url,
-                                                             'show_survey_button': True, 'survey_url': survey_url,
-                                                             'grade': '0.67', 'mode': 'honor', 'linked_in_url': None,
-                                                             'can_unenroll': False}
+        assert _cert_info(user, course, cert_status) == {'status': 'downloadable', 'download_url': cert.download_url,
+                                                         'show_survey_button': True, 'survey_url': survey_url,
+                                                         'grade': '0.67', 'mode': 'honor', 'linked_in_url': None,
+                                                         'can_unenroll': False}
 
         cert_status = {
             'status': 'notpassing', 'grade': '0.67',
@@ -132,35 +123,25 @@ class CourseEndingTest(ModuleStoreTestCase):
             'mode': 'honor',
             'uuid': 'fakeuuidbutitsfine',
         }
-        assert _cert_info(user, enrollment, cert_status) == {'status': 'notpassing', 'show_survey_button': True,
-                                                             'survey_url': survey_url, 'grade': '0.67', 'mode': 'honor',
-                                                             'linked_in_url': None, 'can_unenroll': True}
+        assert _cert_info(user, course, cert_status) == {'status': 'notpassing', 'show_survey_button': True,
+                                                         'survey_url': survey_url, 'grade': '0.67', 'mode': 'honor',
+                                                         'linked_in_url': None, 'can_unenroll': True}
 
         # Test a course that doesn't have a survey specified
-        course2 = CourseOverviewFactory.create(
-            end_of_course_survey_url=None,
-            certificates_display_behavior='end',
-        )
-        enrollment2 = CourseEnrollmentFactory(user=user, course_id=course2.id, mode=CourseMode.VERIFIED)
-
+        course2 = Mock(end_of_course_survey_url=None, id=CourseLocator(org="a", course="b", run="c"))
         cert_status = {
             'status': 'notpassing', 'grade': '0.67',
             'download_url': cert.download_url, 'mode': 'honor', 'uuid': 'fakeuuidbutitsfine'
         }
-        assert _cert_info(user, enrollment2, cert_status) == {'status': 'notpassing', 'show_survey_button': False,
-                                                              'grade': '0.67', 'mode': 'honor', 'linked_in_url': None,
-                                                              'can_unenroll': True}
+        assert _cert_info(user, course2, cert_status) == {'status': 'notpassing', 'show_survey_button': False,
+                                                          'grade': '0.67', 'mode': 'honor', 'linked_in_url': None,
+                                                          'can_unenroll': True}
 
-        course3 = CourseOverviewFactory.create(
-            end_of_course_survey_url=None,
-            certificates_display_behavior='early_no_info',
-        )
-        enrollment3 = CourseEnrollmentFactory(user=user, course_id=course3.id, mode=CourseMode.VERIFIED)
         # test when the display is unavailable or notpassing, we get the correct results out
-        course2.certificates_display_behavior = CertificatesDisplayBehaviors.EARLY_NO_INFO
+        course2.certificates_display_behavior = 'early_no_info'
         cert_status = {'status': 'unavailable', 'mode': 'honor', 'uuid': None}
-        assert _cert_info(user, enrollment3, cert_status) == {'status': 'processing', 'show_survey_button': False,
-                                                              'can_unenroll': True}
+        assert _cert_info(user, course2, cert_status) == {'status': 'processing', 'show_survey_button': False,
+                                                          'can_unenroll': True}
 
         cert_status = {
             'status': 'notpassing', 'grade': '0.67',
@@ -168,47 +149,8 @@ class CourseEndingTest(ModuleStoreTestCase):
             'mode': 'honor',
             'uuid': 'fakeuuidbutitsfine'
         }
-        assert _cert_info(user, enrollment3, cert_status) == {'status': 'processing', 'show_survey_button': False,
-                                                              'can_unenroll': True}
-
-    def test_cert_info_beta_tester(self):
-        user = UserFactory.create()
-        course = CourseOverviewFactory.create()
-        mode = CourseMode.VERIFIED
-        grade = '0.67'
-        status = CertificateStatuses.downloadable
-        cert = GeneratedCertificateFactory.create(
-            user=user,
-            course_id=course.id,
-            status=status,
-            mode=mode
-        )
-        enrollment = CourseEnrollmentFactory(user=user, course_id=course.id, mode=mode)
-
-        cert_status = {
-            'status': status,
-            'grade': grade,
-            'download_url': cert.download_url,
-            'mode': mode,
-            'uuid': 'blah',
-        }
-        with patch(BETA_TESTER_METHOD, return_value=False):
-            assert _cert_info(user, enrollment, cert_status) == {
-                'status': status,
-                'download_url': cert.download_url,
-                'show_survey_button': False,
-                'grade': grade,
-                'mode': mode,
-                'linked_in_url': None,
-                'can_unenroll': False
-            }
-
-        with patch(BETA_TESTER_METHOD, return_value=True):
-            assert _cert_info(user, enrollment, cert_status) == {
-                'status': 'processing',
-                'show_survey_button': False,
-                'can_unenroll': True
-            }
+        assert _cert_info(user, course2, cert_status) == {'status': 'processing', 'show_survey_button': False,
+                                                          'can_unenroll': True}
 
     @ddt.data(
         (0.70, 0.60),
@@ -231,10 +173,8 @@ class CourseEndingTest(ModuleStoreTestCase):
         survey_url = "http://a_survey.com"
         course = CourseOverviewFactory.create(
             end_of_course_survey_url=survey_url,
-            certificates_display_behavior=CertificatesDisplayBehaviors.END,
-            end=datetime.now(pytz.UTC) - timedelta(days=2),
+            certificates_display_behavior='end',
         )
-        enrollment = CourseEnrollmentFactory(user=user, course_id=course.id, mode=CourseMode.VERIFIED)
 
         if cert_grade is not None:
             cert_status = {'status': 'generating', 'grade': str(cert_grade), 'mode': 'honor', 'uuid': None}
@@ -243,10 +183,10 @@ class CourseEndingTest(ModuleStoreTestCase):
 
         with patch('lms.djangoapps.grades.course_grade_factory.CourseGradeFactory.read') as patch_persisted_grade:
             patch_persisted_grade.return_value = Mock(percent=persisted_grade)
-            assert _cert_info(user, enrollment, cert_status) == {'status': 'generating', 'show_survey_button': True,
-                                                                 'survey_url': survey_url, 'grade': str(expected_grade),
-                                                                 'mode': 'honor', 'linked_in_url': None,
-                                                                 'can_unenroll': False}
+            assert _cert_info(user, course, cert_status) == {'status': 'generating', 'show_survey_button': True,
+                                                             'survey_url': survey_url, 'grade': str(expected_grade),
+                                                             'mode': 'honor', 'linked_in_url': None,
+                                                             'can_unenroll': False}
 
     def test_cert_grade_no_grades(self):
         """
@@ -258,16 +198,14 @@ class CourseEndingTest(ModuleStoreTestCase):
         survey_url = "http://a_survey.com"
         course = CourseOverviewFactory.create(
             end_of_course_survey_url=survey_url,
-            certificates_display_behavior=CertificatesDisplayBehaviors.END,
-            end=datetime.now(pytz.UTC) - timedelta(days=2),
+            certificates_display_behavior='end',
         )
         cert_status = {'status': 'generating', 'mode': 'honor', 'uuid': None}
-        enrollment = CourseEnrollmentFactory(user=user, course_id=course.id, mode=CourseMode.VERIFIED)
 
         with patch('lms.djangoapps.grades.course_grade_factory.CourseGradeFactory.read') as patch_persisted_grade:
             patch_persisted_grade.return_value = None
-            assert _cert_info(user, enrollment, cert_status) == {'status': 'processing', 'show_survey_button': False,
-                                                                 'can_unenroll': True}
+            assert _cert_info(user, course, cert_status) == {'status': 'processing', 'show_survey_button': False,
+                                                             'can_unenroll': True}
 
 
 @ddt.ddt
@@ -630,11 +568,8 @@ class EnrollmentEventTestMixin(EventTestMixin):
     """ Mixin with assertions for validating enrollment events. """
     def setUp(self):  # lint-amnesty, pylint: disable=arguments-differ
         super().setUp('common.djangoapps.student.models.tracker')
-        segment_patcher = patch('common.djangoapps.student.models.segment')
-        self.mock_segment_tracker = segment_patcher.start()
-        self.addCleanup(segment_patcher.stop)
 
-    def assert_enrollment_mode_change_event_was_emitted(self, user, course_key, mode, course, enrollment):
+    def assert_enrollment_mode_change_event_was_emitted(self, user, course_key, mode):
         """Ensures an enrollment mode change event was emitted"""
         self.mock_tracker.emit.assert_called_once_with(
             'edx.course.enrollment.mode_changed',
@@ -645,13 +580,8 @@ class EnrollmentEventTestMixin(EventTestMixin):
             }
         )
         self.mock_tracker.reset_mock()
-        properties, traits = self._build_segment_properties_and_traits(user, course_key, course, enrollment)
-        self.mock_segment_tracker.track.assert_called_once_with(
-            user.id, 'edx.course.enrollment.mode_changed', properties, traits=traits
-        )
-        self.mock_segment_tracker.reset_mock()
 
-    def assert_enrollment_event_was_emitted(self, user, course_key, course, enrollment):
+    def assert_enrollment_event_was_emitted(self, user, course_key):
         """Ensures an enrollment event was emitted since the last event related assertion"""
         self.mock_tracker.emit.assert_called_once_with(
             'edx.course.enrollment.activated',
@@ -662,13 +592,8 @@ class EnrollmentEventTestMixin(EventTestMixin):
             }
         )
         self.mock_tracker.reset_mock()
-        properties, traits = self._build_segment_properties_and_traits(user, course_key, course, enrollment, True)
-        self.mock_segment_tracker.track.assert_called_once_with(
-            user.id, 'edx.course.enrollment.activated', properties, traits=traits
-        )
-        self.mock_segment_tracker.reset_mock()
 
-    def assert_unenrollment_event_was_emitted(self, user, course_key, course, enrollment):
+    def assert_unenrollment_event_was_emitted(self, user, course_key):
         """Ensures an unenrollment event was emitted since the last event related assertion"""
         self.mock_tracker.emit.assert_called_once_with(
             'edx.course.enrollment.deactivated',
@@ -679,35 +604,6 @@ class EnrollmentEventTestMixin(EventTestMixin):
             }
         )
         self.mock_tracker.reset_mock()
-        properties, traits = self._build_segment_properties_and_traits(user, course_key, course, enrollment)
-        self.mock_segment_tracker.track.assert_called_once_with(
-            user.id, 'edx.course.enrollment.deactivated', properties, traits=traits
-        )
-        self.mock_segment_tracker.reset_mock()
-
-    def _build_segment_properties_and_traits(self, user, course_key, course, enrollment, activated=False):
-        """ Builds the segment properties and traits that are sent during enrollment events """
-        properties = {
-            'category': 'conversion',
-            'label': str(course_key),
-            'org': course_key.org,
-            'course': course_key.course,
-            'run': course_key.run,
-            'mode': enrollment.mode,
-        }
-        traits = properties.copy()
-        traits.update({'course_title': course.display_name, 'email': user.email})
-
-        if activated:
-            properties.update({
-                'email': user.email,
-                # This next property is for an experiment, see method's comments for more information
-                # we will just hardcode the default value while the experiment runs
-                'external_course_updates': -1,
-                'course_start': course.start,
-                'course_pacing': course.pacing,
-            })
-        return properties, traits
 
 
 class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
@@ -715,21 +611,20 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
 
     @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
     def test_enrollment(self):
-        user = UserFactory.create(username="joe", email="joe@joe.com", password="password")
+        user = User.objects.create_user("joe", "joe@joe.com", "password")
         course_id = CourseKey.from_string("edX/Test101/2013")
         course_id_partial = CourseKey.from_string("edX/Test101/")
-        course = CourseOverviewFactory.create(id=course_id)
 
         # Test basic enrollment
         assert not CourseEnrollment.is_enrolled(user, course_id)
         assert not CourseEnrollment.is_enrolled_by_partial(user, course_id_partial)
-        enrollment = CourseEnrollment.enroll(user, course_id)
+        CourseEnrollment.enroll(user, course_id)
         assert CourseEnrollment.is_enrolled(user, course_id)
         assert CourseEnrollment.is_enrolled_by_partial(user, course_id_partial)
-        self.assert_enrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_enrollment_event_was_emitted(user, course_id)
 
         # Enrolling them again should be harmless
-        enrollment = CourseEnrollment.enroll(user, course_id)
+        CourseEnrollment.enroll(user, course_id)
         assert CourseEnrollment.is_enrolled(user, course_id)
         assert CourseEnrollment.is_enrolled_by_partial(user, course_id_partial)
         self.assert_no_events_were_emitted()
@@ -738,7 +633,7 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
         CourseEnrollment.unenroll(user, course_id)
         assert not CourseEnrollment.is_enrolled(user, course_id)
         assert not CourseEnrollment.is_enrolled_by_partial(user, course_id_partial)
-        self.assert_unenrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_unenrollment_event_was_emitted(user, course_id)
 
         # Unenrolling them again should also be harmless
         CourseEnrollment.unenroll(user, course_id)
@@ -763,9 +658,8 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
 
     def test_enrollment_non_existent_user(self):
         # Testing enrollment of newly unsaved user (i.e. no database entry)
-        user = UserFactory(username="rusty", email="rusty@fake.edx.org")
+        user = User(username="rusty", email="rusty@fake.edx.org")
         course_id = CourseLocator("edX", "Test101", "2013")
-        course = CourseOverviewFactory.create(id=course_id)
 
         assert not CourseEnrollment.is_enrolled(user, course_id)
 
@@ -775,19 +669,18 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
 
         # Implicit save() happens on new User object when enrolling, so this
         # should still work
-        enrollment = CourseEnrollment.enroll(user, course_id)
+        CourseEnrollment.enroll(user, course_id)
         assert CourseEnrollment.is_enrolled(user, course_id)
-        self.assert_enrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_enrollment_event_was_emitted(user, course_id)
 
     @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
     def test_enrollment_by_email(self):
-        user = UserFactory.create(username="jack", email="jack@fake.edx.org")
+        user = User.objects.create(username="jack", email="jack@fake.edx.org")
         course_id = CourseLocator("edX", "Test101", "2013")
-        course = CourseOverviewFactory.create(id=course_id)
 
-        enrollment = CourseEnrollment.enroll_by_email("jack@fake.edx.org", course_id)
+        CourseEnrollment.enroll_by_email("jack@fake.edx.org", course_id)
         assert CourseEnrollment.is_enrolled(user, course_id)
-        self.assert_enrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_enrollment_event_was_emitted(user, course_id)
 
         # This won't throw an exception, even though the user is not found
         assert CourseEnrollment.enroll_by_email('not_jack@fake.edx.org', course_id) is None
@@ -805,7 +698,7 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
         # Now unenroll them by email
         CourseEnrollment.unenroll_by_email("jack@fake.edx.org", course_id)
         assert not CourseEnrollment.is_enrolled(user, course_id)
-        self.assert_unenrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_unenrollment_event_was_emitted(user, course_id)
 
         # Harmless second unenroll
         CourseEnrollment.unenroll_by_email("jack@fake.edx.org", course_id)
@@ -818,34 +711,31 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
 
     @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
     def test_enrollment_multiple_classes(self):
-        user = UserFactory(username="rusty", email="rusty@fake.edx.org")
+        user = User(username="rusty", email="rusty@fake.edx.org")
         course_id1 = CourseLocator("edX", "Test101", "2013")
         course_id2 = CourseLocator("MITx", "6.003z", "2012")
-        course1 = CourseOverviewFactory.create(id=course_id1)
-        course2 = CourseOverviewFactory.create(id=course_id2)
 
-        enrollment1 = CourseEnrollment.enroll(user, course_id1)
-        self.assert_enrollment_event_was_emitted(user, course_id1, course1, enrollment1)
-        enrollment2 = CourseEnrollment.enroll(user, course_id2)
-        self.assert_enrollment_event_was_emitted(user, course_id2, course2, enrollment2)
+        CourseEnrollment.enroll(user, course_id1)
+        self.assert_enrollment_event_was_emitted(user, course_id1)
+        CourseEnrollment.enroll(user, course_id2)
+        self.assert_enrollment_event_was_emitted(user, course_id2)
         assert CourseEnrollment.is_enrolled(user, course_id1)
         assert CourseEnrollment.is_enrolled(user, course_id2)
 
         CourseEnrollment.unenroll(user, course_id1)
-        self.assert_unenrollment_event_was_emitted(user, course_id1, course1, enrollment1)
+        self.assert_unenrollment_event_was_emitted(user, course_id1)
         assert not CourseEnrollment.is_enrolled(user, course_id1)
         assert CourseEnrollment.is_enrolled(user, course_id2)
 
         CourseEnrollment.unenroll(user, course_id2)
-        self.assert_unenrollment_event_was_emitted(user, course_id2, course2, enrollment2)
+        self.assert_unenrollment_event_was_emitted(user, course_id2)
         assert not CourseEnrollment.is_enrolled(user, course_id1)
         assert not CourseEnrollment.is_enrolled(user, course_id2)
 
     @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
     def test_activation(self):
-        user = UserFactory.create(username="jack", email="jack@fake.edx.org")
+        user = User.objects.create(username="jack", email="jack@fake.edx.org")
         course_id = CourseLocator("edX", "Test101", "2013")
-        course = CourseOverviewFactory.create(id=course_id)
         assert not CourseEnrollment.is_enrolled(user, course_id)
 
         # Creating an enrollment doesn't actually enroll a student
@@ -857,17 +747,17 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
         # Until you explicitly activate it
         enrollment.activate()
         assert CourseEnrollment.is_enrolled(user, course_id)
-        self.assert_enrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_enrollment_event_was_emitted(user, course_id)
 
         # Activating something that's already active does nothing
         enrollment.activate()
         assert CourseEnrollment.is_enrolled(user, course_id)
         self.assert_no_events_were_emitted()
 
-        # Now deactivate
+        # Now deactive
         enrollment.deactivate()
         assert not CourseEnrollment.is_enrolled(user, course_id)
-        self.assert_unenrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_unenrollment_event_was_emitted(user, course_id)
 
         # Deactivating something that's already inactive does nothing
         enrollment.deactivate()
@@ -878,25 +768,24 @@ class EnrollInCourseTest(EnrollmentEventTestMixin, CacheIsolationTestCase):
         # for that user/course_id combination
         CourseEnrollment.enroll(user, course_id)
         assert CourseEnrollment.is_enrolled(user, course_id)
-        self.assert_enrollment_event_was_emitted(user, course_id, course, enrollment)
+        self.assert_enrollment_event_was_emitted(user, course_id)
 
     def test_change_enrollment_modes(self):
-        user = UserFactory.create(username="justin", email="jh@fake.edx.org")
+        user = User.objects.create(username="justin", email="jh@fake.edx.org")
         course_id = CourseLocator("edX", "Test101", "2013")
-        course = CourseOverviewFactory.create(id=course_id)
 
-        enrollment = CourseEnrollment.enroll(user, course_id, "audit")
-        self.assert_enrollment_event_was_emitted(user, course_id, course, enrollment)
+        CourseEnrollment.enroll(user, course_id, "audit")
+        self.assert_enrollment_event_was_emitted(user, course_id)
 
-        enrollment = CourseEnrollment.enroll(user, course_id, "honor")
-        self.assert_enrollment_mode_change_event_was_emitted(user, course_id, "honor", course, enrollment)
+        CourseEnrollment.enroll(user, course_id, "honor")
+        self.assert_enrollment_mode_change_event_was_emitted(user, course_id, "honor")
 
         # same enrollment mode does not emit an event
-        enrollment = CourseEnrollment.enroll(user, course_id, "honor")
+        CourseEnrollment.enroll(user, course_id, "honor")
         self.assert_no_events_were_emitted()
 
-        enrollment = CourseEnrollment.enroll(user, course_id, "audit")
-        self.assert_enrollment_mode_change_event_was_emitted(user, course_id, "audit", course, enrollment)
+        CourseEnrollment.enroll(user, course_id, "audit")
+        self.assert_enrollment_mode_change_event_was_emitted(user, course_id, "audit")
 
 
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')

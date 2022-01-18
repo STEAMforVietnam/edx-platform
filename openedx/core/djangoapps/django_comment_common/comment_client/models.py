@@ -89,7 +89,7 @@ class Model:
         record the class name of the model.
         """
         tags = [
-            f'{self.__class__.__name__}.{attr}:{self[attr]}'
+            '{}.{}:{}'.format(self.__class__.__name__, attr, self[attr])
             for attr in self.metric_tag_fields
             if attr in self.attributes
         ]
@@ -99,25 +99,6 @@ class Model:
     @classmethod
     def find(cls, id):  # pylint: disable=redefined-builtin
         return cls(id=id)
-
-    @classmethod
-    def retrieve_all(cls, params=None):
-        """
-        Performs a GET request against the resource's listing endpoint.
-
-        Arguments:
-            params: A dictionary of parameters to be passed as the request's query string.
-
-        Returns:
-            The parsed JSON response from the backend.
-        """
-        return perform_request(
-            'get',
-            cls.url(action='get_all'),
-            params,
-            metric_tags=[f'model_class:{cls.__name__}'],
-            metric_action='model.retrieve_all',
-        )
 
     def _update_from_response(self, response_data):
         for k, v in response_data.items():
@@ -199,7 +180,7 @@ class Model:
             raise CommentClientRequestError("Must provide base_url when using default url function")
         if action not in cls.DEFAULT_ACTIONS:  # lint-amnesty, pylint: disable=no-else-raise
             raise ValueError(
-                f"Invalid action {action}. The supported action must be in {str(cls.DEFAULT_ACTIONS)}"
+                "Invalid action {}. The supported action must be in {}".format(action, str(cls.DEFAULT_ACTIONS))
             )
         elif action in cls.DEFAULT_ACTIONS_WITH_ID:
             try:

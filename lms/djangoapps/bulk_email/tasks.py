@@ -34,7 +34,7 @@ from django.core.mail.message import forbid_multi_line_headers
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import override as override_language
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_django_utils.monitoring import set_code_owner_attribute
 from markupsafe import escape
 
@@ -110,7 +110,7 @@ def _get_course_email_context(course):
         settings.LMS_ROOT_URL,
         course_root
     )
-    image_url = f'{settings.LMS_ROOT_URL}{course_image_url(course)}'
+    image_url = '{}{}'.format(settings.LMS_ROOT_URL, course_image_url(course))
     lms_root_url = configuration_helpers.get_value('LMS_ROOT_URL', settings.LMS_ROOT_URL)
     email_context = {
         'course_title': course_title,
@@ -464,18 +464,23 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
     recipients_info = Counter()
 
     log.info(
-        f"BulkEmail ==> Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, "
-        f"TotalRecipients: {total_recipients}"
+        "BulkEmail ==> Task: %s, SubTask: %s, EmailId: %s, TotalRecipients: %s",
+        parent_task_id,
+        task_id,
+        email_id,
+        total_recipients
     )
 
     try:
         course_email = CourseEmail.objects.get(id=email_id)
     except CourseEmail.DoesNotExist as exc:
         log.exception(
-            f"BulkEmail ==> Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, Could not find email to "
-            "send."
+            "BulkEmail ==> Task: %s, SubTask: %s, EmailId: %s, Could not find email to send.",
+            parent_task_id,
+            task_id,
+            email_id
         )
-        raise exc
+        raise
 
     # Exclude optouts (if not a retry):
     # Note that we don't have to do the optout logic at all if this is a retry,
@@ -522,9 +527,12 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
             if _has_non_ascii_characters(email):
                 to_list.pop()
                 total_recipients_failed += 1
-                log.warning(
-                    f"BulkEmail ==> Skipping course email to user {current_recipient['pk']} with email_id {email_id}. "
-                    "The email address contains non-ASCII characters."
+                log.info(
+                    "BulkEmail ==> Email address %s contains non-ascii characters. Skipping sending "
+                    "email to %s, EmailId: %s ",
+                    email,
+                    current_recipient['profile__name'],
+                    email_id
                 )
                 subtask_status.increment(failed=1)
                 continue
@@ -560,18 +568,30 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
 
             try:
                 log.info(
-                    f"BulkEmail ==> Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, Recipient num: "
-                    f"{recipient_num}/{total_recipients}, Recipient UserId: {current_recipient['pk']}"
+                    "BulkEmail ==> Task: %s, SubTask: %s, EmailId: %s, Recipient num: %s/%s, \
+                    Recipient name: %s, Email address: %s",
+                    parent_task_id,
+                    task_id,
+                    email_id,
+                    recipient_num,
+                    total_recipients,
+                    current_recipient['profile__name'],
+                    email
                 )
                 connection.send_messages([email_msg])
 
             except SMTPDataError as exc:
                 # According to SMTP spec, we'll retry error codes in the 4xx range.  5xx range indicates hard failure.
                 total_recipients_failed += 1
-                log.exception(
-                    f"BulkEmail ==> Status: Failed(SMTPDataError), Task: {parent_task_id}, SubTask: {task_id}, "
-                    f"EmailId: {email_id}, Recipient num: {recipient_num}/{total_recipients}, Recipient UserId: "
-                    f"{current_recipient['pk']}"
+                log.error(
+                    "BulkEmail ==> Status: Failed(SMTPDataError), Task: %s, SubTask: %s, EmailId: %s, \
+                    Recipient num: %s/%s, Email address: %s",
+                    parent_task_id,
+                    task_id,
+                    email_id,
+                    recipient_num,
+                    total_recipients,
+                    email
                 )
                 if exc.smtp_code >= 400 and exc.smtp_code < 500:  # lint-amnesty, pylint: disable=no-else-raise
                     # This will cause the outer handler to catch the exception and retry the entire task.
@@ -579,32 +599,50 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
                 else:
                     # This will fall through and not retry the message.
                     log.warning(
-                        f"BulkEmail ==> Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, Recipient "
-                        f"num: {recipient_num}/{total_recipients}, Email not delievered to user "
-                        f"{current_recipient['pk']} due to error: {exc.smtp_error}"
+                        'BulkEmail ==> Task: %s, SubTask: %s, EmailId: %s, Recipient num: %s/%s, \
+                        Email not delivered to %s due to error %s',
+                        parent_task_id,
+                        task_id,
+                        email_id,
+                        recipient_num,
+                        total_recipients,
+                        email,
+                        exc.smtp_error
                     )
                     subtask_status.increment(failed=1)
 
             except SINGLE_EMAIL_FAILURE_ERRORS as exc:
                 # This will fall through and not retry the message.
                 total_recipients_failed += 1
-                log.exception(
-                    f"BulkEmail ==> Status: Failed(SINGLE_EMAIL_FAILURE_ERRORS), Task: {parent_task_id}, SubTask: "
-                    f"{task_id}, EmailId: {email_id}, Recipient num: {recipient_num}/{total_recipients}, Recipient "
-                    f"UserId: {current_recipient['pk']}"
+                log.error(
+                    "BulkEmail ==> Status: Failed(SINGLE_EMAIL_FAILURE_ERRORS), Task: %s, SubTask: %s, \
+                    EmailId: %s, Recipient num: %s/%s, Email address: %s, Exception: %s",
+                    parent_task_id,
+                    task_id,
+                    email_id,
+                    recipient_num,
+                    total_recipients,
+                    email,
+                    exc
                 )
                 subtask_status.increment(failed=1)
 
             else:
                 total_recipients_successful += 1
                 log.info(
-                    f"BulkEmail ==> Status: Success, Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, "
-                    f"Recipient num: {recipient_num}/{total_recipients}, Recipient UserId: {current_recipient['pk']}"
+                    "BulkEmail ==> Status: Success, Task: %s, SubTask: %s, EmailId: %s, \
+                    Recipient num: %s/%s, Email address: %s,",
+                    parent_task_id,
+                    task_id,
+                    email_id,
+                    recipient_num,
+                    total_recipients,
+                    email
                 )
                 if settings.BULK_EMAIL_LOG_SENT_EMAILS:
-                    log.info(f"Email with id {email_id} sent to user {current_recipient['pk']}")
+                    log.info('Email with id %s sent to %s', email_id, email)
                 else:
-                    log.debug(f"Email with id {email_id} sent to user {current_recipient['pk']}")
+                    log.debug('Email with id %s sent to %s', email_id, email)
                 subtask_status.increment(succeeded=1)
 
             # Pop the user that was emailed off the end of the list only once they have
@@ -614,17 +652,27 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
             to_list.pop()
 
         log.info(
-            f"BulkEmail ==> Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, Total Successful "
-            f"Recipients: {total_recipients_successful}/{total_recipients}, Failed Recipients: "
-            f"{total_recipients_failed}/{total_recipients}, Time Taken: {time.time() - start_time}"
+            "BulkEmail ==> Task: %s, SubTask: %s, EmailId: %s, Total Successful Recipients: %s/%s, \
+            Failed Recipients: %s/%s, Time Taken: %s",
+            parent_task_id,
+            task_id,
+            email_id,
+            total_recipients_successful,
+            total_recipients,
+            total_recipients_failed,
+            total_recipients,
+            time.time() - start_time
         )
-
         duplicate_recipients = [f"{email} ({repetition})"
                                 for email, repetition in recipients_info.most_common() if repetition > 1]
         if duplicate_recipients:
             log.info(
-                f"BulkEmail ==> Task: {parent_task_id}, SubTask: {task_id}, EmailId: {email_id}, Total Duplicate "
-                f"Recipients [{len(duplicate_recipients)}]"
+                "BulkEmail ==> Task: %s, SubTask: %s, EmailId: %s, Total Duplicate Recipients [%s]: [%s]",
+                parent_task_id,
+                task_id,
+                email_id,
+                len(duplicate_recipients),
+                ', '.join(duplicate_recipients)
             )
 
     except INFINITE_RETRY_ERRORS as exc:
@@ -648,10 +696,9 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
 
     except BULK_EMAIL_FAILURE_ERRORS as exc:
         num_pending = len(to_list)
-        log.exception(
-            f"Task {task_id}: email with id {email_id} caused send_course_email task to fail with 'fatal' exception. "
-            f"{num_pending} emails unsent."
-        )
+        log.exception(('Task %s: email with id %d caused send_course_email task to fail '
+                       'with u"fatal" exception.  %d emails unsent.'),
+                      task_id, email_id, num_pending)
         # Update counters with progress to date, counting unsent emails as failures,
         # and set the state to FAILURE:
         subtask_status.increment(failed=num_pending, state=FAILURE)
@@ -662,10 +709,9 @@ def _send_course_email(entry_id, email_id, to_list, global_email_context, subtas
         # without popping the current recipient off of the existing list.
         # These are unexpected errors.  Since they might be due to a temporary condition that might
         # succeed on retry, we give them a retry.
-        log.exception(
-            f"Task {task_id}: email with id {email_id} caused send_course_email task to fail with unexpected "
-            "exception. Generating retry."
-        )
+        log.exception(('Task %s: email with id %d caused send_course_email task to fail '
+                       'with unexpected exception.  Generating retry.'),
+                      task_id, email_id)
         # Increment the "retried_withmax" counter, update other counters with progress to date,
         # and set the state to RETRY:
         subtask_status.increment(retried_withmax=1, state=RETRY)

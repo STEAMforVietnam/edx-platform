@@ -82,11 +82,10 @@ class BulkUserRetirementViewTests(APITestCase):
         }
         with self.settings(RETIREMENT_SERVICE_WORKER_USERNAME=self.user1.username):
             response = self.client.post(user_retirement_url, {
-                "usernames": f'{self.user3.username},{self.user4.username}'
+                "usernames": '{user1},{user2}'.format(user1=self.user3.username, user2=self.user4.username)
             })
-
             assert response.status_code == 200
-            assert sorted(response.data['successful_user_retirements']) == sorted(expected_response['successful_user_retirements'])  # pylint: disable=line-too-long
+            assert response.data == expected_response
 
             retirement_status_1 = UserRetirementStatus.objects.get(user__username=self.user3.username)
             assert retirement_status_1.current_state == self.pending_state
@@ -100,7 +99,6 @@ class BulkUserRetirementViewTests(APITestCase):
             'successful_user_retirements': [self.user3.username, self.user4.username],
             'failed_user_retirements': ['non_existing_user']
         }
-
         with self.settings(RETIREMENT_SERVICE_WORKER_USERNAME=self.user1.username):
             response = self.client.post(user_retirement_url, {
                 "usernames": '{user1},{user2}, non_existing_user'.format(
@@ -109,8 +107,7 @@ class BulkUserRetirementViewTests(APITestCase):
                 )
             })
             assert response.status_code == 200
-
-            assert sorted(response.data['successful_user_retirements']) == sorted(expected_response['successful_user_retirements'])  # pylint: disable=line-too-long
+            assert response.data == expected_response
 
             retirement_status_1 = UserRetirementStatus.objects.get(user__username=self.user3.username)
             assert retirement_status_1.current_state == self.pending_state

@@ -40,10 +40,7 @@ import six
             /><label id="${id}-${choice_id}-label" for="input_${id}_${choice_id}"
                 class="${label_class}"
                 ${describedby_html}
-                >
-                <div>
-                    ${HTML(choice_label)}
-                </div>
+                > ${HTML(choice_label)}
             </label>
           </div>
         % endfor

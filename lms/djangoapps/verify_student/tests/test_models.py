@@ -23,7 +23,7 @@ from lms.djangoapps.verify_student.models import (
     VerificationException
 )
 from lms.djangoapps.verify_student.tests import TestVerificationBase
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 
 FAKE_SETTINGS = {
     "SOFTWARE_SECURE": {
@@ -184,20 +184,6 @@ class TestPhotoVerification(TestVerificationBase, MockS3BotoMixin, ModuleStoreTe
         user.profile.name = "Rusty \u01B4"
 
         assert 'Clyde ƴ' == attempt.name
-
-    def test_name_preset(self):
-        """
-        If a name was set when creating the photo verification
-        (from name affirmation / verified name flow) it should not
-        be overwritten by the profile name
-        """
-        user = UserFactory.create()
-        user.profile.name = "Profile"
-
-        preset_attempt = SoftwareSecurePhotoVerification(user=user)
-        preset_attempt.name = "Preset"
-        preset_attempt.mark_ready()
-        assert "Preset" == preset_attempt.name
 
     def test_submissions(self):
         """Test that we set our status correctly after a submission."""
@@ -403,6 +389,19 @@ class TestPhotoVerification(TestVerificationBase, MockS3BotoMixin, ModuleStoreTe
         verification.save()
 
         assert verification.expiration_datetime == (verification.created_at + timedelta(days=FAKE_SETTINGS['DAYS_GOOD_FOR']))
+
+    def test_deprecated_expiry_date(self):
+        """
+        Test `expiration_datetime` returns `expiry_date` if it is not null.
+        """
+        user = UserFactory.create()
+        with freeze_time(now()):
+            verification = SoftwareSecurePhotoVerification(user=user)
+            # First, assert that expiration_date is set correctly
+            assert verification.expiration_datetime == (now() + timedelta(days=FAKE_SETTINGS['DAYS_GOOD_FOR']))
+            verification.expiry_date = now() + timedelta(days=10)
+            # Then, assert that expiration_datetime favors expiry_date's value if set
+            assert verification.expiration_datetime == (now() + timedelta(days=10))
 
     def test_get_verification_from_receipt(self):
         result = SoftwareSecurePhotoVerification.get_verification_from_receipt('')

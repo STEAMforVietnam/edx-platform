@@ -800,8 +800,7 @@ class EnrollmentListView(APIView, ApiKeyPermissionMixIn):
                     str(course_id),
                     mode=mode,
                     is_active=is_active,
-                    enrollment_attributes=enrollment_attributes,
-                    enterprise_uuid=request.data.get('enterprise_uuid')
+                    enrollment_attributes=enrollment_attributes
                 )
 
             cohort_name = request.data.get('cohort')

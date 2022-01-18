@@ -8,6 +8,7 @@ from django.http import Http404
 from edx_django_utils.monitoring import set_custom_attribute
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
+from rest_condition import C
 from rest_framework import permissions
 
 from edx_rest_framework_extensions.permissions import IsStaff, IsUserInUrl
@@ -102,7 +103,7 @@ class IsMasterCourseStaffInstructor(permissions.BasePermission):
 
 class IsUserInUrlOrStaff(permissions.BasePermission):
     def has_permission(self, request, view):
-        return IsStaff | IsUserInUrl
+        return C(IsStaff) | IsUserInUrl
 
 
 class IsStaffOrReadOnly(permissions.BasePermission):

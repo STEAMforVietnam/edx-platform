@@ -16,9 +16,9 @@ from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import ItemFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import ItemFactory, check_mongo_calls
 
 from ..api import UNKNOWN_BLOCK_DISPLAY_NAME, course_detail, get_due_dates, list_courses, get_course_members
 from ..exceptions import OverEnrollmentLimitException
@@ -100,12 +100,7 @@ class CourseListTestMixin(CourseApiTestMixin):
     Common behavior for list_courses tests
     """
 
-    def _make_api_call(self,
-                       requesting_user,
-                       specified_user,
-                       org=None,
-                       filter_=None,
-                       permissions=None):
+    def _make_api_call(self, requesting_user, specified_user, org=None, filter_=None):
         """
         Call the list_courses api endpoint to get information about
         `specified_user` on behalf of `requesting_user`.
@@ -113,13 +108,7 @@ class CourseListTestMixin(CourseApiTestMixin):
         request = Request(self.request_factory.get('/'))
         request.user = requesting_user
         with check_mongo_calls(0):
-            return list_courses(
-                request,
-                specified_user.username,
-                org=org,
-                filter_=filter_,
-                permissions=permissions,
-            )
+            return list_courses(request, specified_user.username, org=org, filter_=filter_)
 
     def verify_courses(self, courses):
         """
@@ -200,11 +189,11 @@ class TestGetCourseListMultipleCourses(CourseListTestMixin, ModuleStoreTestCase)
         # No filtering.
         unfiltered_courses = self._make_api_call(self.staff_user, self.staff_user)
         for org in [self.course.org, alternate_course.org]:
-            assert any((course.org == org) for course in unfiltered_courses)
+            assert any(((course.org == org) for course in unfiltered_courses))
 
         # With filtering.
         filtered_courses = self._make_api_call(self.staff_user, self.staff_user, org=self.course.org)
-        assert all((course.org == self.course.org) for course in filtered_courses)
+        assert all(((course.org == self.course.org) for course in filtered_courses))
 
     def test_filter(self):
         # Create a second course to be filtered out of queries.
@@ -219,28 +208,6 @@ class TestGetCourseListMultipleCourses(CourseListTestMixin, ModuleStoreTestCase)
             filtered_courses = self._make_api_call(self.staff_user, self.staff_user, filter_=filter_)
             assert {course.id for course in filtered_courses} == {course.id for course in expected_courses},\
                 f'testing course_api.api.list_courses with filter_={filter_}'
-
-    def test_permissions(self):
-
-        # Create a second course to be filtered out of queries.
-        self.create_course(course='should-be-hidden-course')
-
-        # Create instructor (non-staff), and enroll him in the course.
-        instructor_user = self.create_user('the-instructor', is_staff=False)
-        self.create_enrollment(user=instructor_user, course_id=self.course.id)
-        self.create_courseaccessrole(
-            user=instructor_user,
-            course_id=self.course.id,
-            role='instructor',
-            org='edX',
-        )
-
-        filtered_courses = self._make_api_call(
-            instructor_user,
-            instructor_user,
-            permissions={'instructor'})
-
-        self.assertEqual({c.id for c in filtered_courses}, {self.course.id})
 
 
 class TestGetCourseListExtras(CourseListTestMixin, ModuleStoreTestCase):

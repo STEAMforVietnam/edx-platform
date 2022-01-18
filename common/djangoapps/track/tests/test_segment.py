@@ -1,13 +1,12 @@
 """Ensure emitted events contain the fields legacy processors expect to find."""
 
 
-from unittest.mock import patch, sentinel
-
 import ddt
 from django.test import TestCase
 from django.test.utils import override_settings
 from eventtracking import tracker
 from eventtracking.django import DjangoTracker
+from mock import patch, sentinel
 
 from common.djangoapps.track import segment
 
@@ -17,7 +16,7 @@ class SegmentTrackTestCase(TestCase):
     """Ensure emitted events contain the expected context values."""
 
     def setUp(self):
-        super().setUp()
+        super(SegmentTrackTestCase, self).setUp()  # lint-amnesty, pylint: disable=super-with-arguments
         self.tracker = DjangoTracker()
         tracker.register_tracker(self.tracker)
         self.properties = {sentinel.key: sentinel.value}
@@ -120,7 +119,7 @@ class SegmentIdentifyTestCase(TestCase):
     """Ensure emitted events contain the fields legacy processors expect to find."""
 
     def setUp(self):
-        super().setUp()
+        super(SegmentIdentifyTestCase, self).setUp()  # lint-amnesty, pylint: disable=super-with-arguments
         patcher = patch('common.djangoapps.track.segment.analytics.identify')
         self.mock_segment_identify = patcher.start()
         self.addCleanup(patcher.stop)

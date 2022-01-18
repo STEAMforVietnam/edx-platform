@@ -73,6 +73,7 @@ class RequestUtilTestCase(unittest.TestCase):
         """ Test course_id_from_url(). """
 
         assert course_id_from_url('/login') is None
+        assert course_id_from_url('/course/edX/maths/2020') is None
         assert course_id_from_url('/courses/edX/maths/') is None
         assert course_id_from_url('/api/courses/v1/blocks/edX/maths/2020') is None
         assert course_id_from_url('/api/courses/v1/blocks/course-v1:incidental+courseid+formatting') is None
@@ -81,14 +82,8 @@ class RequestUtilTestCase(unittest.TestCase):
         course_id = course_id_from_url('/courses/course-v1:edX+maths+2020')
         self.assertCourseIdFieldsMatch(course_id=course_id, org="edX", course='maths', run='2020')
 
-        course_id = course_id_from_url('/course/course-v1:edX+maths+2020')
-        self.assertCourseIdFieldsMatch(course_id=course_id, org="edX", course='maths', run='2020')
-
         course_id = course_id_from_url('/courses/edX/maths/2020')
         self.assertCourseIdFieldsMatch(course_id=course_id, org='edX', course='maths', run='2020')
-
-        course_id = course_id_from_url('/course/edX/maths/2020')
-        self.assertCourseIdFieldsMatch(course_id=course_id, org="edX", course='maths', run='2020')
 
         course_id = course_id_from_url('/api/courses/v1/courses/course-v1:edX+maths+2020')
         self.assertCourseIdFieldsMatch(course_id=course_id, org='edX', course='maths', run='2020')
@@ -104,30 +99,13 @@ class RequestUtilTestCase(unittest.TestCase):
 
     @patch("openedx.core.lib.request_utils.CAPTURE_COOKIE_SIZES")
     @patch("openedx.core.lib.request_utils.set_custom_attribute")
-    def test_basic_cookie_monitoring(self, mock_set_custom_attribute, mock_capture_cookie_sizes):
-        mock_capture_cookie_sizes.is_enabled.return_value = False
-        middleware = CookieMonitoringMiddleware()
-
-        cookies_dict = {'a': 'b'}
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
-
-        middleware.process_request(mock_request)
-
-        mock_set_custom_attribute.assert_called_once_with('cookies.header.size', 3)
-
-    @patch("openedx.core.lib.request_utils.CAPTURE_COOKIE_SIZES")
-    @patch("openedx.core.lib.request_utils.set_custom_attribute")
     def test_cookie_monitoring(self, mock_set_custom_attribute, mock_capture_cookie_sizes):
 
         mock_capture_cookie_sizes.is_enabled.return_value = True
         middleware = CookieMonitoringMiddleware()
 
-        cookies_dict = {
+        mock_request = Mock()
+        mock_request.COOKIES = {
             "a": "." * 100,
             "_b": "." * 13,
             "_c_": "." * 13,
@@ -136,14 +114,7 @@ class RequestUtilTestCase(unittest.TestCase):
             "b.": "." * 13,
             "b_a": "." * 15,
             "b_c": "." * 15,
-            "d": "." * 3,
         }
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
 
         middleware.process_request(mock_request)
 
@@ -158,12 +129,6 @@ class RequestUtilTestCase(unittest.TestCase):
             call('cookies.4.size', 13),
             call('cookies.5.name', '_c_'),
             call('cookies.5.size', 13),
-            call('cookies.6.name', 'b.'),
-            call('cookies.6.size', 13),
-            call('cookies.7.name', 'a.b'),
-            call('cookies.7.size', 10),
-            call('cookies.8.name', 'a.c'),
-            call('cookies.8.size', 10),
             call('cookies.group.1.name', 'b'),
             call('cookies.group.1.size', 43),
             call('cookies.group.2.name', 'a'),
@@ -172,10 +137,7 @@ class RequestUtilTestCase(unittest.TestCase):
             call('cookies.max.size', 100),
             call('cookies.max.group.name', 'a'),
             call('cookies.max.group.size', 100),
-            call('cookies_total_size', 192),
-            call('cookies_unaccounted_size', 3),
-            call('cookies_total_num', 9),
-            call('cookies.header.size', 238)
+            call('cookies_total_size', 189),
         ], any_order=True)
 
     @patch("openedx.core.lib.request_utils.CAPTURE_COOKIE_SIZES")
@@ -185,17 +147,12 @@ class RequestUtilTestCase(unittest.TestCase):
         mock_capture_cookie_sizes.is_enabled.return_value = True
         middleware = CookieMonitoringMiddleware()
 
-        cookies_dict = {
+        mock_request = Mock()
+        mock_request.COOKIES = {
             "a": "." * 10,
             "b_a": "." * 15,
             "b_c": "." * 20,
         }
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
 
         middleware.process_request(mock_request)
 
@@ -222,20 +179,12 @@ class RequestUtilTestCase(unittest.TestCase):
         mock_capture_cookie_sizes.is_enabled.return_value = True
         middleware = CookieMonitoringMiddleware()
 
-        cookies_dict = {}
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
+        mock_request = Mock()
+        mock_request.COOKIES = {}
 
         middleware.process_request(mock_request)
 
-        mock_set_custom_attribute.assert_has_calls([
-            call('cookies_total_size', 0),
-            call('cookies.header.size', 0)
-        ], any_order=True)
+        mock_set_custom_attribute.assert_has_calls([call('cookies_total_size', 0)], any_order=True)
 
     @patch("openedx.core.lib.request_utils.CAPTURE_COOKIE_SIZES")
     @patch("openedx.core.lib.request_utils.set_custom_attribute")
@@ -244,16 +193,11 @@ class RequestUtilTestCase(unittest.TestCase):
         mock_capture_cookie_sizes.is_enabled.return_value = True
         middleware = CookieMonitoringMiddleware()
 
-        cookies_dict = {
+        mock_request = Mock()
+        mock_request.COOKIES = {
             "a": "." * 10,
             "b": "." * 15,
         }
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
 
         middleware.process_request(mock_request)
 
@@ -266,51 +210,6 @@ class RequestUtilTestCase(unittest.TestCase):
             call('cookies.2.size', 10),
             call('cookies_total_size', 25),
         ], any_order=True)
-
-    @override_settings(COOKIE_SIZE_LOGGING_THRESHOLD=1)
-    @patch("openedx.core.lib.request_utils.CAPTURE_COOKIE_SIZES")
-    @patch("openedx.core.lib.request_utils.encrypt_for_log")
-    def test_log_encrypted_cookies_no_key(self, mock_encrypt, mock_capture_cookie_sizes):
-        middleware = CookieMonitoringMiddleware()
-
-        cookies_dict = {
-            "a": "." * 10,
-            "b": "." * 15,
-        }
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
-
-        middleware.process_request(mock_request)
-        mock_encrypt.assert_not_called()
-
-    @override_settings(COOKIE_SIZE_LOGGING_THRESHOLD=1)
-    @override_settings(COOKIE_HEADER_DEBUG_PUBLIC_KEY="fake-key")
-    @patch("openedx.core.lib.request_utils.CAPTURE_COOKIE_SIZES")
-    @patch("openedx.core.lib.request_utils.encrypt_for_log")
-    def test_log_encrypted_cookies(self, mock_encrypt, mock_capture_cookie_sizes):
-
-        middleware = CookieMonitoringMiddleware()
-
-        cookies_dict = {
-            "a": "." * 10,
-            "b": "." * 15,
-        }
-
-        factory = RequestFactory()
-        for name, value in cookies_dict.items():
-            factory.cookies[name] = value
-
-        mock_request = factory.request()
-        cookie_header = str(mock_request.META.get('HTTP_COOKIE', ''))
-
-        middleware.process_request(mock_request)
-        mock_encrypt.assert_has_calls([
-            call(cookie_header, "fake-key")
-        ])
 
 
 class TestGetExpectedErrorSettingsDict(unittest.TestCase):

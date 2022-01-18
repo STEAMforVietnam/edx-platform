@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = 0;
-    if (typeof v === 'boolean') {
+    var v=0;
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,7 +19,7 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
     "6 a.m.": "\u0cac\u0cc6\u0cb3\u0c97\u0cbf\u0ca8 \u0cec \u0c97\u0c82\u0c9f\u0cc6 ",
     "Available %s": "\u0cb2\u0cad\u0ccd\u0caf %s ",
     "Cancel": "\u0cb0\u0ca6\u0ccd\u0ca6\u0cc1\u0c97\u0cca\u0cb3\u0cbf\u0cb8\u0cbf",
@@ -40,24 +39,24 @@
     "Yesterday": "\u0ca8\u0cbf\u0ca8\u0ccd\u0ca8\u0cc6",
     "You have unsaved changes on individual editable fields. If you run an action, your unsaved changes will be lost.": "\u0ca8\u0cbf\u0cd5\u0cb5\u0cc1 \u0caa\u0ccd\u0cb0\u0ca4\u0ccd\u0caf\u0cc6\u0cd5\u0c95 \u0ca4\u0cbf\u0ca6\u0ccd\u0ca6\u0cac\u0cb2\u0ccd\u0cb2 \u0c95\u0ccd\u0cb7\u0cc6\u0cd5\u0ca4\u0ccd\u0cb0\u0c97\u0cb3\u0cb2\u0ccd\u0cb2\u0cbf \u0cac\u0ca6\u0cb2\u0cbe\u0cb5\u0ca3\u0cc6 \u0c89\u0cb3\u0cbf\u0cb8\u0cbf\u0cb2\u0ccd\u0cb2. \u0ca8\u0cbf\u0cae\u0ccd\u0cae \u0c89\u0cb3\u0cbf\u0cb8\u0ca6 \u0cac\u0ca6\u0cb2\u0cbe\u0cb5\u0ca3\u0cc6\u0c97\u0cb3\u0cc1 \u0ca8\u0cbe\u0cb6\u0cb5\u0cbe\u0c97\u0cc1\u0ca4\u0ccd\u0ca4\u0cb5\u0cc6"
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -67,16 +66,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -99,12 +98,15 @@
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
+      "%Y-%m-%d",
       "%m/%d/%Y %H:%M:%S",
       "%m/%d/%Y %H:%M:%S.%f",
       "%m/%d/%Y %H:%M",
+      "%m/%d/%Y",
       "%m/%d/%y %H:%M:%S",
       "%m/%d/%y %H:%M:%S.%f",
-      "%m/%d/%y %H:%M"
+      "%m/%d/%y %H:%M",
+      "%m/%d/%y"
     ],
     "DATE_FORMAT": "j F Y",
     "DATE_INPUT_FORMATS": [
@@ -137,8 +139,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -157,5 +159,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

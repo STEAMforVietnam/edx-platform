@@ -24,7 +24,7 @@ def display(message):  # lint-amnesty, pylint: disable=missing-function-docstrin
     if message.get('event'):
         event = json.loads(message['event'])
         for k in sorted(event):
-            print(f'\t{k}: {event[k]}')
+            print('\t{}: {}'.format(k, event[k]))
     print()
 
 while 1:

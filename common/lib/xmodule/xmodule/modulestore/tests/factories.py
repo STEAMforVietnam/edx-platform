@@ -300,7 +300,7 @@ class ItemFactory(XModuleFactory):
         if self.display_name is None:
             dest_name = uuid4().hex
         else:
-            dest_name = BlockUsageLocator.clean(self.display_name)
+            dest_name = self.display_name.replace(" ", "_")  # lint-amnesty, pylint: disable=no-member
 
         new_location = self.parent_location.course_key.make_usage_key(
             self.category,
@@ -324,7 +324,7 @@ class ItemFactory(XModuleFactory):
         return parent.location
 
     @classmethod
-    def _create(cls, target_class, **kwargs):  # lint-amnesty, pylint: disable=arguments-differ, too-many-statements, unused-argument
+    def _create(cls, target_class, **kwargs):  # lint-amnesty, pylint: disable=arguments-differ, unused-argument
         """
         Uses ``**kwargs``:
 
@@ -412,7 +412,6 @@ class ItemFactory(XModuleFactory):
                 module.submission_start = submission_start
             if submission_end:
                 module.submission_end = submission_end
-            store.update_item(module, user_id)
 
             # VS[compat] cdodge: This is a hack because static_tabs also have references from the course module, so
             # if we add one then we need to also add it to the policy information (i.e. metadata)

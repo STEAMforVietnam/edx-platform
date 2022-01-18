@@ -27,8 +27,8 @@ from openedx.features.enterprise_support.tests.factories import (
     EnterpriseCustomerUserFactory
 )
 from openedx.features.enterprise_support.utils import get_data_consent_share_cache_key
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +75,20 @@ class EnterpriseSupportSignals(SharedModuleStoreTestCase):
         EnterpriseCourseEnrollmentFactory(
             course_id=course_id,
             enterprise_customer_user=enterprise_customer_user,
+        )
+
+    @patch('openedx.features.enterprise_support.signals.update_user.delay')
+    def test_register_user(self, mock_update_user):
+        """
+        make sure marketing enterprise user call invokes update_user
+        """
+        self._create_enterprise_enrollment(self.user.id, self.course_id)
+        mock_update_user.assert_called_with(
+            sailthru_vars={
+                'is_enterprise_learner': True,
+                'enterprise_name': self.enterprise_customer.name,
+            },
+            email=self.user.email
         )
 
     def test_signal_update_dsc_cache_on_course_enrollment(self):
@@ -133,42 +147,28 @@ class EnterpriseSupportSignals(SharedModuleStoreTestCase):
 
         return enrollment
 
-    @patch('common.djangoapps.student.models.CourseEnrollment.is_order_voucher_refundable')
     @ddt.data(
-        (True, True, 2, True, False),  # test if skip_refund
-        (False, True, 20, True, False),  # test refundable time passed
-        (False, False, 2, True, False),    # test not enterprise enrollment
-        (False, True, 2, False, False),    # test order voucher expiration date has already passed
-        (False, True, 2, True, True),  # success: no skip_refund, is enterprise enrollment, coupon voucher is refundable
-        # and is still in refundable window.
+        (True, True, 2, False),  # test if skip_refund
+        (False, True, 20, False),  # test refundable time passed
+        (False, False, 2, False),    # test not enterprise enrollment
+        (False, True, 2, True),    # success: no skip_refund, is enterprise enrollment and still in refundable window.
     )
     @ddt.unpack
-    def test_refund_order_voucher(
-        self,
-        skip_refund,
-        enterprise_enrollment_exists,
-        no_of_days_placed,
-        order_voucher_refundable,
-        api_called,
-        mock_is_order_voucher_refundable
-    ):
+    def test_refund_order_voucher(self, skip_refund, enterprise_enrollment_exists, no_of_days_placed, api_called):
         """Test refund_order_voucher signal"""
-        mock_is_order_voucher_refundable.return_value = order_voucher_refundable
         enrollment = self._create_enrollment_to_refund(no_of_days_placed, enterprise_enrollment_exists)
         with patch('openedx.features.enterprise_support.signals.ecommerce_api_client') as mock_ecommerce_api_client:
             enrollment.update_enrollment(is_active=False, skip_refund=skip_refund)
             assert mock_ecommerce_api_client.called == api_called
 
-    @patch('common.djangoapps.student.models.CourseEnrollment.is_order_voucher_refundable')
     @ddt.data(
         (HttpClientError, 'INFO'),
         (HttpServerError, 'ERROR'),
         (Exception, 'ERROR'),
     )
     @ddt.unpack
-    def test_refund_order_voucher_with_client_errors(self, mock_error, log_level, mock_is_order_voucher_refundable):
+    def test_refund_order_voucher_with_client_errors(self, mock_error, log_level):
         """Test refund_order_voucher signal client_error"""
-        mock_is_order_voucher_refundable.return_value = True
         enrollment = self._create_enrollment_to_refund()
         with patch('openedx.features.enterprise_support.signals.ecommerce_api_client') as mock_ecommerce_api_client:
             client_instance = mock_ecommerce_api_client.return_value

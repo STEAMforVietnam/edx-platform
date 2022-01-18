@@ -8,14 +8,17 @@ from unittest.mock import patch
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
 from common.djangoapps.util.testing import UrlResetMixin
 from openedx.core.djangoapps.course_groups.tests.helpers import CohortFactory
-from openedx.core.djangoapps.django_comment_common.models import CourseDiscussionSettings
 from openedx.core.djangoapps.django_comment_common.models import ForumsConfig, Role
-from openedx.core.djangoapps.django_comment_common.utils import seed_permissions_roles
+from openedx.core.djangoapps.django_comment_common.utils import (
+    CourseDiscussionSettings,
+    seed_permissions_roles,
+    set_course_discussion_settings
+)
 from openedx.core.lib.teams_config import TeamsConfig
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 class ForumsEnableMixin:
@@ -105,15 +108,12 @@ def config_course_discussions(
         """Convert name to id."""
         return topic_name_to_id(course, name)
 
-    discussion_settings = CourseDiscussionSettings.get(course.id)
-    discussion_settings.update({
-        'divided_discussions': [
-            to_id(name)
-            for name in divided_discussions
-        ],
-        'always_divide_inline_discussions': always_divide_inline_discussions,
-        'division_scheme': CourseDiscussionSettings.COHORT,
-    })
+    set_course_discussion_settings(
+        course.id,
+        divided_discussions=[to_id(name) for name in divided_discussions],
+        always_divide_inline_discussions=always_divide_inline_discussions,
+        division_scheme=CourseDiscussionSettings.COHORT,
+    )
 
     course.discussion_topics = {name: {"sort_key": "A", "id": to_id(name)}
                                 for name in discussion_topics}

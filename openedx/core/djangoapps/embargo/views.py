@@ -101,7 +101,7 @@ class CourseAccessMessageView(View):
             embargo.messages.BlockedMessage or None
 
         """
-        message_dict = {}
+        message_dict = dict()
 
         # The access point determines which set of messages to use.
         # This allows us to show different messages to students who

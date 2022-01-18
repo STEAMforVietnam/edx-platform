@@ -14,7 +14,6 @@ from path import Path
 
 from common.test.acceptance.fixtures import STUDIO_BASE_URL
 from common.test.acceptance.fixtures.base import FixtureError, XBlockContainerFixture
-from common.djangoapps.util.course import course_location_from_key
 
 
 class XBlockFixtureDesc:
@@ -253,7 +252,11 @@ class CourseFixture(XBlockContainerFixture):
         Return the locator string for the course.
         """
         course_key = CourseKey.from_string(self._course_key)
-        return str(course_location_from_key(course_key))
+        if getattr(course_key, 'deprecated', False):
+            block_id = self._course_dict['run']
+        else:
+            block_id = 'course'
+        return str(course_key.make_usage_key('course', block_id))
 
     @property
     def _assets_url(self):
@@ -354,7 +357,7 @@ class CourseFixture(XBlockContainerFixture):
             'children': None,
             'data': handouts_html,
             'id': self._handouts_loc,
-            'metadata': {},
+            'metadata': dict(),
         })
 
         response = self.session.post(url, data=payload, headers=self.headers)
@@ -393,7 +396,7 @@ class CourseFixture(XBlockContainerFixture):
         for asset_name in self._assets:
             asset_file_path = test_dir + '/data/uploads/' + asset_name
 
-            asset_file = open(asset_file_path, mode='rb')  # lint-amnesty, pylint: disable=consider-using-with
+            asset_file = open(asset_file_path, mode='rb')  # lint-amnesty, pylint: disable=bad-option-value, open-builtin
             files = {'file': (asset_name, asset_file, mimetypes.guess_type(asset_file_path)[0])}
 
             headers = {

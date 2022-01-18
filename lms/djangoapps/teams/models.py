@@ -11,9 +11,9 @@ from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imp
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.dispatch import receiver
-
+from django.utils.encoding import python_2_unicode_compatible
 from django.utils.text import slugify
-from django.utils.translation import gettext_lazy
+from django.utils.translation import ugettext_lazy
 from django_countries.fields import CountryField
 from model_utils import FieldTracker
 from opaque_keys.edx.django.models import CourseKeyField
@@ -104,6 +104,7 @@ def utc_now():
     return datetime.utcnow().replace(tzinfo=pytz.utc)
 
 
+@python_2_unicode_compatible
 class CourseTeam(models.Model):
     """
     This model represents team related info.
@@ -138,7 +139,7 @@ class CourseTeam(models.Model):
     language = LanguageField(
         default='',
         blank=True,
-        help_text=gettext_lazy("Optional language the team uses as ISO 639-1 code."),
+        help_text=ugettext_lazy("Optional language the team uses as ISO 639-1 code."),
     )
     # indexed for ordering
     last_activity_at = models.DateTimeField(default=utc_now, db_index=True)
@@ -223,6 +224,7 @@ class CourseTeam(models.Model):
         self.save()
 
 
+@python_2_unicode_compatible
 class CourseTeamMembership(models.Model):
     """
     This model represents the membership of a single user in a single team.

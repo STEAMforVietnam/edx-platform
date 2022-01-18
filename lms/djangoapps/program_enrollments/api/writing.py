@@ -8,7 +8,6 @@ from `lms.djangoapps.program_enrollments.api`.
 
 import logging
 
-from requests.structures import CaseInsensitiveDict
 from simple_history.utils import bulk_create_with_history
 
 from common.djangoapps.course_modes.models import CourseMode
@@ -62,7 +61,7 @@ def write_program_enrollments(program_uuid, enrollment_requests, create, update)
     existing_enrollments = fetch_program_enrollments(
         program_uuid=program_uuid, external_user_keys=external_keys
     )
-    existing_enrollments_by_key = CaseInsensitiveDict({key: None for key in external_keys})
+    existing_enrollments_by_key = {key: None for key in external_keys}
     existing_enrollments_by_key.update({
         enrollment.external_user_key: enrollment
         for enrollment in existing_enrollments
@@ -211,9 +210,9 @@ def write_program_course_enrollments(
         program_uuid=program_uuid,
         external_user_keys=processable_external_keys,
     ).prefetch_related('program_course_enrollments')
-    program_enrollments_by_key = CaseInsensitiveDict({
+    program_enrollments_by_key = {
         enrollment.external_user_key: enrollment for enrollment in program_enrollments
-    })
+    }
 
     # Fetch enrollments regardless of anchored Program Enrollments
     existing_course_enrollments = fetch_program_course_enrollments_by_students(
@@ -240,9 +239,7 @@ def write_program_course_enrollments(
         program_enrollment__program_uuid=program_uuid
     )
 
-    existing_course_enrollments_by_key = CaseInsensitiveDict({
-        key: None for key in processable_external_keys
-    })
+    existing_course_enrollments_by_key = {key: None for key in processable_external_keys}
     existing_course_enrollments_by_key.update({
         enrollment.program_enrollment.external_user_key: enrollment
         for enrollment in existing_course_enrollments_of_program_enrollment
@@ -255,7 +252,7 @@ def write_program_course_enrollments(
     enrollments_to_save = []
     created_enrollments = []
     updated_enrollments = []
-    staff_assignments_by_user_key = CaseInsensitiveDict()
+    staff_assignments_by_user_key = {}
     for external_key, request in requests_by_key.items():
         course_staff = request['course_staff']
         status = request['status']
@@ -501,7 +498,7 @@ def _organize_requests_by_external_key(enrollment_requests):
         where requests_by_key is dict[str: dict]
           and duplicated_keys is set[str].
     """
-    requests_by_key = CaseInsensitiveDict()
+    requests_by_key = {}
     duplicated_keys = set()
     for request in enrollment_requests:
         key = request['external_user_key']
@@ -537,11 +534,11 @@ def _get_conflicting_active_course_enrollments(
     Returns:
         results (dict) with detected conflict entry, or empty dict.
     """
-    conflicted_by_user_key = CaseInsensitiveDict()
+    conflicted_by_user_key = {}
 
-    requested_statuses_by_user_key = CaseInsensitiveDict({
+    requested_statuses_by_user_key = {
         key: request.get('status') for key, request in requests_by_key.items()
-    })
+    }
 
     for existing_enrollment in existing_course_enrollments:
         external_user_key = existing_enrollment.program_enrollment.external_user_key

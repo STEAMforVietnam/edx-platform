@@ -16,13 +16,14 @@ import ipaddress
 import json
 import logging
 
+from django.utils.encoding import python_2_unicode_compatible
 from config_models.models import ConfigurationModel
 from django.core.cache import cache
 from django.db import models
 from django.db.models.signals import post_delete, post_save
 from django.urls import reverse
-from django.utils.translation import gettext as _
-from django.utils.translation import gettext_lazy
+from django.utils.translation import ugettext as _
+from django.utils.translation import ugettext_lazy
 from django_countries import countries
 from django_countries.fields import CountryField
 from opaque_keys.edx.django.models import CourseKeyField
@@ -35,6 +36,7 @@ from .messages import COURSEWARE_MESSAGES, ENROLL_MESSAGES
 log = logging.getLogger(__name__)
 
 
+@python_2_unicode_compatible
 class EmbargoedCourse(models.Model):
     """
     Enable course embargo on a course-by-course basis.
@@ -68,9 +70,10 @@ class EmbargoedCourse(models.Model):
         not_em = "Not "
         if self.embargoed:
             not_em = ""
-        return f"Course '{str(self.course_id)}' is {not_em}Embargoed"
+        return "Course '{}' is {}Embargoed".format(str(self.course_id), not_em)
 
 
+@python_2_unicode_compatible
 class EmbargoedState(ConfigurationModel):
     """
     Register countries to be embargoed.
@@ -98,6 +101,7 @@ class EmbargoedState(ConfigurationModel):
         return self.embargoed_countries
 
 
+@python_2_unicode_compatible
 class RestrictedCourse(models.Model):
     """
     Course with access restrictions.
@@ -132,26 +136,26 @@ class RestrictedCourse(models.Model):
 
     course_key = CourseKeyField(
         max_length=255, db_index=True, unique=True,
-        help_text=gettext_lazy("The course key for the restricted course.")
+        help_text=ugettext_lazy("The course key for the restricted course.")
     )
 
     enroll_msg_key = models.CharField(
         max_length=255,
         choices=ENROLL_MSG_KEY_CHOICES,
         default='default',
-        help_text=gettext_lazy("The message to show when a user is blocked from enrollment.")
+        help_text=ugettext_lazy("The message to show when a user is blocked from enrollment.")
     )
 
     access_msg_key = models.CharField(
         max_length=255,
         choices=COURSEWARE_MSG_KEY_CHOICES,
         default='default',
-        help_text=gettext_lazy("The message to show when a user is blocked from accessing a course.")
+        help_text=ugettext_lazy("The message to show when a user is blocked from accessing a course.")
     )
 
     disable_access_check = models.BooleanField(
         default=False,
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Allow users who enrolled in an allowed country "
             "to access restricted courses from excluded countries."
         )
@@ -369,6 +373,7 @@ class RestrictedCourse(models.Model):
         log.info("Invalidated cached messaging URLs ")
 
 
+@python_2_unicode_compatible
 class Country(models.Model):
     """Representation of a country.
 
@@ -380,7 +385,7 @@ class Country(models.Model):
     """
     country = CountryField(
         db_index=True, unique=True,
-        help_text=gettext_lazy("Two character ISO country code.")
+        help_text=ugettext_lazy("Two character ISO country code.")
     )
 
     def __str__(self):
@@ -394,6 +399,7 @@ class Country(models.Model):
         ordering = ['country']
 
 
+@python_2_unicode_compatible
 class CountryAccessRule(models.Model):
     """Course access rule based on the user's country.
 
@@ -425,7 +431,7 @@ class CountryAccessRule(models.Model):
         max_length=255,
         choices=RULE_TYPE_CHOICES,
         default=BLACKLIST_RULE,
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Whether to include or exclude the given course. "
             "If whitelist countries are specified, then ONLY users from whitelisted countries "
             "will be able to access the course.  If blacklist countries are specified, then "
@@ -435,13 +441,13 @@ class CountryAccessRule(models.Model):
 
     restricted_course = models.ForeignKey(
         "RestrictedCourse",
-        help_text=gettext_lazy("The course to which this rule applies."),
+        help_text=ugettext_lazy("The course to which this rule applies."),
         on_delete=models.CASCADE,
     )
 
     country = models.ForeignKey(
         "Country",
-        help_text=gettext_lazy("The country to which this rule applies."),
+        help_text=ugettext_lazy("The country to which this rule applies."),
         on_delete=models.CASCADE,
     )
 
@@ -676,6 +682,7 @@ post_delete.connect(CourseAccessRuleHistory.snapshot_post_delete_receiver, sende
 post_delete.connect(CourseAccessRuleHistory.snapshot_post_delete_receiver, sender=CountryAccessRule)
 
 
+@python_2_unicode_compatible
 class IPFilter(ConfigurationModel):
     """
     Register specific IP addresses to explicitly block or unblock.

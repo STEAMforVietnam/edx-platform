@@ -308,7 +308,10 @@ class LibTestSuite(PytestSuite):
                 xdist_remote_processes = self.processes
             for ip in self.xdist_ip_addresses.split(','):
                 # Propogate necessary env vars to xdist containers
-                django_env_var_cmd = "export DJANGO_SETTINGS_MODULE='lms.envs.test'"
+                if 'pavelib/paver_tests' in self.test_id:
+                    django_env_var_cmd = "export DJANGO_SETTINGS_MODULE='lms.envs.test'"
+                else:
+                    django_env_var_cmd = "export DJANGO_SETTINGS_MODULE='openedx.tests.settings'"
 
                 env_var_cmd = '{} DISABLE_COURSEENROLLMENT_HISTORY={}' \
                     .format(django_env_var_cmd, self.disable_courseenrollment_history)

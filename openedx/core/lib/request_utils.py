@@ -14,19 +14,18 @@ from edx_toggles.toggles import WaffleFlag
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from rest_framework.views import exception_handler
-from common.djangoapps.util.log_sensitive import encrypt_for_log
 
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 
 # accommodates course api urls, excluding any course api routes that do not fall under v*/courses, such as v1/blocks.
-COURSE_REGEX = re.compile(fr'^(.*?/course(s)?/)(?!v[0-9]+/[^/]+){settings.COURSE_ID_PATTERN}')
+COURSE_REGEX = re.compile(fr'^(.*?/courses/)(?!v[0-9]+/[^/]+){settings.COURSE_ID_PATTERN}')
 
 # .. toggle_name: request_utils.capture_cookie_sizes
 # .. toggle_implementation: WaffleFlag
 # .. toggle_default: False
-# .. toggle_description: Enables more detailed capturing of cookie sizes for monitoring purposes. This can be useful for tracking
-#       down large cookies if requests are nearing limits on the total size of cookies. See the
-#       CookieMonitoringMiddleware docstring for details on the monitoring custom attributes that will be set.
+# .. toggle_description: Enables capturing of cookie sizes for monitoring purposes. This can be useful for tracking
+#       down large cookies and avoiding hitting limits on the total size of cookies. See the CookieMonitoringMiddleware
+#       docstring for details on the monitoring custom attributes that will be set.
 # .. toggle_warnings: Enabling this flag will add a number of custom attributes, and could adversely affect other
 #       monitoring. Only enable temporarily, or lower TOP_N_COOKIES_CAPTURED and TOP_N_COOKIE_GROUPS_CAPTURED django
 #       settings to capture less data.
@@ -124,10 +123,6 @@ class CookieMonitoringMiddleware(MiddlewareMixin):
 
         Attributes that are added by this middleware:
 
-        cookies.header.size: The total size in bytes of the cookie header
-
-        If CAPTURE_COOKIE_SIZES is enabled, additional attributes will be added:
-
         cookies.<N>.name: The name of the Nth largest cookie
         cookies.<N>.size: The size of the Nth largest cookie
         cookies..group.<N>.name: The name of the Nth largest cookie.
@@ -144,47 +139,17 @@ class CookieMonitoringMiddleware(MiddlewareMixin):
         - `request_utils.capture_cookie_sizes`
         - TOP_N_COOKIES_CAPTURED
         - TOP_N_COOKIE_GROUPS_CAPTURED
-        - COOKIE_SIZE_LOGGING_THRESHOLD
-        - COOKIE_HEADER_DEBUG_PUBLIC_KEY
 
         """
-
-        raw_header_cookie = request.META.get('HTTP_COOKIE', '')
-        cookie_header_size = len(raw_header_cookie.encode('utf-8'))
-        set_custom_attribute('cookies.header.size', cookie_header_size)
-
-        # .. setting_name: COOKIE_SIZE_LOGGING_THRESHOLD
-        # .. setting_default: None
-        # .. setting_description: The minimum size for logging the entire (encrypted) cookie header. Should be set
-        # to a relatively high threshold (suggested 9-10K) to avoid flooding the logs.
-        # .. setting_warning: Requires COOKIE_HEADER_DEBUG_PUBLIC_KEY to be set
-        logging_threshold = getattr(settings, "COOKIE_SIZE_LOGGING_THRESHOLD", None)
-
-        # .. setting_name: COOKIE_HEADER_DEBUG_PUBLIC_KEY
-        # .. setting_default: None
-        # .. setting_description: The public key used to encrypt large cookie headers. See See
-        #       https://github.com/edx/edx-platform/blob/master/common/djangoapps/util/log_sensitive.py
-        #       for instructions on decrypting.
-        debug_key = getattr(settings, "COOKIE_HEADER_DEBUG_PUBLIC_KEY", None)
-
-        if logging_threshold and cookie_header_size > logging_threshold:
-            if not debug_key:
-                log.warning("COOKIE_SIZE_LOGGING_THRESHOLD set without COOKIE_HEADER_DEBUG_PUBLIC_KEY")
-            else:
-                encrypted_cookie_header = encrypt_for_log(str(raw_header_cookie),
-                                                          debug_key)
-                log.info(f"Large (> {logging_threshold}) cookie header detected."
-                         f" Encrypted contents: {encrypted_cookie_header}")
-
         if not CAPTURE_COOKIE_SIZES.is_enabled():
             return
 
         # .. setting_name: TOP_N_COOKIES_CAPTURED
-        # .. setting_default: 8
+        # .. setting_default: 5
         # .. setting_description: The number of the largest cookies to capture when monitoring. Capture fewer cookies
         #       if you need to save on monitoring resources.
         # .. setting_warning: Depends on the `request_utils.capture_cookie_sizes` toggle being enabled.
-        top_n_cookies_captured = getattr(settings, "TOP_N_COOKIES_CAPTURED", 8)
+        top_n_cookies_captured = getattr(settings, "TOP_N_COOKIES_CAPTURED", 5)
         # .. setting_name: TOP_N_COOKIE_GROUPS_CAPTURED
         # .. setting_default: 5
         # .. setting_description: The number of the largest cookie groups to capture when monitoring. Capture
@@ -242,16 +207,6 @@ class CookieMonitoringMiddleware(MiddlewareMixin):
         set_custom_attribute('cookies_total_size', total_cookie_size)
         log.debug('cookies_total_size = %d', total_cookie_size)
 
-        top_n_cookies = sorted(
-            cookie_names_to_size,
-            key=lambda x: cookie_names_to_size[x],
-            reverse=True,
-        )[:top_n_cookies_captured]
-        top_n_cookies_size = sum([cookie_names_to_size[name] for name in top_n_cookies])
-        set_custom_attribute('cookies_unaccounted_size', total_cookie_size - top_n_cookies_size)
-
-        set_custom_attribute('cookies_total_num', len(cookie_names_to_size))
-
     def set_custom_attributes_for_top_n(self, names_to_size, top_n_captured, attribute_prefix):
         """
         Sets custom metric for the top N biggest cookies or cookie groups.
@@ -266,10 +221,10 @@ class CookieMonitoringMiddleware(MiddlewareMixin):
             key=lambda x: names_to_size[x],
             reverse=True,
         )[:top_n_captured]
-        for count, name in enumerate(top_n_cookies, start=1):
+        for index, name in enumerate(top_n_cookies, start=1):
             size = names_to_size[name]
-            name_attribute = f'{attribute_prefix}.{count}.name'
-            size_attribute = f'{attribute_prefix}.{count}.size'
+            name_attribute = f'{attribute_prefix}.{index}.name'
+            size_attribute = f'{attribute_prefix}.{index}.size'
 
             set_custom_attribute(name_attribute, name)
             set_custom_attribute(size_attribute, size)
@@ -503,9 +458,8 @@ def _log_and_monitor_expected_errors(request, exception, caller):
             set_custom_attribute('checked_error_expected_from', 'multiple')
             return
 
-        # We have confirmed using monitoring that it is very rare that middleware and drf handle different uncaught exceptions.
-        # We will leave this attribute in place, but it is not worth investing in a workaround, especially given that
-        # New Relic now offers its own expected error functionality, and this functionality may be simplified or removed.
+        # Currently, it seems unexpected that middleware and drf will both handle different uncaught exceptions.
+        # We will monitor for this and adjust accordingly if it turns out this is a common case.
         set_custom_attribute('unexpected_multiple_exceptions', cached_module_and_class)
         log.warning(
             "Unexpected scenario where different exceptions are handled by _log_and_monitor_expected_errors. "

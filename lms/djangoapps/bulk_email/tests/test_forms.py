@@ -8,8 +8,8 @@ from opaque_keys.edx.locator import CourseLocator
 from lms.djangoapps.bulk_email.api import is_bulk_email_feature_enabled
 from lms.djangoapps.bulk_email.forms import CourseAuthorizationAdminForm, CourseEmailTemplateForm
 from lms.djangoapps.bulk_email.models import BulkEmailFlag, CourseEmailTemplate
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 class CourseAuthorizationFormTest(ModuleStoreTestCase):
@@ -75,7 +75,7 @@ class CourseAuthorizationFormTest(ModuleStoreTestCase):
         assert not form.is_valid()
 
         msg = 'Course not found.'
-        msg += f' Entered course id was: "{str(bad_id)}".'
+        msg += ' Entered course id was: "{}".'.format(str(bad_id))
         assert msg == form._errors['course_id'][0]  # pylint: disable=protected-access
 
         with self.assertRaisesRegex(

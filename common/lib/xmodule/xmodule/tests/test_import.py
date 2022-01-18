@@ -439,7 +439,7 @@ class ImportTestCase(BaseCourseTestCase):  # lint-amnesty, pylint: disable=missi
 
         def check_for_key(key, node, value):
             "recursive check for presence of key"
-            print(f"Checking {str(node.location)}")
+            print("Checking {}".format(str(node.location)))
             assert getattr(node, key) == value
             for c in node.get_children():
                 check_for_key(key, c, value)
@@ -553,7 +553,11 @@ class ImportTestCase(BaseCourseTestCase):  # lint-amnesty, pylint: disable=missi
 
         # Expect to find an error/exception about characters in "®esources"
         expect = "InvalidKeyError"
-        errors = modulestore.get_course_errors(course.id)
+        errors = [
+            (msg, err)
+            for msg, err  # lint-amnesty, pylint: disable=unnecessary-comprehension
+            in modulestore.get_course_errors(course.id)
+        ]
 
         assert any(((expect in msg) or (expect in err)) for (msg, err) in errors)
         chapters = course.get_children()

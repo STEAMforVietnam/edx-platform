@@ -114,7 +114,7 @@ def get_sass_directories(system, theme_dir=None):
         )
     system = SYSTEMS[system]
 
-    applicable_directories = []
+    applicable_directories = list()
 
     if theme_dir:
         # Add theme sass directories
@@ -141,7 +141,7 @@ def get_common_sass_directories():
         "lookup_paths": [],  # list of directories to be passed as lookup paths for @import resolution.
     }
     """
-    applicable_directories = []
+    applicable_directories = list()
 
     # add common sass directories
     applicable_directories.append({

@@ -10,8 +10,8 @@ from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.course_blocks.api import get_course_blocks
 from openedx.core.djangolib.testing.utils import get_mock_request
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 from ..course_data import CourseData
 from ..subsection_grade_factory import SubsectionGradeFactory
@@ -34,7 +34,7 @@ class GradeTestBase(SharedModuleStoreTestCase):
             cls.sequence = ItemFactory.create(
                 parent=cls.chapter,
                 category='sequential',
-                display_name="Test Sequential X with an & Ampersand",
+                display_name="Test Sequential X",
                 graded=True,
                 format="Homework"
             )

@@ -26,7 +26,7 @@ from lms.djangoapps.courseware.model_data import get_score
 from lms.djangoapps.grades.config.models import ComputeGradesSetting
 from openedx.core.djangoapps.content.course_overviews.models import \
     CourseOverview  # lint-amnesty, pylint: disable=unused-import
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 from .config.waffle import DISABLE_REGRADE_ON_POLICY_CHANGE, waffle
 from .constants import ScoreDatabaseTableEnum
@@ -271,6 +271,7 @@ def _has_db_updated_with_new_score(self, scored_block_usage_key, **kwargs):
                 "student_id": kwargs['anonymous_user_id'],
                 "course_id": str(scored_block_usage_key.course_key),
                 "item_id": str(scored_block_usage_key),
+                "item_type": scored_block_usage_key.block_type,
             }
         )
         found_modified_time = score['created_at'] if score is not None else None

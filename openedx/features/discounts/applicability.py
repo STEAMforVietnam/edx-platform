@@ -19,14 +19,11 @@ from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace
 
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.entitlements.models import CourseEntitlement
-from lms.djangoapps.courseware.utils import is_mode_upsellable
-from lms.djangoapps.courseware.toggles import COURSEWARE_MFE_MILESTONES_STREAK_DISCOUNT
 from lms.djangoapps.experiments.models import ExperimentData
 from lms.djangoapps.experiments.stable_bucketing import stable_bucketing_hash_group
 from openedx.features.discounts.models import DiscountPercentageConfig, DiscountRestrictionConfig
 from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.track import segment
-
 
 # .. toggle_name: discounts.enable_discounting
 # .. toggle_implementation: WaffleFlag
@@ -83,46 +80,6 @@ def get_discount_expiration_date(user, course):
         discount_expiration_date = upgrade_deadline
 
     return discount_expiration_date
-
-
-def can_show_streak_discount_coupon(user, course):
-    """
-    Check whether this combination of user and course
-    can receive the streak discount.
-    """
-
-    # Feature needs to be enabled
-    if not COURSEWARE_MFE_MILESTONES_STREAK_DISCOUNT.is_enabled():
-        return False
-
-    # Course end date needs to be in the future
-    if course.has_ended():
-        return False
-
-    # Course needs to have a non-expired verified mode
-    modes_dict = CourseMode.modes_for_course_dict(course=course, include_expired=False)
-    if 'verified' not in modes_dict:
-        return False
-
-    # Learner needs to be in an upgradeable mode
-    try:
-        enrollment = CourseEnrollment.objects.get(
-            user=user,
-            course=course.id,
-        )
-    except CourseEnrollment.DoesNotExist:
-        return False
-
-    if not is_mode_upsellable(user, enrollment):
-        return False
-
-    # We can't import this at Django load time within the openedx tests settings context
-    from openedx.features.enterprise_support.utils import is_enterprise_learner
-    # Don't give discount to enterprise users
-    if is_enterprise_learner(user):
-        return False
-
-    return True
 
 
 def can_receive_discount(user, course, discount_expiration_date=None):

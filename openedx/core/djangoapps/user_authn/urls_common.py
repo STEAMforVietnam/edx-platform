@@ -54,20 +54,17 @@ urlpatterns = [
 
     # Moved from user_api/legacy_urls.py
     url(
-        r'^api/user/(?P<api_version>v(1|2))/account/login_session/$',
+        r'^api/user/v1/account/login_session/$',
         login.LoginSessionView.as_view(),
         name="user_api_login_session"
     ),
     # `user_api` prefix is preserved for backwards compatibility.
-    url(r'^user_api/(?P<api_version>v(1|2))/account/login_session/$', login.LoginSessionView.as_view(),
+    url(r'^user_api/v1/account/login_session/$', login.LoginSessionView.as_view(),
         name="user_api_login_session_legacy"),
 
     # Login Refresh of JWT Cookies
     url(r'^login_refresh$', login.login_refresh, name="login_refresh"),
 
-    # WARNING: This is similar to auth_backends ^logout/$ (which has a
-    # trailing slash); LMS uses this view, but Studio links to the
-    # auth_backends logout view.
     url(r'^logout$', logout.LogoutView.as_view(), name='logout'),
 
     # Moved from user_api/legacy_urls.py

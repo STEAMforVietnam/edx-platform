@@ -12,6 +12,7 @@ from edx_rest_framework_extensions.permissions import (
     JwtRestrictedApplication,
     NotJwtRestrictedApplication
 )
+from rest_condition import C
 from rest_framework.permissions import BasePermission
 
 from openedx.core.lib.api.permissions import ApiKeyHeaderPermission
@@ -50,11 +51,11 @@ class JwtHasTpaProviderFilterForRequestedProvider(BasePermission):
 
 # TODO: Remove ApiKeyHeaderPermission. Check deprecated_api_key_header custom attribute for active usage.
 _NOT_JWT_RESTRICTED_TPA_PERMISSIONS = (
-    NotJwtRestrictedApplication &
-    (IsSuperuser | ApiKeyHeaderPermission | IsStaff)  # pylint: disable=unsupported-binary-operation
+    C(NotJwtRestrictedApplication) &
+    (C(IsSuperuser) | ApiKeyHeaderPermission | C(IsStaff))  # pylint: disable=unsupported-binary-operation
 )
 _JWT_RESTRICTED_TPA_PERMISSIONS = (
-    JwtRestrictedApplication &
+    C(JwtRestrictedApplication) &
     JwtHasScope &
     JwtHasTpaProviderFilterForRequestedProvider
 )

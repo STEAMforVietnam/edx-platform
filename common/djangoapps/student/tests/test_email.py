@@ -1,4 +1,3 @@
-# lint-amnesty, pylint: disable=missing-module-docstring
 import json
 import unittest
 from string import capwords
@@ -30,15 +29,15 @@ from common.djangoapps.student.views import (
 )
 from common.djangoapps.third_party_auth.views import inactive_user_view
 from common.djangoapps.util.testing import EventTestMixin
+from lms.djangoapps.courseware.toggles import COURSEWARE_PROCTORING_IMPROVEMENTS
 from lms.djangoapps.verify_student.services import IDVerificationService
 from openedx.core.djangoapps.ace_common.tests.mixins import EmailTemplateTagMixin
-from openedx.core.djangoapps.agreements.toggles import ENABLE_INTEGRITY_SIGNATURE, is_integrity_signature_enabled
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.theming.tests.test_util import with_comprehensive_theme
 from openedx.core.djangolib.testing.utils import CacheIsolationMixin, CacheIsolationTestCase
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 class TestException(Exception):
@@ -215,6 +214,7 @@ class ActivationEmailTests(EmailTemplateTagMixin, CacheIsolationTestCase):
 
 
 @ddt.ddt
+@override_waffle_flag(COURSEWARE_PROCTORING_IMPROVEMENTS, active=True)
 @patch.dict('django.conf.settings.FEATURES', {'ENABLE_SPECIAL_EXAMS': True})
 @override_settings(ACCOUNT_MICROFRONTEND_URL='http://account-mfe')
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', "Test only valid in LMS")
@@ -226,25 +226,10 @@ class ProctoringRequirementsEmailTests(EmailTemplateTagMixin, ModuleStoreTestCas
     # pylint: disable=no-member
     def setUp(self):
         super().setUp()
-        self.course = None
+        self.course = CourseFactory(enable_proctored_exams=True)
         self.user = UserFactory()
 
-    @ddt.data('course_run_1', 'matt''s course', 'matt＇s run')
-    def test_send_proctoring_requirements_email(self, course_run_name):
-        self.course = CourseFactory(
-            display_name=course_run_name,
-            enable_proctored_exams=True
-        )
-        context = generate_proctoring_requirements_email_context(self.user, self.course.id)
-        send_proctoring_requirements_email(context)
-        self._assert_email()
-
-    @override_waffle_flag(ENABLE_INTEGRITY_SIGNATURE, active=True)
-    def test_send_proctoring_requirements_email_honor(self):
-        self.course = CourseFactory(
-            display_name='honor code on course',
-            enable_proctored_exams=True
-        )
+    def test_send_proctoring_requirements_email(self):
         context = generate_proctoring_requirements_email_context(self.user, self.course.id)
         send_proctoring_requirements_email(context)
         self._assert_email()
@@ -261,22 +246,15 @@ class ProctoringRequirementsEmailTests(EmailTemplateTagMixin, ModuleStoreTestCas
 
         assert message.subject == f"Proctoring requirements for {self.course.display_name}"
 
-        appears, does_not_appear = self._get_fragments()
-        for fragment in appears:
-            self.assertIn(fragment, text)
-            self.assertIn(fragment, html)
-        for fragment in does_not_appear:
-            self.assertNotIn(fragment, text)
-            self.assertNotIn(fragment, html)
+        for fragment in self._get_fragments():
+            assert fragment in text
+            assert escape(fragment) in html
 
     def _get_fragments(self):
-        """
-        Provide a tuple of string[]s that should be (in, not_in) the email
-        """
         course_module = modulestore().get_course(self.course.id)
         proctoring_provider = capwords(course_module.proctoring_provider.replace('_', ' '))
         id_verification_url = IDVerificationService.get_verify_location()
-        fragments = [
+        return [
             (
                 "You are enrolled in {} at {}. This course contains proctored exams.".format(
                     self.course.display_name,
@@ -288,20 +266,14 @@ class ProctoringRequirementsEmailTests(EmailTemplateTagMixin, ModuleStoreTestCas
                 "your computer's desktop, webcam video, and audio."
             ),
             proctoring_provider,
-            escape(
+            (
                 "Carefully review the system requirements as well as the steps to take a proctored "
                 "exam in order to ensure that you are prepared."
             ),
             settings.PROCTORING_SETTINGS.get('LINK_URLS', {}).get('faq', ''),
+            ("Before taking a graded proctored exam, you must have approved ID verification photos."),
+            id_verification_url
         ]
-        idv_fragments = [
-            escape("Before taking a graded proctored exam, you must have approved ID verification photos."),
-            id_verification_url,
-        ]
-        if not is_integrity_signature_enabled(self.course.id):
-            fragments.extend(idv_fragments)
-            return (fragments, [])
-        return (fragments, idv_fragments)
 
 
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', "Test only valid in LMS")

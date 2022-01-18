@@ -56,14 +56,14 @@ from openedx.core.djangoapps.waffle_utils.testutils import WAFFLE_TABLES
 from openedx.core.lib.teams_config import TeamsConfig
 from openedx.features.content_type_gating.models import ContentTypeGatingConfig
 from openedx.features.enterprise_support.tests.mixins.enterprise import EnterpriseTestConsentRequired
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import (
     TEST_DATA_MONGO_MODULESTORE,
     ModuleStoreTestCase,
     SharedModuleStoreTestCase
 )
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls
 
 log = logging.getLogger(__name__)
 
@@ -280,7 +280,7 @@ def make_mock_request_impl(  # lint-amnesty, pylint: disable=missing-function-do
     return mock_request_impl
 
 
-class StringEndsWithMatcher:  # lint-amnesty, pylint: disable=missing-class-docstring
+class StringEndsWithMatcher:  # lint-amnesty, pylint: disable=missing-class-docstring,eq-without-hash
     def __init__(self, suffix):
         self.suffix = suffix
 
@@ -288,7 +288,7 @@ class StringEndsWithMatcher:  # lint-amnesty, pylint: disable=missing-class-docs
         return other.endswith(self.suffix)
 
 
-class PartialDictMatcher:  # lint-amnesty, pylint: disable=missing-class-docstring
+class PartialDictMatcher:  # lint-amnesty, pylint: disable=missing-class-docstring,eq-without-hash
     def __init__(self, expected_values):
         self.expected_values = expected_values
 
@@ -445,7 +445,7 @@ class SingleThreadTestCase(ForumsEnableMixin, ModuleStoreTestCase):  # lint-amne
             assert 'This is a private discussion. You do not have permissions to view this discussion' in html
 
 
-class AllowPlusOrMinusOneInt(int):
+class AllowPlusOrMinusOneInt(int):  # pylint: disable=eq-without-hash
     """
     A workaround for the fact that assertNumQueries doesn't let you
     specify a range or any tolerance. An 'int' that is 'equal to' its value,
@@ -483,15 +483,15 @@ class SingleThreadQueryCountTestCase(ForumsEnableMixin, ModuleStoreTestCase):
         (ModuleStoreEnum.Type.mongo, False, 1, 5, 2, 21, 7),
         (ModuleStoreEnum.Type.mongo, False, 50, 5, 2, 21, 7),
         # split mongo: 3 queries, regardless of thread response size.
-        (ModuleStoreEnum.Type.split, False, 1, 2, 2, 21, 8),
-        (ModuleStoreEnum.Type.split, False, 50, 2, 2, 21, 8),
+        (ModuleStoreEnum.Type.split, False, 1, 3, 3, 21, 8),
+        (ModuleStoreEnum.Type.split, False, 50, 3, 3, 21, 8),
 
         # Enabling Enterprise integration should have no effect on the number of mongo queries made.
         (ModuleStoreEnum.Type.mongo, True, 1, 5, 2, 21, 7),
         (ModuleStoreEnum.Type.mongo, True, 50, 5, 2, 21, 7),
         # split mongo: 3 queries, regardless of thread response size.
-        (ModuleStoreEnum.Type.split, True, 1, 2, 2, 21, 8),
-        (ModuleStoreEnum.Type.split, True, 50, 2, 2, 21, 8),
+        (ModuleStoreEnum.Type.split, True, 1, 3, 3, 21, 8),
+        (ModuleStoreEnum.Type.split, True, 50, 3, 3, 21, 8),
     )
     @ddt.unpack
     def test_number_of_mongo_queries(
@@ -2079,7 +2079,7 @@ class CourseDiscussionsHandlerTestCase(DividedDiscussionsTestCase):
             expected_response_code=400,
             handler=views.course_discussions_settings_handler
         )
-        assert 'Incorrect field type for `{}`. Type must be `{}`'.format(
+        assert u'Incorrect field type for `{}`. Type must be `{}`'.format(
             'always_divide_inline_discussions',
             bool.__name__
         ) == response.get('error')

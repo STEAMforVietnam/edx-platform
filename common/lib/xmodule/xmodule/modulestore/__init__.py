@@ -13,6 +13,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from operator import itemgetter
 
+from contracts import contract, new_contract
 from opaque_keys.edx.keys import AssetKey, CourseKey
 from opaque_keys.edx.locations import Location  # For import backwards compatibility
 from pytz import UTC
@@ -30,6 +31,11 @@ from xmodule.errortracker import make_error_tracker
 from .exceptions import InsufficientSpecificationError, InvalidLocationError
 
 log = logging.getLogger('edx.modulestore')
+
+new_contract('CourseKey', CourseKey)
+new_contract('AssetKey', AssetKey)
+new_contract('AssetMetadata', AssetMetadata)
+new_contract('XBlock', XBlock)
 
 LIBRARY_ROOT = 'library.xml'
 COURSE_ROOT = 'course.xml'
@@ -328,7 +334,7 @@ class BulkOperationsMixin:
             bulk_ops_record.has_library_updated_item = False
 
 
-class EditInfo:
+class EditInfo:  # pylint: disable=eq-without-hash
     """
     Encapsulates the editing info of a block.
     """
@@ -407,7 +413,7 @@ class EditInfo:
         return not self == edit_info
 
 
-class BlockData:
+class BlockData:  # pylint: disable=eq-without-hash
     """
     Wrap the block data in an object instead of using a straight Python dictionary.
     Allows the storing of meta-information about a structure that doesn't persist along with
@@ -491,6 +497,9 @@ class BlockData:
         return not self == block_data
 
 
+new_contract('BlockData', BlockData)
+
+
 class IncorrectlySortedList(Exception):
     """
     Thrown when calling find() on a SortedAssetList not sorted by filename.
@@ -510,6 +519,7 @@ class SortedAssetList(SortedKeyList):  # lint-amnesty, pylint: disable=abstract-
             self.filename_sort = True
         super().__init__(**kwargs)
 
+    @contract(asset_id=AssetKey)
     def find(self, asset_id):
         """
         Find the index of a particular asset in the list. This method is only functional for lists
@@ -530,6 +540,7 @@ class SortedAssetList(SortedKeyList):  # lint-amnesty, pylint: disable=abstract-
             idx = idx_left
         return idx
 
+    @contract(asset_md=AssetMetadata)
     def insert_or_update(self, asset_md):
         """
         Insert asset metadata if asset is not present. Update asset metadata if asset is already present.
@@ -566,6 +577,7 @@ class ModuleStoreAssetBase:
 
         return course_assets, idx
 
+    @contract(asset_key='AssetKey')
     def find_asset_metadata(self, asset_key, **kwargs):
         """
         Find the metadata for a particular course asset.
@@ -585,6 +597,10 @@ class ModuleStoreAssetBase:
         mdata.from_storable(all_assets[asset_idx])
         return mdata
 
+    @contract(
+        course_key='CourseKey', asset_type='None | str',
+        start='int | None', maxresults='int | None', sort='tuple(str,int) | None'
+    )
     def get_all_asset_metadata(self, course_key, asset_type, start=0, maxresults=-1, sort=None, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
         """
         Returns a list of asset metadata for all assets of the given asset_type in the course.
@@ -683,6 +699,7 @@ class ModuleStoreAssetWriteInterface(ModuleStoreAssetBase):
             all_assets.insert_or_update(asset_md)
         return assets_by_type
 
+    @contract(asset_metadata='AssetMetadata')
     def save_asset_metadata(self, asset_metadata, user_id, import_only):
         """
         Saves the asset metadata for a particular course's asset.
@@ -697,6 +714,7 @@ class ModuleStoreAssetWriteInterface(ModuleStoreAssetBase):
         """
         raise NotImplementedError()
 
+    @contract(asset_metadata_list='list(AssetMetadata)')
     def save_asset_metadata_list(self, asset_metadata_list, user_id, import_only):
         """
         Saves a list of asset metadata for a particular course's asset.
@@ -723,6 +741,7 @@ class ModuleStoreAssetWriteInterface(ModuleStoreAssetBase):
         """
         raise NotImplementedError()
 
+    @contract(asset_key='AssetKey', attr=str)
     def set_asset_metadata_attr(self, asset_key, attr, value, user_id):
         """
         Add/set the given attr on the asset at the given location. Value can be any type which pymongo accepts.
@@ -739,6 +758,7 @@ class ModuleStoreAssetWriteInterface(ModuleStoreAssetBase):
         """
         return self.set_asset_metadata_attrs(asset_key, {attr: value}, user_id)
 
+    @contract(source_course_key='CourseKey', dest_course_key='CourseKey')
     def copy_all_asset_metadata(self, source_course_key, dest_course_key, user_id):
         """
         Copy all the course assets from source_course_key to dest_course_key.
@@ -812,6 +832,7 @@ class ModuleStoreRead(ModuleStoreAssetBase, metaclass=ABCMeta):
         """
         pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
+    @contract(block='XBlock | BlockData | dict', qualifiers=dict)
     def _block_matches(self, block, qualifiers):
         """
         Return True or False depending on whether the field value (block contents)

@@ -25,7 +25,7 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.content.course_overviews.models import SimulateCoursePublishConfig
 from lms.djangoapps.ccx.tasks import course_published_handler as ccx_receiver_fn
-from xmodule.modulestore.django import SignalHandler, modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import SignalHandler, modulestore
 
 log = logging.getLogger('simulate_publish')
 
@@ -306,7 +306,7 @@ class Command(BaseCommand):
         for course_key in course_keys[:COURSES_TO_SHOW]:
             print("   ", course_key)
         if len(course_keys) > COURSES_TO_SHOW:
-            print(f"    (+ {len(course_keys) - COURSES_TO_SHOW} more)")
+            print("    (+ {} more)".format(len(course_keys) - COURSES_TO_SHOW))
 
 
 def get_receiver_names():

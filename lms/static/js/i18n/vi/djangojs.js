@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = 0;
-    if (typeof v === 'boolean') {
+    var v=0;
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,8 +19,18 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
     " and ": "v\u00e0",
+    " learner does not exist in LMS and not added to the exception list": " h\u1ecdc vi\u00ean kh\u00f4ng t\u1ed3n t\u1ea1i trong LMS v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learner is already white listed and not added to the exception list": "\u00a0h\u1ecdc vi\u00ean \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u01b0a v\u00e0o danh s\u00e1ch tr\u1eafng v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learner is not enrolled in course and not added to the exception list": " h\u1ecdc vi\u00ean kh\u00f4ng ghi danh tham gia kh\u00f3a h\u1ecdc v\u00e0 kh\u00f4ng th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learner is successfully added to the exception list": " \u0111\u00e3 th\u00eam h\u1ecdc vi\u00ean v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learners are already white listed and not added to the exception list": " nh\u1eefng h\u1ecdc vi\u00ean \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u01b0a v\u00e0o danh s\u00e1ch tr\u1eafng v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learners are not enrolled in course and not added to the exception list": " nh\u1eefng h\u1ecdc vi\u00ean kh\u00f4ng ghi danh tham gia kh\u00f3a h\u1ecdc v\u00e0 kh\u00f4ng th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learners are successfully added to exception list": "\u0111\u00e3 th\u00eam h\u1ecdc vi\u00ean v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " learners do not exist in LMS and not added to the exception list": " nh\u1eefng h\u1ecdc vi\u00ean kh\u00f4ng t\u1ed3n t\u1ea1i trong LMS v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " record is not in correct format and not added to the exception list": " b\u1ea3n ghi kh\u00f4ng \u0111\u00fang \u0111\u1ecbnh d\u1ea1ng v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
+    " records are not in correct format and not added to the exception list": " c\u00e1c b\u1ea3n ghi kh\u00f4ng \u0111\u00fang \u0111\u1ecbnh d\u1ea1ng v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
     "%(errorCount)s error found in form.": [
       "%(errorCount)s l\u1ed7i \u0111\u01b0\u1ee3c ph\u00e1t hi\u1ec7n."
@@ -73,6 +82,8 @@
     "- Sortable": "-  Co\u0301 th\u00ea\u0309 s\u0103\u0301p x\u00ea\u0301p",
     "6 a.m.": "6 gi\u1edd s\u00e1ng",
     ": video upload complete.": ": ho\u00e0n t\u1ea5t t\u1ea3i l\u00ean video.",
+    "<%= user %> already in exception list.": "<%= user %> \u0111\u00e3 trong danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7.",
+    "<%= user %> has been successfully added to the exception list. Click Generate Exception Certificate below to send the certificate.": "<%= user %> \u0111\u00e3 \u0111\u01b0\u1ee3c th\u00eam v\u00e0o danh s\u00e1ch kh\u00f4ng h\u1ee3p l\u1ec7. B\u1ea5m v\u00e0o T\u1ea1o Ch\u1ee9ng ch\u1ec9 kh\u00f4ng h\u1ee3p l\u1ec7 b\u00ean d\u01b0\u1edbi \u0111\u1ec3 g\u1eedi ch\u1ee9ng ch\u1ec9.",
     "A Password is required": "B\u1eaft bu\u1ed9c ph\u1ea3i c\u00f3 M\u1eadt Kh\u1ea9u",
     "A driver's license, passport, or other government-issued ID with your name and photo": "Gi\u1ea5y ph\u00e9p, h\u1ed9 chi\u1ebfu, ho\u1eb7c ID ch\u00ednh ph\u1ee7 ph\u00e1t h\u00e0nh c\u1ee7a m\u1ed9t ng\u01b0\u1eddi l\u00e1i xe v\u1edbi t\u00ean v\u00e0 \u1ea3nh c\u1ee7a b\u1ea1n",
     "A name that identifies your team (maximum 255 characters).": "T\u00ean \u0111\u1ec3 ph\u00e2n bi\u1ec7t nh\u00f3m c\u1ee7a b\u1ea1n (t\u1ed1i \u0111a 255 k\u00fd t\u1ef1).",
@@ -215,6 +226,7 @@
     "Basic Account Information": "Th\u00f4ng tin t\u00e0i kho\u1ea3n c\u01a1 b\u1ea3n",
     "Be sure your entire face is inside the frame": "H\u00e3y ch\u1eafc ch\u1eafn to\u00e0n b\u1ed9 khu\u00f4n m\u1eb7t c\u1ee7a b\u1ea1n trong khung",
     "Before proceeding, please confirm that your details match": "Tr\u01b0\u1edbc khi ti\u1ebfp t\u1ee5c, h\u00e3y ki\u1ec3m tra l\u1ea1i th\u00f4ng tin c\u1ee7a b\u1ea1n",
+    "Before proceeding, please {htmlStart}activate your account{htmlEnd}.": "Tr\u01b0\u1edbc khi ti\u1ebfp t\u1ee5c, vui l\u00f2ng {htmlStart}k\u00edch ho\u1ea1t t\u00e0i kho\u1ea3n c\u1ee7a b\u1ea1n{htmlEnd}.",
     "Before proceeding, please {htmlStart}unlink all social media accounts{htmlEnd}.": "Tr\u01b0\u1edbc khi ti\u1ebfp t\u1ee5c, vui l\u00f2ng {htmlStart}h\u1ee7y li\u00ean k\u1ebft t\u1ea5t c\u1ea3 c\u00e1c t\u00e0i kho\u1ea3n m\u1ea1ng x\u00e3 h\u1ed9i{htmlEnd}.",
     "Biography": "Ti\u1ec3u s\u1eed",
     "Blockquote": "\u0110o\u1ea1n tr\u00edch d\u1eabn",
@@ -239,6 +251,7 @@
     "Cancel upload": "B\u1ecf t\u1ea3i l\u00ean",
     "Cannot delete when in use by a unit": "Kh\u00f4ng th\u1ec3 x\u00f3a khi \u0111\u01b0\u1ee3c s\u1eed d\u1ee5ng b\u1edfi m\u1ed9t \u0111\u01a1n v\u1ecb",
     "Cannot delete when in use by an experiment": "Kh\u00f4ng th\u1ec3 x\u00f3a khi \u0111\u01b0\u1ee3c s\u1eed d\u1ee5ng b\u1edfi m\u1ed9t th\u1eed nghi\u1ec7m",
+    "Cannot drop more <%= types %> assignments than are assigned.": "Kh\u00f4ng th\u1ec3 cho h\u01a1n <%= types %> b\u00e0i t\u1eadp so v\u1edbi quy \u0111\u1ecbnh.",
     "Caption": "Ti\u00eau \u0111\u1ec1 ch\u00fa th\u00edch",
     "Caution: The last published version of this unit is live. By publishing changes you will change the student experience.": "Ch\u00fa \u00fd: Phi\u00ean b\u1ea3n \u0111\u01b0\u1ee3c xu\u1ea5t b\u1ea3n l\u1ea7n cu\u1ed1i c\u1ee7a \u0111\u01a1n v\u1ecb n\u00e0y \u0111ang cung c\u1ea5p cho ng\u01b0\u1eddi h\u1ecdc. B\u1eb1ng c\u00e1ch xu\u1ea5t b\u1ea3n nh\u1eefng thay \u0111\u1ed5i, b\u1ea1n s\u1ebd thay \u0111\u1ed5i tr\u1ea3i nghi\u1ec7m c\u1ee7a sinh vi\u00ean.",
     "Cell": "\u00d4",
@@ -340,6 +353,7 @@
     "Copy Email To Editor": "Sao ch\u00e9p Email ra Thanh Hi\u1ec7u Ch\u1ec9nh",
     "Copy row": "Sao ch\u00e9p h\u00e0ng",
     "Correct failed component": "S\u1eeda ph\u1ea7n b\u1ecb l\u1ed7i",
+    "Could not find Certificate Exception in white list. Please refresh the page and try again": "Kh\u00f4ng t\u00ecm th\u1ea5y Ch\u1ee9ng ch\u1ec9 kh\u00f4ng h\u1ee3p l\u1ec7 trong danh s\u00e1ch tr\u1eafng. H\u00e3y l\u00e0m m\u1edbi trang v\u00e0 th\u1eed l\u1ea1i",
     "Could not find Certificate Invalidation in the list. Please refresh the page and try again": "Kh\u00f4ng th\u1ec3 t\u00ecm th\u1ea5y Ch\u1ee9ng ch\u1ec9 Kh\u00f4ng h\u1ee3p l\u1ec7 trong danh s\u00e1ch. H\u00e3y l\u00e0m m\u1edbi trang v\u00e0 th\u1eed l\u1ea1i",
     "Could not find a user with username or email address '<%- identifier %>'.": "Kh\u00f4ng t\u00ecm th\u1ea5y ng\u01b0\u1eddi d\u00f9ng v\u1edbi t\u00ean \u0111\u0103ng nh\u1eadp ho\u1eb7c email '<%- identifier %>'.",
     "Could not find the specified string.": "Kh\u00f4ng th\u1ec3 t\u00ecm th\u1ea5y x\u00e2u c\u1ea7n t\u00ecm.",
@@ -351,6 +365,7 @@
     "Could not submit order": "Kh\u00f4ng g\u1eedi \u0111\u01b0\u1ee3c \u0111\u01a1n h\u00e0ng",
     "Could not submit photos": "Kh\u00f4ng th\u1ec3 t\u1ea3i \u1ea3nh l\u00ean.",
     "Could not upload the video image file": "Kh\u00f4ng th\u1ec3 t\u1ea3i l\u00ean t\u1ec7p h\u00ecnh \u1ea3nh video",
+    "Couldn't Save This Assignment": "Kh\u00f4ng Th\u1ec3 L\u01b0u B\u00e0i T\u1eadp N\u00e0y",
     "Country": "Qu\u1ed1c gia",
     "Country or Region of Residence": "Qu\u1ed1c gia ho\u1eb7c N\u01a1i c\u01b0 tr\u00fa",
     "Course Credit Requirements": "Nh\u1eefng y\u00eau c\u1ea7u v\u1ec1 T\u00edn ch\u1ec9",
@@ -835,6 +850,7 @@
     "No posts matched your query.": "Kh\u00f4ng c\u00f3 b\u00e0i n\u00e0o kh\u1edbp v\u1edbi t\u00ecm ki\u1ebfm c\u1ee7a b\u1ea1n.",
     "No prerequisite": "Kh\u00f4ng b\u1eaft bu\u1ed9c",
     "No results": "Kh\u00f4ng c\u00f3 k\u1ebft qu\u1ea3",
+    "No results found for \"%(query_string)s\". Please try searching again.": "Kh\u00f4ng c\u00f3 k\u1ebft qu\u1ea3 n\u00e0o cho \"%(query_string)s\". H\u00e3y th\u1eed t\u00ecm ki\u1ebfm v\u1edbi t\u1eeb kho\u00e1 kh\u00e1c.",
     "No results found for {original_query}. Showing results for {suggested_query}.": "Kh\u00f4ng t\u00ecm th\u1ea5y k\u1ebft qu\u1ea3 cho {original_query}. \u0110ang hi\u1ec7n c\u00e1c k\u1ebft qu\u1ea3 cho {suggested_query}.",
     "No tasks currently running.": "Hi\u1ec7n kh\u00f4ng c\u00f3 t\u00e1c v\u1ee5 n\u00e0o \u0111ang ch\u1ea1y.",
     "No validation is performed on policy keys or value pairs. If you are having difficulties, check your formatting.": "Kh\u00f4ng c\u00f3 x\u00e1c nh\u1eadn n\u00e0o \u0111\u01b0\u1ee3c th\u1ef1c hi\u1ec7n tr\u00ean c\u00e1c kh\u00f3a ch\u00ednh s\u00e1ch ho\u1eb7c c\u00e1c c\u1eb7p gi\u00e1 tr\u1ecb. N\u1ebfu b\u1ea1n \u0111ang g\u1eb7p kh\u00f3 kh\u0103n, ki\u1ec3m tra \u0111\u1ecbnh d\u1ea1ng c\u1ee7a b\u1ea1n.",
@@ -975,6 +991,7 @@
     "Processing Re-run Request": "\u0110ang x\u1eed l\u00ed Y\u00eau c\u1ea7u Re-run ",
     "Proctored": "C\u00f3 gi\u00e1m s\u00e1t",
     "Proctored Exam": "Thi c\u00f3 gi\u00e1m s\u00e1t",
+    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "B\u00e0i thi c\u00f3 gi\u00e1m s\u00e1t \u0111\u01b0\u1ee3c t\u00ednh gi\u1edd v\u00e0 ghi l\u1ea1i video m\u1ed7i h\u1ecdc vi\u00ean tham d\u1ef1 b\u00e0i thi. C\u00e1c video n\u00e0y sau \u0111\u00f3 \u0111\u01b0\u1ee3c xem x\u00e9t \u0111\u1ec3 \u0111\u1ea3m b\u1ea3o r\u1eb1ng c\u00e1c h\u1ecdc vi\u00ean tu\u00e2n th\u1ee7 t\u1ea5t c\u1ea3 c\u00e1c quy t\u1eafc ki\u1ec3m tra.",
     "Professional Education": "Gi\u00e1o D\u1ee5c Chuy\u00ean Nghi\u1ec7p",
     "Professional Education Verified Certificate": "Gi\u1ea5y ch\u1ee9ng nh\u1eadn x\u00e1c th\u1ef1c cho gi\u00e1o d\u1ee5c chuy\u00ean nghi\u1ec7p",
     "Profile": "H\u1ed3 s\u01a1",
@@ -1051,6 +1068,7 @@
     "Right": "Ph\u1ea3i",
     "Right to left": "Ph\u1ea3i sang tr\u00e1i",
     "Robots": "Robots",
+    "Role field should not be left unselected.": "tr\u01b0\u1eddng vai tr\u00f2 kh\u00f4ng \u0111\u01b0\u1ee3c \u0111\u1ec3 tr\u1ed1ng.",
     "Row": "H\u00e0ng",
     "Row group": "Nh\u00f3m h\u00e0ng",
     "Row properties": "\u0110\u1eb7c t\u00ednh h\u00e0ng",
@@ -1169,6 +1187,7 @@
     "Status": "Tr\u1ea1ng Th\u00e1i",
     "Status of Your Response": "Tr\u1ea1ng Th\u00e1i Tr\u1ea3 L\u1eddi C\u1ee7a B\u1ea1n",
     "Strikethrough": "G\u1ea1ch ngang",
+    "Student Removed from certificate white list successfully.": "\u0110\u00e3 x\u00f3a h\u1ecdc vi\u00ean kh\u1ecfi danh s\u00e1ch tr\u1eafng ch\u1ee9ng ch\u1ec9.",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Add to Exception List\" button.": "Tr\u01b0\u1eddng t\u00ean \u0111\u0103ng nh\u1eadp/email c\u1ee7a sinh vi\u00ean l\u00e0 b\u1eaft bu\u1ed9c v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c \u0111\u1ec3 tr\u1ed1ng. Vui l\u00f2ng \u0111i\u1ec1n t\u00ean \u0111\u0103ng nh\u1eadp/email sau \u0111\u00f3 nh\u1ea5n n\u00fat \"Th\u00eam v\u00e0o Danh s\u00e1ch Ngo\u1ea1i l\u1ec7\".",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Invalidate Certificate\" button.": "Tr\u01b0\u1eddng t\u00ean \u0111\u0103ng nh\u1eadp/email c\u1ee7a sinh vi\u00ean l\u00e0 b\u1eaft bu\u1ed9c v\u00e0 kh\u00f4ng \u0111\u01b0\u1ee3c \u0111\u1ec3 tr\u1ed1ng. Vui l\u00f2ng \u0111i\u1ec1n t\u00ean \u0111\u0103ng nh\u1eadp/email sau \u0111\u00f3 nh\u1ea5n n\u00fat \"Hu\u1ef7 b\u1ecf Ch\u1ee9ng ch\u1ec9\".",
     "Studio's having trouble saving your work": "Studio x\u1ea3y ra s\u1ef1 c\u1ed1 khi l\u01b0u l\u1ea1i c\u00f4ng vi\u1ec7c c\u1ee7a b\u1ea1n",
@@ -1282,6 +1301,7 @@
     "The post you selected has been deleted.": "B\u00e0i b\u1ea1n ch\u1ecdn \u0111\u00e3 b\u1ecb x\u00f3a.",
     "The published branch version, {published}, was reset to the draft branch version, {draft}.": "Phi\u00ean b\u1ea3n nh\u00e1nh \u0111\u00e3 xu\u1ea5t b\u1ea3n, {published}, \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u1eb7t l\u1ea1i th\u00e0nh phi\u00ean b\u1ea3n nh\u00e1nh d\u1ef1 th\u1ea3o, {draft}.",
     "The raw error message is:": "Th\u00f4ng b\u00e1o l\u1ed7i ban \u0111\u1ea7u l\u00e0:",
+    "The refund deadline for this course has passed,so you will not receive a refund.": "Th\u1eddi h\u1ea1n ho\u00e0n tr\u1ea3 c\u1ee7a kh\u00f3a h\u1ecdc n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c qua, v\u00ec v\u1eady b\u1ea1n s\u1ebd kh\u00f4ng nh\u1eadn \u0111\u01b0\u1ee3c ti\u1ec1n ho\u00e0n l\u1ea1i.",
     "The selected content group does not exist": "N\u1ed9i dung cho nh\u00f3m h\u1ecdc \u0111\u01b0\u1ee3c ch\u1ecdn kh\u00f4ng t\u1ed3n t\u1ea1i",
     "The selected image must be larger than {minFileSizeInKB}.": "H\u00ecnh \u1ea3nh \u0111\u01b0\u1ee3c ch\u1ecdn ph\u1ea3i l\u1edbn h\u01a1n {minFileSizeInKB}.",
     "The selected image must be smaller than {maxFileSizeInMB}.": "H\u00ecnh \u1ea3nh \u0111\u01b0\u1ee3c ch\u1ecdn ph\u1ea3i nh\u1ecf h\u01a1n {maxFileSizeInMB}.",
@@ -1364,6 +1384,7 @@
     "This post could not be unflagged for abuse. Refresh the page and try again.": "B\u00e0i n\u00e0y kh\u00f4ng th\u1ec3 g\u1ee1 b\u1ecf c\u1edd vi ph\u1ea1m. L\u00e0m m\u1edbi l\u1ea1i trang v\u00e0 th\u1eed l\u1ea1i.",
     "This post could not be unpinned. Refresh the page and try again.": "B\u00e0i n\u00e0y ch\u01b0a \u0111\u01b0\u1ee3c b\u1ecf ghim. L\u00e0m m\u1edbi l\u1ea1i trang v\u00e0 th\u1eed l\u1ea1i.",
     "This problem could not be saved.": "Kh\u00f4ng th\u1ec3 l\u01b0u c\u00e2u h\u1ecfi n\u00e0y.",
+    "This problem has already been released. Any changes will apply only to future assessments.": "C\u00e2u h\u1ecfi n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng. B\u1ea5t k\u1ef3 thay \u0111\u1ed5i n\u00e0o c\u0169ng ch\u1ec9 \u1ea3nh h\u01b0\u1edfng \u0111\u1ebfn nh\u1eefng \u0111\u00e1nh gi\u00e1 trong t\u01b0\u01a1ng lai.",
     "This problem has been reset.": "C\u00e2u h\u1ecfi n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c s\u1eeda.",
     "This response could not be marked as an answer. Refresh the page and try again.": "Ph\u1ea3n h\u1ed3i n\u00e0y kh\u00f4ng th\u1ec3 \u0111\u00e1nh d\u1ea5u l\u00e0 m\u1ed9t c\u00e2u tr\u1ea3 l\u1eddi. L\u00e0m m\u1edbi l\u1ea1i trang v\u00e0 th\u1eed l\u1ea1i.",
     "This response could not be marked as endorsed. Refresh the page and try again.": "Ph\u1ea3n h\u1ed3i n\u00e0y kh\u00f4ng th\u1ec3 \u0111\u00e1nh d\u1ea5u l\u00e0 x\u00e1c nh\u1eadn. L\u00e0m m\u1edbi l\u1ea1i trang v\u00e0 th\u1eed l\u1ea1i.",
@@ -1585,6 +1606,7 @@
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "B\u1ea1n d\u01b0\u1eddng nh\u01b0 kh\u00f4ng c\u00f3 c\u00e0i \u0111\u1eb7t Flash. H\u00e3y c\u00e0i \u0111\u1eb7t Flash \u0111\u1ec3 ti\u1ebfp t\u1ee5c qu\u00e1 tr\u00ecnh x\u00e1c minh.",
     "You don't seem to have a webcam connected.": "C\u00f3 v\u1ebb b\u1ea1n ch\u01b0a k\u1ebft n\u1ed1i webcam.",
     "You have already verified your ID!": "ID c\u1ee7a b\u1ea1n \u0111\u00e3 \u0111\u01b0\u1ee3c x\u00e1c nh\u1eadn!",
+    "You have been logged out of your edX account. Click Okay to log in again now. Click Cancel to stay on this page (you must log in again to save your work).": "B\u1ea1n \u0111\u00e3 \u0111\u0103ng xu\u1ea5t kh\u1ecfi t\u00e0i kho\u1ea3n edX c\u1ee7a m\u00ecnh. Nh\u1ea5p OK \u0111\u1ec3 \u0111\u0103ng nh\u1eadp l\u1ea1i ngay b\u00e2y gi\u1edd. Nh\u1ea5p v\u00e0o H\u1ee7y \u0111\u1ec3 l\u1ea1i trang n\u00e0y (b\u1ea1n ph\u1ea3i \u0111\u0103ng nh\u1eadp l\u1ea1i \u0111\u1ec3 l\u01b0u l\u1ea1i c\u00f4ng vi\u1ec7c c\u1ee7a b\u1ea1n).",
     "You have done a dry run of force publishing the course. Nothing has changed. Had you run it, the following course versions would have been change.": "B\u1ea1n \u0111\u00e3 th\u1ef1c hi\u1ec7n ch\u1ea1y th\u1eed nghi\u1ec7m xu\u1ea5t b\u1ea3n kh\u00f3a h\u1ecdc. Kh\u00f4ng c\u00f3 g\u00ec thay \u0111\u1ed5i. N\u1ebfu b\u1ea1n ch\u1ea1y n\u00f3, nh\u1eefng phi\u00ean b\u1ea3n kh\u00f3a h\u1ecdc sau \u0111\u00e2y c\u00f3 th\u1ec3 s\u1ebd thay \u0111\u1ed5i.",
     "You have no handouts defined": "B\u1ea1n kh\u00f4ng c\u00f3 t\u00e0i li\u1ec7u ph\u00e1t tay",
     "You have not created any certificates yet.": "B\u1ea1n ch\u01b0a t\u1ea1o b\u1ea5t k\u1ef3 ch\u1ee9ng ch\u1ec9 n\u00e0o.",
@@ -1769,24 +1791,24 @@
     "{type} Progress": "{type} Ti\u1ebfn \u0111\u1ed9",
     "\u2026": "..."
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1796,16 +1818,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1828,12 +1850,15 @@
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
+      "%Y-%m-%d",
       "%m/%d/%Y %H:%M:%S",
       "%m/%d/%Y %H:%M:%S.%f",
       "%m/%d/%Y %H:%M",
+      "%m/%d/%Y",
       "%m/%d/%y %H:%M:%S",
       "%m/%d/%y %H:%M:%S.%f",
-      "%m/%d/%y %H:%M"
+      "%m/%d/%y %H:%M",
+      "%m/%d/%y"
     ],
     "DATE_FORMAT": "\\N\\g\u00e0\\y d \\t\\h\u00e1\\n\\g n \\n\u0103\\m Y",
     "DATE_INPUT_FORMATS": [
@@ -1866,8 +1891,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1886,5 +1911,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

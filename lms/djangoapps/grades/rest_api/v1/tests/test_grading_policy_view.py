@@ -10,13 +10,12 @@ from django.urls import reverse
 from pytz import UTC
 
 from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import StaffFactory
 from common.djangoapps.student.tests.factories import UserFactory
+from lms.djangoapps.courseware.tests.factories import GlobalStaffFactory, StaffFactory
 from openedx.core.djangoapps.oauth_dispatch.tests.factories import AccessTokenFactory, ApplicationFactory
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 @ddt.ddt

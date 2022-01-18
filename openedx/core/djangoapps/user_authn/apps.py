@@ -3,7 +3,7 @@ User Authentication Configuration
 """
 
 from django.apps import AppConfig
-from edx_django_utils.plugins import PluginSignals, PluginURLs
+from edx_django_utils.plugins import PluginURLs
 
 from openedx.core.djangoapps.plugins.constants import ProjectType
 
@@ -20,16 +20,6 @@ class UserAuthnConfig(AppConfig):
                 PluginURLs.NAMESPACE: '',
                 PluginURLs.REGEX: '',
                 PluginURLs.RELATIVE_PATH: 'urls',
-            },
-        },
-        PluginSignals.CONFIG: {
-            ProjectType.LMS: {
-                PluginSignals.RECEIVERS: [
-                    {
-                        PluginSignals.RECEIVER_FUNC_NAME: 'user_fields_changed',
-                        PluginSignals.SIGNAL_PATH: 'common.djangoapps.util.model_utils.USER_FIELDS_CHANGED',
-                    },
-                ],
             },
         },
     }

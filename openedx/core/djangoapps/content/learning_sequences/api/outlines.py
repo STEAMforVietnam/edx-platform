@@ -6,16 +6,15 @@ __init__.py imports from here, and is a more stable place to import from.
 import logging
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, FrozenSet, List, Optional, Union
-
-from django.db import transaction
+from typing import Optional, List  # lint-amnesty, pylint: disable=unused-import
+from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
-from edx_django_utils.cache import TieredCache
+from django.db import transaction
 from edx_django_utils.monitoring import function_trace, set_custom_attribute
 from opaque_keys import OpaqueKey
-from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import LibraryLocator
-from openedx.core import types
+from edx_django_utils.cache import TieredCache  # lint-amnesty, pylint: disable=unused-import
+from opaque_keys.edx.keys import CourseKey  # lint-amnesty, pylint: disable=unused-import
 
 from ..data import (
     ContentErrorData,
@@ -26,28 +25,28 @@ from ..data import (
     ExamData,
     UserCourseOutlineData,
     UserCourseOutlineDetailsData,
-    VisibilityData
+    VisibilityData,
+
 )
 from ..models import (
     ContentError,
-    CourseContext,
     CourseSection,
     CourseSectionSequence,
+    CourseContext,
     CourseSequenceExam,
     LearningContext,
     LearningSequence,
     PublishReport,
-    UserPartitionGroup
 )
-from .permissions import can_call_public_api, can_see_all_content
+from .permissions import can_see_all_content
 from .processors.content_gating import ContentGatingOutlineProcessor
-from .processors.enrollment import EnrollmentOutlineProcessor
-from .processors.enrollment_track_partition_groups import EnrollmentTrackPartitionGroupsOutlineProcessor
 from .processors.milestones import MilestonesOutlineProcessor
 from .processors.schedule import ScheduleOutlineProcessor
 from .processors.special_exams import SpecialExamsOutlineProcessor
 from .processors.visibility import VisibilityOutlineProcessor
+from .processors.enrollment import EnrollmentOutlineProcessor
 
+User = get_user_model()
 log = logging.getLogger(__name__)
 
 # Public API...
@@ -58,7 +57,6 @@ __all__ = [
     'get_user_course_outline',
     'get_user_course_outline_details',
     'key_supports_outlines',
-    'public_api_available',
     'replace_course_outline',
 ]
 
@@ -83,21 +81,6 @@ def key_supports_outlines(opaque_key: OpaqueKey) -> bool:
         return not opaque_key.deprecated
 
     return False
-
-
-def public_api_available(course_key: CourseKey) -> bool:
-    """
-    Is the Public API available for this Course to this User?
-
-    This only really exists while we do the waffle-flag rollout of this feature,
-    so that in-process callers from other apps can determine whether they should
-    trust Learning Sequences API data for a particular user/course.
-    """
-    return (
-        key_supports_outlines(course_key) and
-        LearningContext.objects.filter(context_key=course_key).exists() and
-        can_call_public_api(course_key)
-    )
 
 
 @function_trace('learning_sequences.api.get_course_keys_with_outlines')
@@ -128,7 +111,7 @@ def get_course_outline(course_key: CourseKey) -> CourseOutlineData:
     course_context = _get_course_context_for_outline(course_key)
 
     # Check to see if it's in the cache.
-    cache_key = "learning_sequences.api.get_course_outline.v2.{}.{}".format(
+    cache_key = "learning_sequences.api.get_course_outline.v1.{}.{}".format(
         course_context.learning_context.context_key, course_context.learning_context.published_version
     )
     outline_cache_result = TieredCache.get_cached_response(cache_key)
@@ -139,11 +122,9 @@ def get_course_outline(course_key: CourseKey) -> CourseOutlineData:
     # represented (so query CourseSection explicitly instead of relying only on
     # select_related from CourseSectionSequence).
     section_models = CourseSection.objects \
-        .prefetch_related('new_user_partition_groups') \
         .filter(course_context=course_context) \
         .order_by('ordering')
     section_sequence_models = CourseSectionSequence.objects \
-        .prefetch_related('new_user_partition_groups') \
         .filter(course_context=course_context) \
         .order_by('ordering') \
         .select_related('sequence', 'exam')
@@ -171,10 +152,7 @@ def get_course_outline(course_key: CourseKey) -> CourseOutlineData:
                 hide_from_toc=sec_seq_model.hide_from_toc,
                 visible_to_staff_only=sec_seq_model.visible_to_staff_only,
             ),
-            exam=exam_data,
-            user_partition_groups=_get_user_partition_groups_from_qset(
-                sec_seq_model.new_user_partition_groups.all()
-            ),
+            exam=exam_data
         )
         sec_ids_to_sequence_list[sec_seq_model.section_id].append(sequence_data)
 
@@ -186,10 +164,7 @@ def get_course_outline(course_key: CourseKey) -> CourseOutlineData:
             visibility=VisibilityData(
                 hide_from_toc=section_model.hide_from_toc,
                 visible_to_staff_only=section_model.visible_to_staff_only,
-            ),
-            user_partition_groups=_get_user_partition_groups_from_qset(
-                section_model.new_user_partition_groups.all()
-            ),
+            )
         )
         for section_model in section_models
     ]
@@ -208,21 +183,6 @@ def get_course_outline(course_key: CourseKey) -> CourseOutlineData:
     TieredCache.set_all_tiers(cache_key, outline_data, 300)
 
     return outline_data
-
-
-def _get_user_partition_groups_from_qset(upg_qset) -> Dict[int, FrozenSet[int]]:
-    """
-    Given a QuerySet of UserPartitionGroup, return a mapping of UserPartition
-    IDs to the set of Group IDs for each UserPartition.
-    """
-    user_part_groups = defaultdict(set)
-    for upg in upg_qset:
-        user_part_groups[upg.partition_id].add(upg.group_id)
-
-    return {
-        partition_id: frozenset(group_ids)
-        for partition_id, group_ids in user_part_groups.items()
-    }
 
 
 def _get_course_context_for_outline(course_key: CourseKey) -> CourseContext:
@@ -270,7 +230,7 @@ def get_content_errors(course_key: CourseKey) -> List[ContentErrorData]:
 
 @function_trace('learning_sequences.api.get_user_course_outline')
 def get_user_course_outline(course_key: CourseKey,
-                            user: types.User,
+                            user: User,
                             at_time: datetime) -> UserCourseOutlineData:
     """
     Get an outline customized for a particular user at a particular time.
@@ -287,7 +247,7 @@ def get_user_course_outline(course_key: CourseKey,
 
 @function_trace('learning_sequences.api.get_user_course_outline_details')
 def get_user_course_outline_details(course_key: CourseKey,
-                                    user: types.User,
+                                    user: User,
                                     at_time: datetime) -> UserCourseOutlineDetailsData:
     """
     Get an outline with supplementary data like scheduling information.
@@ -298,23 +258,18 @@ def get_user_course_outline_details(course_key: CourseKey,
     user_course_outline, processors = _get_user_course_outline_and_processors(
         course_key, user, at_time
     )
-    with function_trace('learning_sequences.api.get_user_course_outline_details.schedule'):
-        schedule_processor = processors['schedule']
-        schedule = schedule_processor.schedule_data(user_course_outline)
-
-    with function_trace('learning_sequences.api.get_user_course_outline_details.special_exams'):
-        special_exams_processor = processors['special_exams']
-        special_exam_attempts = special_exams_processor.exam_data(user_course_outline)
+    schedule_processor = processors['schedule']
+    special_exams_processor = processors['special_exams']
 
     return UserCourseOutlineDetailsData(
         outline=user_course_outline,
-        schedule=schedule,
-        special_exam_attempts=special_exam_attempts,
+        schedule=schedule_processor.schedule_data(user_course_outline),
+        special_exam_attempts=special_exams_processor.exam_data(user_course_outline)
     )
 
 
 def _get_user_course_outline_and_processors(course_key: CourseKey,  # lint-amnesty, pylint: disable=missing-function-docstring
-                                            user: types.User,
+                                            user: User,
                                             at_time: datetime):
     """
     Helper function that runs the outline processors.
@@ -343,12 +298,11 @@ def _get_user_course_outline_and_processors(course_key: CourseKey,  # lint-amnes
         ('special_exams', SpecialExamsOutlineProcessor),
         ('visibility', VisibilityOutlineProcessor),
         ('enrollment', EnrollmentOutlineProcessor),
-        ('enrollment_track_partitions', EnrollmentTrackPartitionGroupsOutlineProcessor),
     ]
 
     # Run each OutlineProcessor in order to figure out what items we have to
     # remove from the CourseOutline.
-    processors = {}
+    processors = dict()
     usage_keys_to_remove = set()
     inaccessible_sequences = set()
     for name, processor_cls in processor_classes:
@@ -356,7 +310,7 @@ def _get_user_course_outline_and_processors(course_key: CourseKey,  # lint-amnes
         # particular ordering).
         processor = processor_cls(course_key, user, at_time)
         processors[name] = processor
-        processor.load_data(full_course_outline)
+        processor.load_data()
         if not user_can_see_all_content:
             # function_trace lets us see how expensive each processor is being.
             with function_trace(f'learning_sequences.api.outline_processors.{name}'):
@@ -367,7 +321,7 @@ def _get_user_course_outline_and_processors(course_key: CourseKey,  # lint-amnes
 
     # Open question: Does it make sense to remove a Section if it has no Sequences in it?
     trimmed_course_outline = full_course_outline.remove(usage_keys_to_remove)
-    accessible_sequences = frozenset(set(trimmed_course_outline.sequences) - inaccessible_sequences)
+    accessible_sequences = set(trimmed_course_outline.sequences) - inaccessible_sequences
 
     user_course_outline = UserCourseOutlineData(
         base_outline=full_course_outline,
@@ -458,7 +412,7 @@ def _update_sections(course_outline: CourseOutlineData, course_context: CourseCo
     Add/Update relevant sections
     """
     for ordering, section_data in enumerate(course_outline.sections):
-        sec_model, _created = CourseSection.objects.update_or_create(
+        CourseSection.objects.update_or_create(
             course_context=course_context,
             usage_key=section_data.usage_key,
             defaults={
@@ -468,9 +422,6 @@ def _update_sections(course_outline: CourseOutlineData, course_context: CourseCo
                 'visible_to_staff_only': section_data.visibility.visible_to_staff_only,
             }
         )
-        # clear out any user partition group mappings, and remake them...
-        _update_user_partition_groups(section_data.user_partition_groups, sec_model)
-
     # Delete sections that we don't want any more
     section_usage_keys_to_keep = [
         section_data.usage_key for section_data in course_outline.sections
@@ -542,24 +493,6 @@ def _update_course_section_sequences(course_outline: CourseOutlineData, course_c
             else:
                 # Otherwise, delete any exams associated with it
                 CourseSequenceExam.objects.filter(course_section_sequence=course_section_sequence).delete()
-
-            # clear out any user partition group mappings, and remake them...
-            _update_user_partition_groups(sequence_data.user_partition_groups, course_section_sequence)
-
-
-def _update_user_partition_groups(upg_data: Dict[int, FrozenSet[int]],
-                                  model_obj: Union[CourseSection, CourseSectionSequence]):
-    """
-    Replace UserPartitionGroups associated with this content with `upg_data`.
-    """
-    model_obj.new_user_partition_groups.all().delete()
-    if upg_data:
-        for partition_id, group_ids in upg_data.items():
-            for group_id in group_ids:
-                upg, _ = UserPartitionGroup.objects.get_or_create(
-                    partition_id=partition_id, group_id=group_id
-                )
-                model_obj.new_user_partition_groups.add(upg)
 
 
 def _update_publish_report(course_outline: CourseOutlineData,

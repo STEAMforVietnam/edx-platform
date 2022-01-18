@@ -13,7 +13,7 @@ from dateutil.parser import parse as parse_date
 from django.conf import settings
 from django.http import Http404, QueryDict
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_django_utils.monitoring import function_trace
 from fs.errors import ResourceNotFound
 from opaque_keys.edx.keys import UsageKey
@@ -55,16 +55,15 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 from openedx.core.djangoapps.enrollments.api import get_course_enrollment_details
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.lib.api.view_utils import LazySequence
-from openedx.core.lib.courses import get_course_by_id
 from openedx.features.course_duration_limits.access import AuditExpiredError
 from openedx.features.course_experience import RELATIVE_DATES_FLAG
 from openedx.features.course_experience.utils import is_block_structure_complete_for_assignments
 from common.djangoapps.static_replace import replace_static_urls
 from lms.djangoapps.survey.utils import SurveyRequiredAccessError, check_survey_required_and_unanswered
 from common.djangoapps.util.date_utils import strftime_localized
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.x_module import STUDENT_VIEW  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.x_module import STUDENT_VIEW
 
 log = logging.getLogger(__name__)
 
@@ -90,6 +89,22 @@ def get_course(course_id, depth=0):
     if course is None:
         raise CourseRunNotFound(course_key=course_id)
     return course
+
+
+def get_course_by_id(course_key, depth=0):
+    """
+    Given a course id, return the corresponding course descriptor.
+
+    If such a course does not exist, raises a 404.
+
+    depth: The number of levels of children for the modulestore to cache. None means infinite depth
+    """
+    with modulestore().bulk_operations(course_key):
+        course = modulestore().get_course(course_key, depth=depth)
+    if course:
+        return course
+    else:
+        raise Http404("Course not found: {}.".format(str(course_key)))
 
 
 def get_course_with_access(user, action, course_key, depth=0, check_if_enrolled=False, check_survey_complete=True, check_if_authenticated=False):  # lint-amnesty, pylint: disable=line-too-long
@@ -129,16 +144,8 @@ def get_course_overview_with_access(user, action, course_key, check_if_enrolled=
     try:
         course_overview = CourseOverview.get_from_id(course_key)
     except CourseOverview.DoesNotExist:
-        log.exception(f'Failed to retrieve course from courseoverview."{course_key}"')
         raise Http404("Course not found.")  # lint-amnesty, pylint: disable=raise-missing-from
-
-    course_under_investigation = str(course_key) == 'course-v1:UQx+ABLE301x+1T2022'
-    if course_under_investigation:
-        log.info('[TNL_9420] Course overview found, Checking course access.')
     check_course_access_with_redirect(course_overview, user, action, check_if_enrolled)
-    if course_under_investigation:
-        log.info('[TNL_9420] Course access granted')
-
     return course_overview
 
 
@@ -241,9 +248,6 @@ def check_course_access_with_redirect(course, user, action, check_if_enrolled=Fa
 
         # Deliberately return a non-specific error message to avoid
         # leaking info about access control settings
-        log.exception(
-            f'[TNL_9420] Failed to grant course access for "{course.id}", {access_response.to_json()}'
-        )
         raise CoursewareAccessException(access_response)
 
 
@@ -581,10 +585,8 @@ def get_course_assignments(course_key, user, include_access=False):  # lint-amne
                 assignment_released = not start or start < now
                 if assignment_released:
                     url = reverse('jump_to', args=[course_key, subsection_key])
-                    complete = is_block_structure_complete_for_assignments(block_data, subsection_key)
-                else:
-                    complete = False
 
+                complete = is_block_structure_complete_for_assignments(block_data, subsection_key)
                 past_due = not complete and due < now
                 assignments.append(_Assignment(
                     subsection_key, title, url, due, contains_gated_content,
@@ -715,13 +717,10 @@ def get_course_syllabus_section(course, section_key):
 
 
 @function_trace('get_courses')
-def get_courses(user, org=None, filter_=None, permissions=None):
+def get_courses(user, org=None, filter_=None):
     """
-    Return a LazySequence of courses available, optionally filtered by org code
-    (case-insensitive) or a set of permissions to be satisfied for the specified
-    user.
+    Return a LazySequence of courses available, optionally filtered by org code (case-insensitive).
     """
-
     courses = branding.get_visible_courses(
         org=org,
         filter_=filter_,
@@ -731,15 +730,13 @@ def get_courses(user, org=None, filter_=None, permissions=None):
         'image_set'
     )
 
-    permissions = set(permissions or '')
     permission_name = configuration_helpers.get_value(
         'COURSE_CATALOG_VISIBILITY_PERMISSION',
         settings.COURSE_CATALOG_VISIBILITY_PERMISSION
     )
-    permissions.add(permission_name)
 
     return LazySequence(
-        (c for c in courses if all(has_access(user, p, c) for p in permissions)),
+        (c for c in courses if has_access(user, permission_name, c)),
         est_len=courses.count()
     )
 
@@ -787,7 +784,7 @@ def get_cms_course_link(course, page='course'):
     """
     # This is fragile, but unfortunately the problem is that within the LMS we
     # can't use the reverse calls from the CMS
-    return f"//{settings.CMS_BASE}/{page}/{str(course.id)}"
+    return "//{}/{}/{}".format(settings.CMS_BASE, page, str(course.id))
 
 
 def get_cms_block_link(block, page):

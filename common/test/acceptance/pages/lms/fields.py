@@ -114,7 +114,7 @@ class FieldsMixin:
         """
         EmptyPromise(
             lambda: indicator == self.indicator_for_field(field_id),
-            f"Indicator \"{self.indicator_for_field(field_id)}\" is visible."
+            "Indicator \"{}\" is visible.".format(self.indicator_for_field(field_id))
         ).fulfill()
 
     def make_field_editable(self, field_id):

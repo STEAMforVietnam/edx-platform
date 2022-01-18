@@ -4,7 +4,7 @@ Account constants
 
 from django.conf import settings
 from django.utils.text import format_lazy
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ugettext_lazy as _
 
 # The maximum length for the bio ("about me") account field
 BIO_MAX_LENGTH = 300
@@ -53,7 +53,6 @@ USERNAME_INVALID_CHARS_UNICODE = _(
 # Translators: This message is shown to users who attempt to create a new account using
 # an invalid email format.
 EMAIL_INVALID_MSG = _('"{email}" is not a valid email address.')
-AUTHN_EMAIL_INVALID_MSG = _('Enter a valid email address')
 
 # Translators: This message is shown to users who attempt to create a new
 # account using an username/email associated with an existing account.
@@ -61,16 +60,10 @@ EMAIL_CONFLICT_MSG = _(
     "It looks like {email_address} belongs to an existing account. "
     "Try again with a different email address."
 )
-AUTHN_EMAIL_CONFLICT_MSG = _(  # pylint: disable=translation-of-non-string
-    f'This email is already associated with an existing or previous {settings.PLATFORM_NAME} account')
-AUTHN_PASSWORD_COMPROMISED_MSG = _(
-    "The password you entered is on a list of known compromised passwords. Please choose a different one."
-)
 USERNAME_CONFLICT_MSG = _(
     "It looks like {username} belongs to an existing account. "
     "Try again with a different username."
 )
-AUTHN_USERNAME_CONFLICT_MSG = _("It looks like this username is already taken")
 
 # Translators: This message is shown to users who enter a username/email/password
 # with an inappropriate length (too short or too long).

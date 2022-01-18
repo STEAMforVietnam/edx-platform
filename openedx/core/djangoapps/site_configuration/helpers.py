@@ -252,6 +252,6 @@ def page_title_breadcrumbs(*crumbs, **kwargs):
     separator = kwargs.get("separator", " | ")
     crumbs = [c for c in crumbs if c is not None]
     if crumbs:
-        return f'{separator.join(crumbs)}{separator}{platform_name}'
+        return '{}{}{}'.format(separator.join(crumbs), separator, platform_name)
     else:
         return platform_name

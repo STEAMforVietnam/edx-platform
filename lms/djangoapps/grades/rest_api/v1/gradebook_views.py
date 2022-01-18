@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db.models import Case, Exists, F, OuterRef, Q, When
 from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ugettext_lazy as _
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey, UsageKey
 from rest_framework import status
@@ -21,7 +21,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.djangoapps.student.auth import has_course_author_access
-from common.djangoapps.student.models import CourseAccessRole, CourseEnrollment, CourseMode
+from common.djangoapps.student.models import CourseEnrollment, CourseAccessRole
 from common.djangoapps.student.roles import BulkRoleCache
 from common.djangoapps.track.event_transaction_utils import (
     create_new_event_transaction_id,
@@ -31,11 +31,12 @@ from common.djangoapps.track.event_transaction_utils import (
 )
 from common.djangoapps.util.date_utils import to_timestamp
 from lms.djangoapps.course_blocks.api import get_course_blocks
+from lms.djangoapps.courseware.courses import get_course_by_id
 from lms.djangoapps.grades.api import CourseGradeFactory, clear_prefetched_course_and_subsection_grades
 from lms.djangoapps.grades.api import constants as grades_constants
 from lms.djangoapps.grades.api import context as grades_context
 from lms.djangoapps.grades.api import events as grades_events
-from lms.djangoapps.grades.api import gradebook_bulk_management_enabled
+from lms.djangoapps.grades.api import gradebook_can_see_bulk_management as can_see_bulk_management
 from lms.djangoapps.grades.api import is_writable_gradebook_enabled, prefetch_course_and_subsection_grades
 from lms.djangoapps.grades.course_data import CourseData
 from lms.djangoapps.grades.grade_utils import are_grades_frozen
@@ -56,7 +57,6 @@ from lms.djangoapps.grades.subsection_grade_factory import SubsectionGradeFactor
 from lms.djangoapps.grades.tasks import recalculate_subsection_grade_v3
 from lms.djangoapps.program_enrollments.api import get_external_key_by_user_and_course
 from openedx.core.djangoapps.course_groups import cohorts
-from openedx.core.djangoapps.enrollments.api import get_course_enrollment_details
 from openedx.core.djangoapps.util.forms import to_bool
 from openedx.core.lib.api.view_utils import (
     DeveloperErrorViewMixin,
@@ -66,9 +66,8 @@ from openedx.core.lib.api.view_utils import (
     view_auth_classes
 )
 from openedx.core.lib.cache_utils import request_cached
-from openedx.core.lib.courses import get_course_by_id
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.util.misc import get_default_short_labeler  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.util.misc import get_default_short_labeler
 
 log = logging.getLogger(__name__)
 
@@ -282,18 +281,9 @@ class CourseGradingView(BaseCourseView):
                 'assignment_types': self._get_assignment_types(course),
                 'subsections': self._get_subsections(course, graded_only),
                 'grades_frozen': are_grades_frozen(course_key),
-                'can_see_bulk_management': self.can_see_bulk_management(course_key),
+                'can_see_bulk_management': can_see_bulk_management(course_key),
             }
             return Response(results)
-
-    def can_see_bulk_management(self, course_key):
-        """
-        Whether or not to show bulk management for this course. Currently, if a course has a
-        master's track or is enabled with the grades.bulk_management course waffle flag.
-        """
-        course_modes = get_course_enrollment_details(str(course_key), include_expired=True).get('course_modes', [])
-        course_has_masters_track = any((course_mode['slug'] == CourseMode.MASTERS for course_mode in course_modes))
-        return course_has_masters_track or gradebook_bulk_management_enabled(course_key)
 
     def _get_assignment_types(self, course):
         """
@@ -515,7 +505,7 @@ class GradebookView(GradeViewMixin, PaginatedAPIView):
 
         return user_entry
 
-    @verify_course_exists("Requested grade for unknown course {course}")
+    @verify_course_exists
     @verify_writable_gradebook_enabled
     @course_author_access_required
     def get(self, request, course_key):  # lint-amnesty, pylint: disable=too-many-statements
@@ -800,7 +790,7 @@ class GradebookBulkUpdateView(GradeViewMixin, PaginatedAPIView):
         ]
     """
 
-    @verify_course_exists("Requested grade for unknown course {course}")
+    @verify_course_exists
     @verify_writable_gradebook_enabled
     @course_author_access_required
     def post(self, request, course_key):
@@ -1088,9 +1078,9 @@ class SubsectionGradeView(GradeViewMixin, APIView):
             if original_grade is not None and hasattr(original_grade, 'override'):
                 override = original_grade.override
                 # pylint: disable=no-member
-                history = list(reversed(PersistentSubsectionGradeOverride.history.filter(
-                    grade_id=original_grade.id
-                ).order_by('-history_date')[:history_record_limit]))
+                history = list(PersistentSubsectionGradeOverride.history.filter(grade_id=original_grade.id).order_by(
+                    'history_date'
+                )[:history_record_limit])
             grade_data = {
                 'earned_all': original_grade.earned_all,
                 'possible_all': original_grade.possible_all,

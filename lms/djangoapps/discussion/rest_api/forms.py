@@ -1,7 +1,7 @@
 """
 Discussion API forms
 """
-import urllib.parse
+import six.moves.urllib.parse
 from django.core.exceptions import ValidationError
 from django.forms import BooleanField, CharField, ChoiceField, Form, IntegerField
 from opaque_keys import InvalidKeyError
@@ -42,13 +42,6 @@ class ThreadListGetForm(_PaginationForm):
     topic_id = MultiValueField(required=False)
     text_search = CharField(required=False)
     following = ExtendedNullBooleanField(required=False)
-    author = CharField(required=False)
-    thread_type = ChoiceField(
-        choices=[(choice, choice) for choice in ["discussion", "question"]],
-        required=False,
-    )
-    count_flagged = ExtendedNullBooleanField(required=False)
-    flagged = ExtendedNullBooleanField(required=False)
     view = ChoiceField(
         choices=[(choice, choice) for choice in ["unread", "unanswered"]],
         required=False,
@@ -110,7 +103,6 @@ class ThreadActionsForm(Form):
     voted = BooleanField(required=False)
     abuse_flagged = BooleanField(required=False)
     read = BooleanField(required=False)
-    pinned = BooleanField(required=False)
 
 
 class CommentListGetForm(_PaginationForm):
@@ -118,26 +110,8 @@ class CommentListGetForm(_PaginationForm):
     A form to validate query parameters in the comment list retrieval endpoint
     """
     thread_id = CharField()
-    flagged = BooleanField(required=False)
     endorsed = ExtendedNullBooleanField(required=False)
     requested_fields = MultiValueField(required=False)
-
-
-class UserCommentListGetForm(_PaginationForm):
-    """
-    A form to validate query parameters in the comment list retrieval endpoint
-    """
-    course_id = CharField()
-    flagged = BooleanField(required=False)
-    requested_fields = MultiValueField(required=False)
-
-    def clean_course_id(self):
-        """Validate course_id"""
-        value = self.cleaned_data["course_id"]
-        try:
-            return CourseLocator.from_string(value)
-        except InvalidKeyError:
-            raise ValidationError(f"'{value}' is not a valid course id")  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 class CommentActionsForm(Form):
@@ -175,7 +149,7 @@ class CourseDiscussionSettingsForm(Form):
             self.cleaned_data['course_key'] = course_key
             return course_id
         except InvalidKeyError:
-            raise ValidationError(f"'{str(course_id)}' is not a valid course key")  # lint-amnesty, pylint: disable=raise-missing-from
+            raise ValidationError("'{}' is not a valid course key".format(str(course_id)))  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 class CourseDiscussionRolesForm(CourseDiscussionSettingsForm):
@@ -194,7 +168,7 @@ class CourseDiscussionRolesForm(CourseDiscussionSettingsForm):
 
     def clean_rolename(self):
         """Validate the 'rolename' value."""
-        rolename = urllib.parse.unquote(self.cleaned_data.get('rolename'))
+        rolename = six.moves.urllib.parse.unquote(self.cleaned_data.get('rolename'))
         course_id = self.cleaned_data.get('course_key')
         if course_id and rolename:
             try:

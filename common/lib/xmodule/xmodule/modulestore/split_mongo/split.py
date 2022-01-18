@@ -64,6 +64,7 @@ from importlib import import_module
 
 from bson.objectid import ObjectId
 from ccx_keys.locator import CCXBlockUsageLocator, CCXLocator
+from contracts import contract, new_contract
 from mongodb_proxy import autoretry_read
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import (
@@ -72,6 +73,7 @@ from opaque_keys.edx.locator import (
     DefinitionLocator,
     LibraryLocator,
     LocalId,
+    VersionTree
 )
 from path import Path as path
 from pytz import UTC
@@ -101,7 +103,7 @@ from xmodule.modulestore.exceptions import (
     VersionConflictError
 )
 from xmodule.modulestore.split_mongo import BlockKey, CourseEnvelope
-from xmodule.modulestore.split_mongo.mongo_connection import DuplicateKeyError, DjangoFlexPersistenceBackend
+from xmodule.modulestore.split_mongo.mongo_connection import DuplicateKeyError, MongoConnection
 from xmodule.modulestore.store_utilities import DETACHED_XBLOCK_TYPES
 from xmodule.partitions.partitions_service import PartitionService
 
@@ -130,6 +132,11 @@ log = logging.getLogger(__name__)
 
 # When blacklists are this, all children should be excluded
 EXCLUDE_ALL = '*'
+
+
+new_contract('BlockUsageLocator', BlockUsageLocator)
+new_contract('BlockKey', BlockKey)
+new_contract('XBlock', XBlock)
 
 
 class SplitBulkWriteRecord(BulkOpsRecord):  # lint-amnesty, pylint: disable=missing-class-docstring
@@ -623,6 +630,67 @@ class SplitBulkWriteMixin(BulkOperationsMixin):
         structures.extend(self.db_connection.find_structures_by_id(list(ids)))
         return structures
 
+    def find_structures_derived_from(self, ids):
+        """
+        Return all structures that were immediately derived from a structure listed in ``ids``.
+
+        Arguments:
+            ids (list): A list of structure ids
+        """
+        found_structure_ids = set()
+        structures = []
+
+        for _, record in self._active_records:
+            for structure in record.structures.values():
+                if structure.get('previous_version') in ids:
+                    structures.append(structure)
+                    if '_id' in structure:
+                        found_structure_ids.add(structure['_id'])
+
+        structures.extend(
+            structure
+            for structure in self.db_connection.find_structures_derived_from(ids)
+            if structure['_id'] not in found_structure_ids
+        )
+        return structures
+
+    def find_ancestor_structures(self, original_version, block_key):
+        """
+        Find all structures that originated from ``original_version`` that contain ``block_key``.
+
+        Any structure found in the cache will be preferred to a structure with the same id from the database.
+
+        Arguments:
+            original_version (str or ObjectID): The id of a structure
+            block_key (BlockKey): The id of the block in question
+        """
+        found_structure_ids = set()
+        structures = []
+
+        for _, record in self._active_records:
+            for structure in record.structures.values():
+                if 'original_version' not in structure:
+                    continue
+
+                if structure['original_version'] != original_version:
+                    continue
+
+                if block_key not in structure.get('blocks', {}):
+                    continue
+
+                if 'update_version' not in structure['blocks'][block_key].get('edit_info', {}):
+                    continue
+
+                structures.append(structure)
+                found_structure_ids.add(structure['_id'])
+
+        structures.extend(
+            structure
+            for structure in self.db_connection.find_ancestor_structures(original_version, block_key)
+            if structure['_id'] not in found_structure_ids
+        )
+        return structures
+
 
 class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
     """
@@ -651,7 +719,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
 
         super().__init__(contentstore, **kwargs)
 
-        self.db_connection = DjangoFlexPersistenceBackend(**doc_store_config)
+        self.db_connection = MongoConnection(**doc_store_config)
 
         if default_class is not None:
             module_path, __, class_name = default_class.rpartition('.')
@@ -747,6 +815,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             system.module_data.update(new_module_data)
             return system.module_data
 
+    @contract(course_entry=CourseEnvelope, block_keys="list(BlockKey)", depth="int | None")
     def _load_items(self, course_entry, block_keys, depth=0, **kwargs):
         """
         Load & cache the given blocks from the course. May return the blocks in any order.
@@ -1155,6 +1224,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
 
         return self._get_block_from_structure(course_structure, BlockKey.from_usage_key(usage_key)) is not None
 
+    @contract(returns='XBlock')
     def get_item(self, usage_key, depth=0, **kwargs):  # lint-amnesty, pylint: disable=arguments-differ
         """
         depth (int): An argument that some module stores may use to prefetch
@@ -1456,6 +1526,94 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             return None
         return definition['edit_info']
 
+    def get_course_successors(self, course_locator, version_history_depth=1):
+        """
+        Find the version_history_depth next versions of this course. Return as a VersionTree
+        Mostly makes sense when course_locator uses a version_guid, but because it finds all relevant
+        next versions, these do include those created for other courses.
+        :param course_locator:
+        """
+        if not isinstance(course_locator, CourseLocator) or course_locator.deprecated:
+            # The supplied CourseKey is of the wrong type, so it can't possibly be stored in this modulestore.
+            raise ItemNotFoundError(course_locator)
+
+        if version_history_depth < 1:
+            return None
+        if course_locator.version_guid is None:
+            course = self._lookup_course(course_locator)
+            version_guid = course.structure['_id']
+            course_locator = course_locator.for_version(version_guid)
+        else:
+            version_guid = course_locator.version_guid
+
+        # TODO if depth is significant, it may make sense to get all that have the same original_version
+        # and reconstruct the subtree from version_guid
+        next_entries = self.find_structures_derived_from([version_guid])
+        # must only scan cursor's once
+        next_versions = [struct for struct in next_entries]  # lint-amnesty, pylint: disable=unnecessary-comprehension
+        result = {version_guid: [CourseLocator(version_guid=struct['_id']) for struct in next_versions]}
+        depth = 1
+        while depth < version_history_depth and len(next_versions) > 0:
+            depth += 1
+            next_entries = self.find_structures_derived_from([struct['_id'] for struct in next_versions])
+            next_versions = [struct for struct in next_entries]  # lint-amnesty, pylint: disable=unnecessary-comprehension
+            for course_structure in next_versions:
+                result.setdefault(course_structure['previous_version'], []).append(
+                    CourseLocator(version_guid=next_entries[-1]['_id']))
+        return VersionTree(course_locator, result)
+
+    def get_block_generations(self, block_locator):
+        """
+        Find the history of this block. Return as a VersionTree of each place the block changed (except
+        deletion).
+
+        The block's history tracks its explicit changes but not the changes in its children starting
+        from when the block was created.
+
+        """
+        # course_agnostic means we don't care if the head and version don't align, trust the version
+        course_struct = self._lookup_course(block_locator.course_key.course_agnostic()).structure
+        block_key = BlockKey.from_usage_key(block_locator)
+        all_versions_with_block = self.find_ancestor_structures(
+            original_version=course_struct['original_version'],
+            block_key=block_key
+        )
+        # find (all) root versions and build map {previous: {successors}..}
+        possible_roots = []
+        result = {}
+        for version in all_versions_with_block:
+            block_payload = self._get_block_from_structure(version, block_key)
+            if version['_id'] == block_payload.edit_info.update_version:
+                if block_payload.edit_info.previous_version is None:
+                    # this was when this block was created
+                    possible_roots.append(block_payload.edit_info.update_version)
+                else:  # map previous to {update..}
+                    result.setdefault(block_payload.edit_info.previous_version, set()).add(
+                        block_payload.edit_info.update_version)
+
+        # more than one possible_root means usage was added and deleted > 1x.
+        if len(possible_roots) > 1:
+            # find the history segment including block_locator's version
+            element_to_find = self._get_block_from_structure(course_struct, block_key).edit_info.update_version
+            if element_to_find in possible_roots:
+                possible_roots = [element_to_find]
+            for possibility in possible_roots:
+                if self._find_local_root(element_to_find, possibility, result):
+                    possible_roots = [possibility]
+                    break
+        elif len(possible_roots) == 0:
+            return None
+        # convert the results value sets to locators
+        for k, versions in result.items():
+            result[k] = [
+                block_locator.for_version(version)
+                for version in versions
+            ]
+        return VersionTree(
+            block_locator.for_version(possible_roots[0]),
+            result
+        )
+
     def get_definition_successors(self, definition_locator, version_history_depth=1):
         """
         Find the version_history_depth next versions of this definition. Return as a VersionTree
@@ -1566,6 +1724,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
                 return potential_key
             serial += 1
 
+    @contract(returns='XBlock')
     def create_item(self, user_id, course_key, block_type, block_id=None, definition_locator=None, fields=None,  # lint-amnesty, pylint: disable=arguments-differ
                     asides=None, force=False, **kwargs):
         """
@@ -2332,6 +2491,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             self.update_structure(destination_course, destination_structure)
             self._update_head(destination_course, index_entry, destination_course.branch, destination_structure['_id'])
 
+    @contract(source_keys="list(BlockUsageLocator)", dest_usage=BlockUsageLocator)
     def copy_from_template(self, source_keys, dest_usage, user_id, head_validation=True):
         """
         Flexible mechanism for inheriting content from an external course/library/etc.
@@ -2424,7 +2584,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         """
         new_blocks = set()
 
-        new_children = []  # ordered list of the new children of new_parent_block_key
+        new_children = list()  # ordered list of the new children of new_parent_block_key
 
         for usage_key in source_keys:
             src_course_key = usage_key.course_key
@@ -2563,6 +2723,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
 
             return result
 
+    @contract(root_block_key=BlockKey, blocks='dict(BlockKey: BlockData)')
     def _remove_subtree(self, root_block_key, blocks):
         """
         Remove the subtree rooted at root_block_key
@@ -2611,6 +2772,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
 
         self._emit_course_deleted_signal(course_key)
 
+    @contract(block_map="dict(BlockKey: dict)", block_key=BlockKey)
     def inherit_settings(
         self, block_map, block_key, inherited_settings_map, inheriting_settings=None, inherited_from=None
     ):
@@ -2765,6 +2927,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         """
         return self.save_asset_metadata_list([asset_metadata, ], user_id, import_only)
 
+    @contract(asset_key='AssetKey', attr_dict=dict)
     def set_asset_metadata_attrs(self, asset_key, attr_dict, user_id):  # lint-amnesty, pylint: disable=arguments-differ
         """
         Add/set the given dict of attrs on the asset at the given location. Value can be any type which pymongo accepts.
@@ -2795,6 +2958,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
 
         self._update_course_assets(user_id, asset_key, _internal_method)
 
+    @contract(asset_key='AssetKey')
     def delete_asset_metadata(self, asset_key, user_id):
         """
         Internal; deletes a single asset's metadata.
@@ -2821,6 +2985,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         except ItemNotFoundError:
             return 0
 
+    @contract(source_course_key='CourseKey', dest_course_key='CourseKey')
     def copy_all_asset_metadata(self, source_course_key, dest_course_key, user_id):
         """
         Copy all the course assets from source_course_key to dest_course_key.
@@ -2872,6 +3037,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         and converting them.
         :param jsonfields: the serialized copy of the xblock's fields
         """
+        @contract(block_key="BlockUsageLocator | seq[2]")
         def robust_usage_key(block_key):
             """
             create a course_key relative usage key for the block_key. If the block_key is in blocks,
@@ -3054,6 +3220,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             'schema_version': self.SCHEMA_VERSION,
         }
 
+    @contract(block_key=BlockKey)
     def _get_parents_from_structure(self, block_key, structure):
         """
         Given a structure, find block_key's parent in that structure. Note returns
@@ -3080,6 +3247,12 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         destination_parent.fields['children'] = destination_reordered
         return orphans
 
+    @contract(
+        block_key=BlockKey,
+        source_blocks="dict(BlockKey: *)",
+        destination_blocks="dict(BlockKey: *)",
+        blacklist="list(BlockKey) | str",
+    )
     def _copy_subdag(self, user_id, destination_version, block_key, source_blocks, destination_blocks, blacklist):
         """
         Update destination_blocks for the sub-dag rooted at block_key to be like the one in
@@ -3148,6 +3321,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         destination_blocks[block_key] = destination_block
         return orphans
 
+    @contract(blacklist='list(BlockKey) | str')
     def _filter_blacklist(self, fields, blacklist):
         """
         Filter out blacklist from the children field in fields. Will construct a new list for children;
@@ -3159,6 +3333,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             fields['children'] = [child for child in fields.get('children', []) if BlockKey(*child) not in blacklist]
         return fields
 
+    @contract(orphan=BlockKey)
     def _delete_if_true_orphan(self, orphan, structure):
         """
         Delete the orphan and any of its descendants which no longer have parents.
@@ -3168,6 +3343,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             for child in orphan_data.fields.get('children', []):
                 self._delete_if_true_orphan(BlockKey(*child), structure)
 
+    @contract(returns=BlockData)
     def _new_block(self, user_id, category, block_fields, definition_id, new_id, raw=False,
                    asides=None, block_defaults=None):
         """
@@ -3199,6 +3375,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
             document['defaults'] = block_defaults
         return BlockData(**document)
 
+    @contract(block_key=BlockKey, returns='BlockData | None')
     def _get_block_from_structure(self, structure, block_key):
         """
         Encodes the block key before retrieving it from the structure to ensure it can
@@ -3206,6 +3383,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         """
         return structure['blocks'].get(block_key)
 
+    @contract(block_key=BlockKey)
     def _get_asides_to_update_from_structure(self, structure, block_key, asides):
         """
         Get list of aside fields that should be updated/inserted
@@ -3237,6 +3415,7 @@ class SplitMongoModuleStore(SplitBulkWriteMixin, ModuleStoreWriteBase):
         else:
             return block.asides, False
 
+    @contract(block_key=BlockKey, content=BlockData)
     def _update_block_in_structure(self, structure, block_key, content):
         """
         Encodes the block key before accessing it in the structure to ensure it can

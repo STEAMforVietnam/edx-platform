@@ -7,6 +7,7 @@ from random import random
 
 import factory
 from django.core.files.base import ContentFile
+from factory import DjangoModelFactory
 from factory.django import ImageField
 
 from common.djangoapps.student.tests.factories import UserFactory
@@ -29,7 +30,7 @@ def generate_dummy_image(_unused):
     )
 
 
-class CourseCompleteImageConfigurationFactory(factory.django.DjangoModelFactory):
+class CourseCompleteImageConfigurationFactory(DjangoModelFactory):
     """
     Factory for BadgeImageConfigurations
     """
@@ -40,7 +41,7 @@ class CourseCompleteImageConfigurationFactory(factory.django.DjangoModelFactory)
     icon = factory.LazyAttribute(generate_dummy_image)
 
 
-class BadgeClassFactory(factory.django.DjangoModelFactory):
+class BadgeClassFactory(DjangoModelFactory):
     """
     Factory for BadgeClass
     """
@@ -48,7 +49,6 @@ class BadgeClassFactory(factory.django.DjangoModelFactory):
         model = BadgeClass
 
     slug = 'test_slug'
-    badgr_server_slug = 'test_badgr_server_slug'
     issuing_component = 'test_component'
     display_name = 'Test Badge'
     description = "Yay! It's a test badge."
@@ -64,7 +64,7 @@ class RandomBadgeClassFactory(BadgeClassFactory):
     slug = factory.lazy_attribute(lambda _: 'test_slug_' + str(random()).replace('.', '_'))
 
 
-class BadgeAssertionFactory(factory.django.DjangoModelFactory):
+class BadgeAssertionFactory(DjangoModelFactory):
     """
     Factory for BadgeAssertions
     """
@@ -78,7 +78,7 @@ class BadgeAssertionFactory(factory.django.DjangoModelFactory):
     image_url = 'http://example.com/image.png'
 
 
-class CourseEventBadgesConfigurationFactory(factory.django.DjangoModelFactory):
+class CourseEventBadgesConfigurationFactory(DjangoModelFactory):
     """
     Factory for CourseEventsBadgesConfiguration
     """

@@ -34,15 +34,11 @@ from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRol
 from common.djangoapps.student.tests.factories import UserFactory
 from common.djangoapps.util import milestones_helpers
 from common.djangoapps.xblock_django.models import XBlockStudioConfigurationFlag
-from openedx.core.djangoapps.discussions.config.waffle import (
-    ENABLE_PAGES_AND_RESOURCES_MICROFRONTEND,
-    OVERRIDE_DISCUSSION_LEGACY_SETTINGS_FLAG
-)
 from openedx.core.djangoapps.models.course_details import CourseDetails
-from xmodule.fields import Date  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.fields import Date
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.factories import CourseFactory
 
 from .utils import AjaxEnabledTestClient, CourseTestCase
 
@@ -97,7 +93,6 @@ class CourseSettingsEncoderTest(CourseTestCase):
         self.assertEqual(jsondetails['string'], 'string')
 
 
-@ddt.ddt
 class CourseAdvanceSettingViewTest(CourseTestCase, MilestonesTestCaseMixin):
     """
     Tests for AdvanceSettings View.
@@ -123,27 +118,6 @@ class CourseAdvanceSettingViewTest(CourseTestCase, MilestonesTestCaseMixin):
 
         self.assertEqual(settings_fields["display_name"], "Mobile Course Available")
         self.assertEqual(settings_fields["deprecated"], True)
-
-    @ddt.data(
-        (False, False, True),
-        (True, False, False),
-        (True, True, True),
-        (False, True, True)
-    )
-    @ddt.unpack
-    def test_discussion_fields_available(self, is_pages_and_resources_enabled,
-                                         is_legacy_discussion_setting_enabled, fields_visible):
-        """
-        Test to check the availability of discussion related fields when relevant flags are enabled
-        """
-
-        with override_waffle_flag(ENABLE_PAGES_AND_RESOURCES_MICROFRONTEND, is_pages_and_resources_enabled):
-            with override_waffle_flag(OVERRIDE_DISCUSSION_LEGACY_SETTINGS_FLAG, is_legacy_discussion_setting_enabled):
-                response = self.client.get_html(self.course_setting_url).content.decode('utf-8')
-                self.assertEqual('allow_anonymous' in response, fields_visible)
-                self.assertEqual('allow_anonymous_to_peers' in response, fields_visible)
-                self.assertEqual('discussion_blackouts' in response, fields_visible)
-                self.assertEqual('discussion_topics' in response, fields_visible)
 
 
 @ddt.ddt
@@ -718,7 +692,7 @@ class CourseGradingTest(CourseTestCase):
                     'event_transaction_id': 'mockUUID',
                     'event_transaction_type': 'edx.grades.grading_policy_changed',
                 }
-            ) for policy_hash in [grading_policy_2, grading_policy_3]
+            ) for policy_hash in {grading_policy_2, grading_policy_3}
         ], any_order=True)
 
     @mock.patch('common.djangoapps.track.event_transaction_utils.uuid4')
@@ -1575,7 +1549,14 @@ class CourseMetadataEditingTest(CourseTestCase):
         )
         self.assertIn(field_name, test_model)
 
-    def test_validate_update_does_not_filter_out_create_zendesk_tickets_for_course_staff(self):
+    def test_create_zendesk_tickets_not_present_for_course_staff(self):
+        """
+        Tests that create zendesk tickets field is filtered out when the user is not an edX staff member.
+        """
+        test_model = CourseMetadata.fetch(self.fullcourse)
+        self.assertNotIn('create_zendesk_tickets', test_model)
+
+    def test_validate_update_does_filter_out_create_zendesk_tickets_for_course_staff(self):
         """
         Tests that create zendesk tickets field is not returned by validate_and_update_from_json method when
         the user is not an edX staff member.
@@ -1589,9 +1570,9 @@ class CourseMetadataEditingTest(CourseTestCase):
             },
             user=self.user
         )
-        self.assertIn(field_name, test_model)
+        self.assertNotIn(field_name, test_model)
 
-    def test_update_from_json_does_not_filter_out_create_zendesk_tickets_for_course_staff(self):
+    def test_update_from_json_does_filter_out_create_zendesk_tickets_for_course_staff(self):
         """
         Tests that create zendesk tickets field is not returned by update_from_json method when
         the user is not an edX staff member.
@@ -1605,7 +1586,7 @@ class CourseMetadataEditingTest(CourseTestCase):
             },
             user=self.user
         )
-        self.assertIn(field_name, test_model)
+        self.assertNotIn(field_name, test_model)
 
     def _set_request_user_to_staff(self):
         """
@@ -1671,7 +1652,7 @@ class CourseGraderUpdatesTest(CourseTestCase):
             "short_label": "yo momma",
             "weight": 17.3,
         }
-        resp = self.client.ajax_post(f'{self.url}/{len(self.starting_graders) + 1}', grader)
+        resp = self.client.ajax_post('{}/{}'.format(self.url, len(self.starting_graders) + 1), grader)
         self.assertEqual(resp.status_code, 200)
         obj = json.loads(resp.content.decode('utf-8'))
         self.assertEqual(obj['id'], len(self.starting_graders))
@@ -1795,7 +1776,6 @@ id=\"course-enrollment-end-time\" value=\"\" placeholder=\"HH:MM\" autocomplete=
         self._verify_editable(self._get_course_details_response(True))
 
     @mock.patch.dict("django.conf.settings.FEATURES", {'ENABLE_PUBLISHER': True})
-    @override_settings(PLATFORM_NAME='edX')
     def test_course_details_with_enabled_setting_non_global_staff(self):
         """
         Test that user enrollment end date is not editable in response.

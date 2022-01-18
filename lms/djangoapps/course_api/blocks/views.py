@@ -13,10 +13,9 @@ from opaque_keys.edx.keys import CourseKey
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 
-from lms.djangoapps.course_goals.models import UserActivity
 from openedx.core.lib.api.view_utils import DeveloperErrorViewMixin, view_auth_classes
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.exceptions import ItemNotFoundError
 
 from .api import get_blocks
 from .forms import BlockListGetForm
@@ -243,7 +242,7 @@ class BlocksView(DeveloperErrorViewMixin, ListAPIView):
                 patch_response_headers(response)
             return response
         except ItemNotFoundError as exception:
-            raise Http404(f"Block not found: {str(exception)}")  # lint-amnesty, pylint: disable=raise-missing-from
+            raise Http404("Block not found: {}".format(str(exception)))  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 @view_auth_classes(is_authenticated=False)
@@ -306,12 +305,9 @@ class BlocksInCourseView(BlocksView):
             course_key = CourseKey.from_string(course_key_string)
             course_usage_key = modulestore().make_course_usage_key(course_key)
         except InvalidKeyError:
-            raise ValidationError(f"'{str(course_key_string)}' is not a valid course key.")  # lint-amnesty, pylint: disable=raise-missing-from
+            raise ValidationError("'{}' is not a valid course key.".format(str(course_key_string)))  # lint-amnesty, pylint: disable=raise-missing-from
         response = super().list(request, course_usage_key,
                                 hide_access_denials=hide_access_denials)
-
-        # Record user activity for tracking progress towards a user's course goals (for mobile app)
-        UserActivity.record_user_activity(request.user, course_key, request=request, only_if_mobile_app=True)
 
         calculate_completion = any('completion' in param
                                    for param in request.query_params.getlist('requested_fields', []))

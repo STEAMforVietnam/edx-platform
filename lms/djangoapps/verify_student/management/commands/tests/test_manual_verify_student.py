@@ -91,6 +91,10 @@ class TestVerifyStudentCommand(TestCase):
              ),
             (LOGGER_NAME,
              'ERROR',
+             'Tried to verify email unknown@unknown.com, but user not found'
+             ),
+            (LOGGER_NAME,
+             'ERROR',
              'Completed manual verification. 1 of 4 failed.'
              ),
             (LOGGER_NAME,
@@ -110,4 +114,4 @@ class TestVerifyStudentCommand(TestCase):
         Verify command raises the CommandError for invalid file path.
         """
         with pytest.raises(CommandError):
-            call_command('manual_verifications', '--email-ids-file', 'invalid/email_id/file/path')
+            call_command('manual_verifications', '--email-ids-file', u'invalid/email_id/file/path')

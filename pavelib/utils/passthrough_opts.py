@@ -9,7 +9,7 @@ Provides:
 """
 
 
-from optparse import BadOptionError, OptionParser  # pylint: disable=deprecated-module
+from optparse import BadOptionError, OptionParser
 from unittest.mock import patch
 
 import paver.tasks

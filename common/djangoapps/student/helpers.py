@@ -15,11 +15,11 @@ from completion.utilities import get_key_to_last_completed_block
 from django.conf import settings
 from django.contrib.auth import load_backend
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.core.validators import ValidationError
-from django.db import IntegrityError, ProgrammingError, transaction
+from django.db import IntegrityError, transaction, ProgrammingError
 from django.urls import NoReverseMatch, reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from pytz import UTC
 
 from common.djangoapps import third_party_auth
@@ -35,27 +35,16 @@ from common.djangoapps.student.models import (
     username_exists_or_retired
 )
 from common.djangoapps.util.password_policy_validators import normalize_password
-from lms.djangoapps.certificates.api import (
-    certificates_viewable_for_course,
-    has_self_generated_certificates_enabled,
-    get_certificate_url,
-    has_html_certificates_enabled,
-    certificate_status_for_student,
-    auto_certificate_generation_enabled,
-)
-from lms.djangoapps.certificates.data import CertificateStatuses
-from lms.djangoapps.course_blocks.api import get_course_blocks
+from lms.djangoapps.certificates.api import get_certificate_url, has_html_certificates_enabled
+from lms.djangoapps.certificates.models import CertificateStatuses, certificate_status_for_student
 from lms.djangoapps.grades.api import CourseGradeFactory
-from lms.djangoapps.instructor import access
 from lms.djangoapps.verify_student.models import VerificationDeadline
 from lms.djangoapps.verify_student.services import IDVerificationService
 from lms.djangoapps.verify_student.utils import is_verification_expiring_soon, verification_for_datetime
-from openedx.core.djangoapps.agreements.toggles import is_integrity_signature_enabled
-from openedx.core.djangoapps.content.block_structure.exceptions import UsageKeyNotInBlockStructure
+from openedx.core.djangoapps.certificates.api import certificates_viewable_for_course
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangoapps.theming.helpers import get_themes
 from openedx.core.djangoapps.user_authn.utils import is_safe_login_or_logout_redirect
-from xmodule.data import CertificatesDisplayBehaviors  # lint-amnesty, pylint: disable=wrong-import-order
 
 # Enumeration of per-course verification statuses
 # we display on the student dashboard.
@@ -117,16 +106,6 @@ def check_verify_status_by_course(user, course_enrollments):
     """
     status_by_course = {}
 
-    # Before retriving verification data, if the integrity_signature feature is enabled for the course
-    # let's bypass all logic below. Filter down to those course with integrity_signature not enabled.
-    enabled_course_enrollments = []
-    for enrollment in course_enrollments:
-        if not is_integrity_signature_enabled(enrollment.course_id):
-            enabled_course_enrollments.append(enrollment)
-
-    if len(enabled_course_enrollments) == 0:
-        return status_by_course
-
     # Retrieve all verifications for the user, sorted in descending
     # order by submission datetime
     verifications = IDVerificationService.verifications_for_user(user)
@@ -144,7 +123,7 @@ def check_verify_status_by_course(user, course_enrollments):
     )
     recent_verification_datetime = None
 
-    for enrollment in enabled_course_enrollments:
+    for enrollment in course_enrollments:
 
         # If the user hasn't enrolled as verified, then the course
         # won't display state related to its verification status.
@@ -354,7 +333,7 @@ def _get_redirect_to(request_host, request_headers, request_params, request_is_h
     header_accept = request_headers.get('HTTP_ACCEPT', '')
     accepts_text_html = any(
         mime_type in header_accept
-        for mime_type in ['*/*', 'text/*', 'text/html']
+        for mime_type in {'*/*', 'text/*', 'text/html'}
     )
 
     # If we get a redirect parameter, make sure it's safe i.e. not redirecting outside our domain.
@@ -387,7 +366,7 @@ def _get_redirect_to(request_host, request_headers, request_params, request_is_h
             redirect_to = None
         elif mime_type:
             log.warning(
-                "Redirect to url path with specified file type '%(mime_type)s' not allowed: '%(redirect_to)s'",
+                "Redirect to url path with specified filed type '%(mime_type)s' not allowed: '%(redirect_to)s'",
                 {"redirect_to": redirect_to, "mime_type": mime_type}
             )
             redirect_to = None
@@ -417,7 +396,7 @@ def create_or_set_user_attribute_created_on_site(user, site):
     Create or Set UserAttribute indicating the site the user account was created on.
     User maybe created on 'courses.edx.org', or a white-label site. Due to the very high
     traffic on this table we now ignore the default site (eg. 'courses.edx.org') and
-    code which consumes this attribute should assume a 'created_on_site' which doesn't exist
+    code which comsumes this attribute should assume a 'created_on_site' which doesn't exist
     belongs to the default site.
     """
     if site and site.id != settings.SITE_ID:
@@ -456,36 +435,32 @@ class AccountValidationError(Exception):
         self.error_code = error_code
 
 
-def cert_info(user, enrollment):
+def cert_info(user, course_overview):
     """
     Get the certificate info needed to render the dashboard section for the given
     student and course.
 
     Arguments:
         user (User): A user.
-        enrollment (CourseEnrollment): A course enrollment.
+        course_overview (CourseOverview): A course.
 
     Returns:
         See _cert_info
     """
     return _cert_info(
         user,
-        enrollment,
-        certificate_status_for_student(user, enrollment.course_overview.id),
+        course_overview,
+        certificate_status_for_student(user, course_overview.id),
     )
 
 
-def _cert_info(user, enrollment, cert_status):
+def _cert_info(user, course_overview, cert_status):
     """
     Implements the logic for cert_info -- split out for testing.
 
-    TODO: replace with a method that lives in the certificates app and combines this logic with
-     lms.djangoapps.certificates.api.can_show_certificate_message and
-     lms.djangoapps.courseware.views.get_cert_data
-
     Arguments:
         user (User): A user.
-        enrollment (CourseEnrollment): A course enrollment.
+        course_overview (CourseOverview): A course.
         cert_status (dict): dictionary containing information about certificate status for the user
 
     Returns:
@@ -525,27 +500,23 @@ def _cert_info(user, enrollment, cert_status):
         'can_unenroll': True,
     }
 
-    if cert_status is None or enrollment is None:
+    if cert_status is None:
         return default_info
 
-    course_overview = enrollment.course_overview if enrollment else None
     status = template_state.get(cert_status['status'], default_status)
     is_hidden_status = status in ('processing', 'generating', 'notpassing', 'auditing')
 
-    if _is_certificate_earned_but_not_available(course_overview, status):
+    if (
+        not certificates_viewable_for_course(course_overview) and
+        (status in CertificateStatuses.PASSED_STATUSES) and
+        course_overview.certificate_available_date
+    ):
         status = certificate_earned_but_not_available_status
 
     if (
-        course_overview.certificates_display_behavior == CertificatesDisplayBehaviors.EARLY_NO_INFO and
+        course_overview.certificates_display_behavior == 'early_no_info' and
         is_hidden_status
     ):
-        return default_info
-
-    if not CourseMode.is_eligible_for_certificate(enrollment.mode, status=status):
-        return default_info
-
-    if course_overview and access.is_beta_tester(user, course_overview.id):
-        # Beta testers are not eligible for a course certificate
         return default_info
 
     status_dict = {
@@ -617,52 +588,7 @@ def _cert_info(user, enrollment, cert_status):
         )
         status_dict['grade'] = str(max_grade)
 
-        # If the grade is passing, the status is one of these statuses, and request certificate
-        # is enabled for a course then we need to provide the option to the learner
-        cert_gen_enabled = (
-            has_self_generated_certificates_enabled(course_overview.id) or
-            auto_certificate_generation_enabled()
-        )
-        passing_grade = persisted_grade and persisted_grade.passed
-        if (
-            status_dict['status'] != CertificateStatuses.downloadable and
-            cert_gen_enabled and
-            passing_grade and
-            course_overview.has_any_active_web_certificate
-        ):
-            status_dict['status'] = CertificateStatuses.requesting
-
     return status_dict
-
-
-def _is_certificate_earned_but_not_available(course_overview, status):
-    """
-    Returns True if the user is passing the course, but the certificate is not visible due to display behavior or
-    available date
-
-    Params:
-        course_overview (CourseOverview): The course to check we're checking the certificate for
-        status (str): The certificate status the user has in the course
-
-    Returns:
-        (bool): True if the user earned the certificate but it's hidden due to display behavior, else False
-
-    """
-    if settings.FEATURES.get("ENABLE_V2_CERT_DISPLAY_SETTINGS"):
-        return (
-            not certificates_viewable_for_course(course_overview)
-            and CertificateStatuses.is_passing_status(status)
-            and course_overview.certificates_display_behavior in (
-                CertificatesDisplayBehaviors.END_WITH_DATE,
-                CertificatesDisplayBehaviors.END
-            )
-        )
-    else:
-        return (
-            not certificates_viewable_for_course(course_overview) and
-            CertificateStatuses.is_passing_status(status) and
-            course_overview.certificate_available_date
-        )
 
 
 def process_survey_link(survey_link, user):
@@ -770,7 +696,7 @@ def get_resume_urls_for_enrollments(user, enrollments):
         enrollments (list): a list of user enrollments
 
     Returns:
-        resume_course_urls (OrderedDict): an OrderedDict of urls
+        resume_course_urls (OrderedDict): an OrderdDict of urls
             key: CourseKey
             value: url to the last completed block
                 if the value is '', then the user has not completed any blocks in the course run
@@ -779,18 +705,10 @@ def get_resume_urls_for_enrollments(user, enrollments):
     for enrollment in enrollments:
         try:
             block_key = get_key_to_last_completed_block(user, enrollment.course_id)
-            try:
-                block_data = get_course_blocks(user, block_key)
-            except UsageKeyNotInBlockStructure:
-                url_to_block = ''
-            else:
-                if block_key in block_data:
-                    url_to_block = reverse(
-                        'jump_to',
-                        kwargs={'course_id': enrollment.course_id, 'location': block_key}
-                    )
-                else:
-                    url_to_block = ''
+            url_to_block = reverse(
+                'jump_to',
+                kwargs={'course_id': enrollment.course_id, 'location': block_key}
+            )
         except UnavailableCompletionData:
             url_to_block = ''
         resume_course_urls[enrollment.course_id] = url_to_block
@@ -806,18 +724,3 @@ def does_user_profile_exist(user):
         return hasattr(user, 'profile')
     except (ProgrammingError, ObjectDoesNotExist):
         return False
-
-
-def user_has_passing_grade_in_course(enrollment):
-    """
-    Check to see if a user has passing grade for a course
-    """
-    try:
-        user = enrollment.user
-        course = enrollment.course_overview
-        course_grade = CourseGradeFactory().read(user, course, create_if_needed=False)
-        if course_grade:
-            return course_grade.passed
-    except AttributeError:
-        pass
-    return False

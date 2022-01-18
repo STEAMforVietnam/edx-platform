@@ -3,9 +3,9 @@ Certificates API URLs.
 """
 
 
-from django.urls import include, path
+from django.conf.urls import include, url
 
 app_name = 'certificates'
 urlpatterns = [
-    path('v0/', include('lms.djangoapps.certificates.apis.v0.urls')),
+    url(r'^v0/', include('lms.djangoapps.certificates.apis.v0.urls')),
 ]

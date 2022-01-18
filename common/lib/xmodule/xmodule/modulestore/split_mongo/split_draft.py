@@ -1,7 +1,9 @@
 """
 Module for the dual-branch fall-back Draft->Published Versioning ModuleStore
 """
-from edx_django_utils.monitoring import function_trace
+
+
+from contracts import contract
 from opaque_keys.edx.locator import CourseLocator, LibraryLocator, LibraryUsageLocator
 
 from xmodule.exceptions import InvalidVersionError
@@ -55,7 +57,6 @@ class DraftVersioningModuleStore(SplitMongoModuleStore, ModuleStoreDraftAndPubli
 
             return item
 
-    @function_trace('get_course.split_modulestore')
     def get_course(self, course_id, depth=0, **kwargs):
         course_id = self._map_revision_to_branch(course_id)
         return super().get_course(course_id, depth=depth, **kwargs)
@@ -520,6 +521,22 @@ class DraftVersioningModuleStore(SplitMongoModuleStore, ModuleStoreDraftAndPubli
         course_locator = self._map_revision_to_branch(course_locator)
         return super().get_course_history_info(course_locator)
 
+    def get_course_successors(self, course_locator, version_history_depth=1):
+        """
+        See :py:meth `xmodule.modulestore.split_mongo.split.SplitMongoModuleStore.get_course_successors`
+        """
+        course_locator = self._map_revision_to_branch(course_locator)
+        return super().get_course_successors(
+            course_locator, version_history_depth=version_history_depth
+        )
+
+    def get_block_generations(self, block_locator):
+        """
+        See :py:meth `xmodule.modulestore.split_mongo.split.SplitMongoModuleStore.get_block_generations`
+        """
+        block_locator = self._map_revision_to_branch(block_locator)
+        return super().get_block_generations(block_locator)
+
     def has_published_version(self, xblock):
         """
         Returns whether this xblock has a published version (whether it's up to date or not).
@@ -595,6 +612,7 @@ class DraftVersioningModuleStore(SplitMongoModuleStore, ModuleStoreDraftAndPubli
             xblock._published_by = published_block.edit_info.edited_by
             xblock._published_on = published_block.edit_info.edited_on
 
+    @contract(asset_key='AssetKey')
     def find_asset_metadata(self, asset_key, **kwargs):
         return super().find_asset_metadata(
             self._map_revision_to_branch(asset_key), **kwargs

@@ -7,15 +7,12 @@ from completion.exceptions import UnavailableCompletionData
 from completion.utilities import get_key_to_last_completed_block
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.contrib.auth.signals import user_logged_in
-from django.db import transaction
 from django.shortcuts import redirect
 from django.utils import dateparse
-from django.utils.decorators import method_decorator
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey
 from rest_framework import generics, views
 from rest_framework.decorators import api_view
-from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from xblock.fields import Scope
 from xblock.runtime import KeyValueStore
@@ -29,8 +26,8 @@ from lms.djangoapps.courseware.module_render import get_module_for_descriptor
 from lms.djangoapps.courseware.views.index import save_positions_recursively_up
 from lms.djangoapps.mobile_api.utils import API_V1, API_V05
 from openedx.features.course_duration_limits.access import check_course_expired
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.exceptions import ItemNotFoundError
 
 from .. import errors
 from ..decorators import mobile_course_access, mobile_view
@@ -80,7 +77,6 @@ class UserDetail(generics.RetrieveAPIView):
 
 
 @mobile_view(is_user=True)
-@method_decorator(transaction.non_atomic_requests, name='dispatch')
 class UserCourseStatus(views.APIView):
     """
     **Use Cases**
@@ -126,13 +122,6 @@ class UserCourseStatus(views.APIView):
 
     http_method_names = ["get", "patch"]
 
-    def dispatch(self, request, *args, **kwargs):
-        if request.method in SAFE_METHODS:
-            return super().dispatch(request, *args, **kwargs)
-        else:
-            with transaction.atomic():
-                return super().dispatch(request, *args, **kwargs)
-
     def _last_visited_module_path(self, request, course):
         """
         Returns the path from the last module visited by the current user in the given course up to
@@ -146,7 +135,7 @@ class UserCourseStatus(views.APIView):
             request.user, request, course, field_data_cache, course.id, course=course
         )
 
-        path = [course_module] if course_module else []
+        path = [course_module]
         chapter = get_current_child(course_module, min_depth=2)
         if chapter is not None:
             path.append(chapter)

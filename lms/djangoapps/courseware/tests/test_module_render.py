@@ -41,12 +41,7 @@ from xblock.runtime import DictKeyValueStore, KvsFieldData, Runtime  # lint-amne
 from xblock.test.tools import TestRuntime  # lint-amnesty, pylint: disable=wrong-import-order
 
 from capa.tests.response_xml_factory import OptionResponseXMLFactory  # lint-amnesty, pylint: disable=reimported
-from capa.xqueue_interface import XQueueInterface
 from common.djangoapps.course_modes.models import CourseMode  # lint-amnesty, pylint: disable=reimported
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import RequestFactoryNoCsrf
-from common.djangoapps.student.tests.factories import UserFactory
-from common.djangoapps.xblock_django.constants import ATTR_KEY_ANONYMOUS_USER_ID
 from lms.djangoapps.courseware import module_render as render
 from lms.djangoapps.courseware.access_response import AccessResponse
 from lms.djangoapps.courseware.courses import get_course_info_section, get_course_with_access
@@ -55,7 +50,12 @@ from lms.djangoapps.courseware.masquerade import CourseMasquerade
 from lms.djangoapps.courseware.model_data import FieldDataCache
 from lms.djangoapps.courseware.models import StudentModule
 from lms.djangoapps.courseware.module_render import get_module_for_descriptor, hash_resource
-from lms.djangoapps.courseware.tests.factories import StudentModuleFactory
+from lms.djangoapps.courseware.tests.factories import (
+    GlobalStaffFactory,
+    RequestFactoryNoCsrf,
+    StudentModuleFactory,
+    UserFactory
+)
 from lms.djangoapps.courseware.tests.test_submitting_problems import TestSubmittingProblems
 from lms.djangoapps.courseware.tests.tests import LoginEnrollmentTestCase
 from lms.djangoapps.lms_xblock.field_data import LmsFieldData
@@ -69,19 +69,19 @@ from openedx.core.lib.url_utils import quote_slashes
 from common.djangoapps.student.models import CourseEnrollment, anonymous_id_for_user
 from lms.djangoapps.verify_student.tests.factories import SoftwareSecurePhotoVerificationFactory
 from common.djangoapps.xblock_django.models import XBlockConfiguration
-from xmodule.capa_module import ProblemBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.html_module import AboutBlock, CourseInfoBlock, HtmlBlock, StaticTabBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.lti_module import LTIBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.capa_module import ProblemBlock
+from xmodule.html_module import AboutBlock, CourseInfoBlock, HtmlBlock, StaticTabBlock
+from xmodule.lti_module import LTIBlock
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import (
     ModuleStoreTestCase,
     SharedModuleStoreTestCase
 )
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, ToyCourseFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.test_asides import AsideTestType  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.video_module import VideoBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.x_module import STUDENT_VIEW, CombinedSystem, XModule, XModuleDescriptor  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, ToyCourseFactory, check_mongo_calls
+from xmodule.modulestore.tests.test_asides import AsideTestType
+from xmodule.video_module import VideoBlock
+from xmodule.x_module import STUDENT_VIEW, CombinedSystem, XModule, XModuleDescriptor
 
 
 TEST_DATA_DIR = settings.COMMON_TEST_DATA_ROOT
@@ -575,8 +575,6 @@ class TestHandleXBlockCallback(SharedModuleStoreTestCase, LoginEnrollmentTestCas
         csrf_token = get_token(request)
         request._post = {'csrfmiddlewaretoken': f'{csrf_token}-dummy'}  # pylint: disable=protected-access
         request.user = self.mock_user
-        request.COOKIES[settings.CSRF_COOKIE_NAME] = csrf_token
-
         response = render.handle_xblock_callback(
             request,
             str(self.course_key),
@@ -594,8 +592,6 @@ class TestHandleXBlockCallback(SharedModuleStoreTestCase, LoginEnrollmentTestCas
         csrf_token = get_token(request)
         request._post = {'csrfmiddlewaretoken': csrf_token}  # pylint: disable=protected-access
         request.user = self.mock_user
-        request.COOKIES[settings.CSRF_COOKIE_NAME] = csrf_token
-
         response = render.handle_xblock_callback(
             request,
             str(self.course_key),
@@ -903,31 +899,6 @@ class TestHandleXBlockCallback(SharedModuleStoreTestCase, LoginEnrollmentTestCas
         )
         assert not mock_score_signal.called
 
-    @ddt.data(
-        # See seq_module.py for the definition of these handlers
-        ('get_completion', True),  # has the 'will_recheck_access' attribute set to True
-        ('goto_position', False),  # does not set it
-    )
-    @ddt.unpack
-    @patch('lms.djangoapps.courseware.module_render.get_module_for_descriptor', wraps=get_module_for_descriptor)
-    def test_will_recheck_access_handler_attribute(self, handler, will_recheck_access, mock_get_module):
-        """Confirm that we pay attention to any 'will_recheck_access' attributes on handler methods"""
-        course = CourseFactory.create()
-        descriptor_kwargs = {
-            'category': 'sequential',
-            'parent': course,
-        }
-        descriptor = ItemFactory.create(**descriptor_kwargs)
-        usage_id = str(descriptor.location)
-
-        # Send no special parameters, which will be invalid, but we don't care
-        request = self.request_factory.post('/', data='{}', content_type='application/json')
-        request.user = self.mock_user
-
-        render.handle_xblock_callback(request, str(course.id), usage_id, handler)
-        assert mock_get_module.call_count == 1
-        assert mock_get_module.call_args[1]['will_recheck_access'] == will_recheck_access
-
 
 @ddt.ddt
 @patch.dict('django.conf.settings.FEATURES', {'ENABLE_XBLOCK_VIEW_ENDPOINT': True})
@@ -1016,9 +987,9 @@ class TestTOC(ModuleStoreTestCase):
     # Split makes 2 queries to load the course to depth 2:
     #     - 1 for the structure
     #     - 1 for 5 definitions
-    # Split makes 1 MySQL query to render the toc:
-    #     - 1 MySQL for the active version at the start of the bulk operation (no mongo calls)
-    @ddt.data((ModuleStoreEnum.Type.mongo, 3, 0, 0), (ModuleStoreEnum.Type.split, 2, 0, 0))
+    # Split makes 1 query to render the toc:
+    #     - 1 for the active version at the start of the bulk operation
+    @ddt.data((ModuleStoreEnum.Type.mongo, 3, 0, 0), (ModuleStoreEnum.Type.split, 2, 0, 1))
     @ddt.unpack
     def test_toc_toy_from_chapter(self, default_ms, setup_finds, setup_sends, toc_finds):
         with self.store.default_store(default_ms):
@@ -1056,9 +1027,9 @@ class TestTOC(ModuleStoreTestCase):
     # Split makes 2 queries to load the course to depth 2:
     #     - 1 for the structure
     #     - 1 for 5 definitions
-    # Split makes 1 MySQL query to render the toc:
-    #     - 1 MySQL for the active version at the start of the bulk operation (no mongo calls)
-    @ddt.data((ModuleStoreEnum.Type.mongo, 3, 0, 0), (ModuleStoreEnum.Type.split, 2, 0, 0))
+    # Split makes 1 query to render the toc:
+    #     - 1 for the active version at the start of the bulk operation
+    @ddt.data((ModuleStoreEnum.Type.mongo, 3, 0, 0), (ModuleStoreEnum.Type.split, 2, 0, 1))
     @ddt.unpack
     def test_toc_toy_from_section(self, default_ms, setup_finds, setup_sends, toc_finds):
         with self.store.default_store(default_ms):
@@ -1595,6 +1566,7 @@ class TestHtmlModifiers(ModuleStoreTestCase):
         self.course.static_asset_path = ""
 
     @override_settings(DEFAULT_COURSE_ABOUT_IMAGE_URL='test.png')
+    @override_settings(STATIC_URL='static/')
     @ddt.data(ModuleStoreEnum.Type.mongo, ModuleStoreEnum.Type.split)
     def test_course_image_for_split_course(self, store):
         """
@@ -1605,7 +1577,7 @@ class TestHtmlModifiers(ModuleStoreTestCase):
         self.course.course_image = ''
 
         url = course_image_url(self.course)
-        assert '/static/test.png' == url
+        assert 'static/test.png' == url
 
     def test_get_course_info_section(self):
         self.course.static_asset_path = "toy_course_dir"
@@ -1622,7 +1594,7 @@ class TestHtmlModifiers(ModuleStoreTestCase):
         )
         result_fragment = module.render(STUDENT_VIEW)
 
-        assert f'/courses/{str(self.course.id)}/bar/content' in result_fragment.content
+        assert '/courses/{course_id}/bar/content'.format(course_id=str(self.course.id)) in result_fragment.content
 
 
 class XBlockWithJsonInitData(XBlock):
@@ -1925,17 +1897,16 @@ class TestAnonymousStudentId(SharedModuleStoreTestCase, LoginEnrollmentTestCase)
         if hasattr(xblock_class, 'module_class'):
             descriptor.module_class = xblock_class.module_class
 
-        module = render.get_module_for_descriptor_internal(
+        return render.get_module_for_descriptor_internal(
             user=self.user,
             descriptor=descriptor,
             student_data=Mock(spec=FieldData, name='student_data'),
             course_id=course_id,
             track_function=Mock(name='track_function'),  # Track Function
+            xqueue_callback_url_prefix=Mock(name='xqueue_callback_url_prefix'),  # XQueue Callback Url Prefix
             request_token='request_token',
             course=self.course,
-        )
-        current_user = module.xmodule_runtime.service(module, 'user').get_current_user()
-        return current_user.opt_attrs.get(ATTR_KEY_ANONYMOUS_USER_ID)
+        ).xmodule_runtime.anonymous_student_id
 
     @ddt.data(*PER_STUDENT_ANONYMIZED_DESCRIPTORS)
     def test_per_student_anonymized_id(self, descriptor_class):
@@ -2290,6 +2261,7 @@ class LMSXBlockServiceBindingTest(SharedModuleStoreTestCase):
         self.user = UserFactory()
         self.student_data = Mock()
         self.track_function = Mock()
+        self.xqueue_callback_url_prefix = Mock()
         self.request_token = Mock()
 
     @XBlock.register_temp_plugin(PureXBlock, identifier='pure')
@@ -2305,6 +2277,7 @@ class LMSXBlockServiceBindingTest(SharedModuleStoreTestCase):
             descriptor,
             self.course.id,
             self.track_function,
+            self.xqueue_callback_url_prefix,
             self.request_token,
             course=self.course
         )
@@ -2323,6 +2296,7 @@ class LMSXBlockServiceBindingTest(SharedModuleStoreTestCase):
             descriptor,
             self.course.id,
             self.track_function,
+            self.xqueue_callback_url_prefix,
             self.request_token,
             course=self.course
         )
@@ -2557,223 +2531,3 @@ class TestDisabledXBlockTypes(ModuleStoreTestCase):
         item = self.store.get_item(item_id)
         assert item.__class__.__name__ == descriptor
         return item_id
-
-
-@ddt.ddt
-class LmsModuleSystemShimTest(SharedModuleStoreTestCase):
-    """
-    Tests that the deprecated attributes in the LMS Module System (XBlock Runtime) return the expected values.
-    """
-    COURSE_ID = 'edX/LmsModuleShimTest/2021_Fall'
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Set up the course and descriptor used to instantiate the runtime.
-        """
-        super().setUpClass()
-        org, number, run = cls.COURSE_ID.split('/')
-        cls.course = CourseFactory.create(org=org, number=number, run=run)
-        cls.descriptor = ItemFactory(category="vertical", parent=cls.course)
-        cls.problem_descriptor = ItemFactory(category="problem", parent=cls.course)
-
-    def setUp(self):
-        """
-        Set up the user and other fields that will be used to instantiate the runtime.
-        """
-        super().setUp()
-        self.user = UserFactory(id=232)
-        self.student_data = Mock()
-        self.track_function = Mock()
-        self.request_token = Mock()
-
-    @ddt.data(
-        ('seed', 232),
-        ('user_id', 232),
-        ('user_is_staff', False),
-    )
-    @ddt.unpack
-    def test_user_service_attributes(self, attribute, expected_value):
-        """
-        Tests that the deprecated attributes provided by the user service match expected values.
-        """
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        assert getattr(runtime, attribute) == expected_value
-
-    @patch('lms.djangoapps.courseware.module_render.has_access', Mock(return_value=True, autospec=True))
-    def test_user_is_staff(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        assert runtime.user_is_staff
-        assert runtime.get_user_role() == 'student'
-
-    @patch('lms.djangoapps.courseware.module_render.get_user_role', Mock(return_value='instructor', autospec=True))
-    def test_get_user_role(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        assert runtime.get_user_role() == 'instructor'
-
-    def test_anonymous_student_id(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        assert runtime.anonymous_student_id == anonymous_id_for_user(self.user, self.course.id)
-
-    def test_anonymous_student_id_bug(self):
-        """
-        Verifies that subsequent calls to get_module_system_for_user have no effect on each block runtime's
-        anonymous_student_id value.
-        """
-        problem_runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.problem_descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        # Ensure the problem block returns a per-user anonymous id
-        assert problem_runtime.anonymous_student_id == anonymous_id_for_user(self.user, None)
-
-        vertical_runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        # Ensure the vertical block returns a per-course+user anonymous id
-        assert vertical_runtime.anonymous_student_id == anonymous_id_for_user(self.user, self.course.id)
-
-        # Ensure the problem runtime's anonymous student ID is unchanged after the above call.
-        assert problem_runtime.anonymous_student_id == anonymous_id_for_user(self.user, None)
-
-    def test_user_service_with_anonymous_user(self):
-        runtime, _ = render.get_module_system_for_user(
-            AnonymousUser(),
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        assert runtime.anonymous_student_id is None
-        assert runtime.seed == 0
-        assert runtime.user_id is None
-        assert not runtime.user_is_staff
-        assert not runtime.get_user_role()
-
-    def test_get_real_user(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        course_anonymous_student_id = anonymous_id_for_user(self.user, self.course.id)
-        assert runtime.get_real_user(course_anonymous_student_id) == self.user  # pylint: disable=not-callable
-
-        no_course_anonymous_student_id = anonymous_id_for_user(self.user, None)
-        assert runtime.get_real_user(no_course_anonymous_student_id) == self.user  # pylint: disable=not-callable
-
-        # Tests that the default is to use the user service's anonymous_student_id
-        assert runtime.get_real_user() == self.user  # pylint: disable=not-callable
-
-    def test_render_template(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        rendered = runtime.render_template('templates/edxmako.html', {'element_id': 'hi'})  # pylint: disable=not-callable
-        assert rendered == '<div id="hi" ns="main">Testing the MakoService</div>\n'
-
-    def test_xqueue(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        xqueue = runtime.xqueue
-        assert isinstance(xqueue['interface'], XQueueInterface)
-        assert xqueue['interface'].url == 'http://sandbox-xqueue.edx.org'
-        assert xqueue['default_queuename'] == 'edX-LmsModuleShimTest'
-        assert xqueue['waittime'] == 5
-        callback_url = ('http://localhost:8000/courses/edX/LmsModuleShimTest/2021_Fall/xqueue/232/'
-                        + str(self.descriptor.location))
-        assert xqueue['construct_callback']() == f'{callback_url}/score_update'
-        assert xqueue['construct_callback']('mock_dispatch') == f'{callback_url}/mock_dispatch'
-
-    @override_settings(
-        XQUEUE_INTERFACE={
-            'callback_url': 'http://alt.url',
-            'url': 'http://xqueue.url',
-            'django_auth': {
-                'username': 'user',
-                'password': 'password',
-            },
-            'basic_auth': ('basic', 'auth'),
-        },
-        XQUEUE_WAITTIME_BETWEEN_REQUESTS=15,
-    )
-    def test_xqueue_settings(self):
-        runtime, _ = render.get_module_system_for_user(
-            self.user,
-            self.student_data,
-            self.descriptor,
-            self.course.id,
-            self.track_function,
-            self.request_token,
-            course=self.course,
-        )
-        xqueue = runtime.xqueue
-        assert isinstance(xqueue['interface'], XQueueInterface)
-        assert xqueue['interface'].url == 'http://xqueue.url'
-        assert xqueue['default_queuename'] == 'edX-LmsModuleShimTest'
-        assert xqueue['waittime'] == 15
-        callback_url = f'http://alt.url/courses/edX/LmsModuleShimTest/2021_Fall/xqueue/232/{self.descriptor.location}'
-        assert xqueue['construct_callback']() == f'{callback_url}/score_update'
-        assert xqueue['construct_callback']('mock_dispatch') == f'{callback_url}/mock_dispatch'

@@ -1,17 +1,18 @@
+# coding=utf-8
 """
 Tests for the course home page.
 """
 
 
 from datetime import datetime, timedelta
-from unittest import mock
-from urllib.parse import quote_plus
 
 import ddt
+import mock
+import six
 from django.conf import settings
 from django.http import QueryDict
-from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils.http import urlquote_plus
 from django.utils.timezone import now
 from edx_toggles.toggles.testutils import override_waffle_flag
 from pytz import UTC
@@ -20,17 +21,21 @@ from waffle.testutils import override_flag
 
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.course_modes.tests.factories import CourseModeFactory
-from common.djangoapps.student.tests.factories import BetaTesterFactory
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import InstructorFactory
-from common.djangoapps.student.tests.factories import OrgInstructorFactory
-from common.djangoapps.student.tests.factories import OrgStaffFactory
-from common.djangoapps.student.tests.factories import StaffFactory
+from common.djangoapps.util.date_utils import strftime_localized_html
+from lms.djangoapps.experiments.models import ExperimentData
 from lms.djangoapps.commerce.models import CommerceConfiguration
 from lms.djangoapps.commerce.utils import EcommerceService
-from lms.djangoapps.course_goals.api import add_course_goal_deprecated, get_course_goal
-from lms.djangoapps.course_home_api.toggles import COURSE_HOME_USE_LEGACY_FRONTEND
+from lms.djangoapps.course_goals.api import add_course_goal, remove_course_goal
+from lms.djangoapps.courseware.tests.factories import (
+    BetaTesterFactory,
+    GlobalStaffFactory,
+    InstructorFactory,
+    OrgInstructorFactory,
+    OrgStaffFactory,
+    StaffFactory
+)
 from lms.djangoapps.courseware.tests.helpers import get_expiration_banner_text
+from lms.djangoapps.courseware.utils import verified_upgrade_deadline_link
 from lms.djangoapps.discussion.django_comment_client.tests.factories import RoleFactory
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.django_comment_common.models import (
@@ -45,20 +50,22 @@ from openedx.core.djangolib.markup import HTML
 from openedx.features.course_duration_limits.models import CourseDurationLimitConfig
 from openedx.features.course_experience import (
     COURSE_ENABLE_UNENROLLED_ACCESS_FLAG,
-    COURSE_PRE_START_ACCESS_FLAG,
     DISABLE_UNIFIED_COURSE_TAB_FLAG,
-    ENABLE_COURSE_GOALS,
     SHOW_UPGRADE_MSG_ON_COURSE_HOME
 )
 from openedx.features.course_experience.tests import BaseCourseUpdatesTestCase
-from openedx.features.course_experience.tests.views.helpers import add_course_mode, remove_course_mode
+from openedx.features.discounts.applicability import get_discount_expiration_date
+from openedx.features.discounts.utils import REV1008_EXPERIMENT_ID, format_strikeout_price
 from common.djangoapps.student.models import CourseEnrollment, FBEEnrollmentExclusion
 from common.djangoapps.student.tests.factories import UserFactory
 from common.djangoapps.util.date_utils import strftime_localized
-from xmodule.course_module import COURSE_VISIBILITY_PRIVATE, COURSE_VISIBILITY_PUBLIC, COURSE_VISIBILITY_PUBLIC_OUTLINE  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import CourseUserType, ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.course_module import COURSE_VISIBILITY_PRIVATE, COURSE_VISIBILITY_PUBLIC, COURSE_VISIBILITY_PUBLIC_OUTLINE
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.tests.django_utils import CourseUserType, ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls
+
+from ... import COURSE_PRE_START_ACCESS_FLAG, ENABLE_COURSE_GOALS
+from .helpers import add_course_mode, remove_course_mode
 
 TEST_PASSWORD = 'test'
 TEST_CHAPTER_NAME = 'Test Chapter'
@@ -87,7 +94,7 @@ def course_home_url(course):
     Arguments:
         course (CourseBlock): The course being tested.
     """
-    return course_home_url_from_string(str(course.id))
+    return course_home_url_from_string(six.text_type(course.id))
 
 
 def course_home_url_from_string(course_key_string):
@@ -160,7 +167,6 @@ class CourseHomePageTestCase(BaseCourseUpdatesTestCase):
 
 
 class TestCourseHomePage(CourseHomePageTestCase):  # lint-amnesty, pylint: disable=missing-class-docstring
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_welcome_message_when_unified(self):
         # Create a welcome message
         self.create_course_update(TEST_WELCOME_MESSAGE)
@@ -169,7 +175,6 @@ class TestCourseHomePage(CourseHomePageTestCase):  # lint-amnesty, pylint: disab
         response = self.client.get(url)
         self.assertContains(response, TEST_WELCOME_MESSAGE, status_code=200)
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     @override_waffle_flag(DISABLE_UNIFIED_COURSE_TAB_FLAG, active=True)
     def test_welcome_message_when_not_unified(self):
         # Create a welcome message
@@ -179,7 +184,6 @@ class TestCourseHomePage(CourseHomePageTestCase):  # lint-amnesty, pylint: disab
         response = self.client.get(url)
         self.assertNotContains(response, TEST_WELCOME_MESSAGE, status_code=200)
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_updates_tool_visibility(self):
         """
         Verify that the updates course tool is visible only when the course
@@ -194,7 +198,6 @@ class TestCourseHomePage(CourseHomePageTestCase):  # lint-amnesty, pylint: disab
         response = self.client.get(url)
         self.assertContains(response, TEST_COURSE_UPDATES_TOOL, status_code=200)
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_queries(self):
         """
         Verify that the view's query count doesn't regress.
@@ -205,7 +208,7 @@ class TestCourseHomePage(CourseHomePageTestCase):  # lint-amnesty, pylint: disab
 
         # Fetch the view and verify the query counts
         # TODO: decrease query count as part of REVO-28
-        with self.assertNumQueries(65, table_blacklist=QUERY_COUNT_TABLE_BLACKLIST):
+        with self.assertNumQueries(79, table_blacklist=QUERY_COUNT_TABLE_BLACKLIST):
             with check_mongo_calls(4):
                 url = course_home_url(self.course)
                 self.client.get(url)
@@ -226,15 +229,6 @@ class TestCourseHomePage(CourseHomePageTestCase):  # lint-amnesty, pylint: disab
             url = course_home_url(future_course)
             response = self.client.get(url)
             assert response.status_code == 200
-
-    def test_legacy_redirect(self):
-        """
-        Verify that the legacy course home page redirects to the MFE correctly.
-        """
-        url = course_home_url(self.course) + '?foo=b$r'
-        response = self.client.get(url)
-        assert response.status_code == 302
-        assert response.get('Location') == 'http://learning-mfe/course/course-v1:edX+test+Test_Course/home?foo=b%24r'
 
 
 @ddt.ddt
@@ -285,7 +279,6 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         [True, COURSE_VISIBILITY_PUBLIC, CourseUserType.GLOBAL_STAFF, True, True],
     )
     @ddt.unpack
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_home_page(
             self, enable_unenrolled_access, course_visibility, user_type,
             expected_enroll_message, expected_course_outline,
@@ -336,7 +329,6 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
                     self.assertContains(private_response,
                                         'You must be enrolled in the course to see course content.')
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     @override_waffle_flag(DISABLE_UNIFIED_COURSE_TAB_FLAG, active=True)
     @ddt.data(
         [CourseUserType.ANONYMOUS, 'To see course content'],
@@ -373,14 +365,13 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         if expected_message:
             self.assertContains(response, expected_message)
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_sign_in_button(self):
         """
         Verify that the sign in button will return to this page.
         """
         url = course_home_url(self.course)
         response = self.client.get(url)
-        self.assertContains(response, f'/login?next={quote_plus(url)}')
+        self.assertContains(response, '/login?next={url}'.format(url=urlquote_plus(url)))
 
     @mock.patch.dict(settings.FEATURES, {'DISABLE_START_DATES': False})
     def test_non_live_course(self):
@@ -401,6 +392,50 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
             params=expected_params.urlencode()
         )
         self.assertRedirects(response, expected_url)
+
+    @mock.patch('openedx.features.discounts.utils.discount_percentage')
+    @mock.patch('openedx.features.discounts.utils.can_receive_discount')
+    @ddt.data(
+        [True, 15],
+        [True, 13],
+        [True, 0],
+        [False, 15])
+    @ddt.unpack
+    def test_first_purchase_offer_banner_display(self,
+                                                 applicability,
+                                                 percentage,
+                                                 can_receive_discount_mock,
+                                                 discount_percentage_mock):
+        """
+        Ensure first purchase offer banner displays correctly
+        """
+        can_receive_discount_mock.return_value = applicability
+        discount_percentage_mock.return_value = percentage
+        user = self.create_user_for_course(self.course, CourseUserType.ENROLLED)
+        now_time = datetime.now(tz=UTC).strftime(u"%Y-%m-%d %H:%M:%S%z")
+        ExperimentData.objects.create(
+            user=user, experiment_id=REV1008_EXPERIMENT_ID, key=str(self.course.id), value=now_time
+        )
+        self.client.login(username=user.username, password=self.TEST_PASSWORD)
+        url = course_home_url(self.course)
+        response = self.client.get(url)
+        expiration_date = strftime_localized_html(get_discount_expiration_date(user, self.course), 'SHORT_DATE')
+        upgrade_link = verified_upgrade_deadline_link(user=user, course=self.course)
+        bannerText = u'''<div class="first-purchase-offer-banner" role="note">
+             <span class="first-purchase-offer-banner-bold"><b>
+             Upgrade by {discount_expiration_date} and save {percentage}% [{strikeout_price}]</b></span>
+             <br>Use code <b>EDXWELCOME</b> at checkout! <a id="welcome" href="{upgrade_link}">Upgrade Now</a>
+             </div>'''.format(
+            discount_expiration_date=expiration_date,
+            percentage=percentage,
+            strikeout_price=HTML(format_strikeout_price(user, self.course)[0]),
+            upgrade_link=upgrade_link
+        )
+
+        if applicability:
+            self.assertContains(response, bannerText, html=True)
+        else:
+            self.assertNotContains(response, bannerText, html=True)
 
     @mock.patch.dict(settings.FEATURES, {'DISABLE_START_DATES': False})
     def test_course_does_not_expire_for_verified_user(self):
@@ -516,7 +551,7 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         expiration_date = strftime_localized(course.start + timedelta(weeks=4) + timedelta(days=1), 'SHORT_DATE')
         expected_params = QueryDict(mutable=True)
         course_name = CourseOverview.get_from_id(course.id).display_name_with_default
-        expected_params['access_response_error'] = 'Access to {run} expired on {expiration_date}'.format(
+        expected_params['access_response_error'] = u'Access to {run} expired on {expiration_date}'.format(
             run=course_name,
             expiration_date=expiration_date
         )
@@ -598,14 +633,14 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         future_course = self.create_future_course()
         self.create_user_for_course(future_course, CourseUserType.ENROLLED)
 
-        fake_unicode_start_time = "üñîçø∂é_ßtå®t_tîµé"
+        fake_unicode_start_time = u"üñîçø∂é_ßtå®t_tîµé"
         mock_strftime_localized.return_value = fake_unicode_start_time
 
         url = course_home_url(future_course)
         response = self.client.get(url)
         expected_params = QueryDict(mutable=True)
         expected_params['notlive'] = fake_unicode_start_time
-        expected_url = '{url}?{params}'.format(
+        expected_url = u'{url}?{params}'.format(
             url=reverse('dashboard'),
             params=expected_params.urlencode()
         )
@@ -621,9 +656,7 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         response = self.client.get(url)
         assert response.status_code == 404
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     @override_waffle_flag(COURSE_PRE_START_ACCESS_FLAG, active=True)
-    @override_settings(PLATFORM_NAME="edX")
     def test_masters_course_message(self):
         enroll_button_html = "<button class=\"enroll-btn btn-link\">Enroll now</button>"
 
@@ -652,7 +685,6 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         self.assertContains(response, expected_message)
         self.assertNotContains(response, enroll_button_html)
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     @override_waffle_flag(COURSE_PRE_START_ACCESS_FLAG, active=True)
     def test_course_messaging(self):
         """
@@ -721,7 +753,6 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         self.assertContains(response, TEST_COURSE_HOME_MESSAGE)
         self.assertContains(response, TEST_COURSE_HOME_MESSAGE_PRE_START)
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_course_messaging_for_staff(self):
         """
         Staff users will not see the expiration banner when course duration limits
@@ -766,12 +797,12 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         self.assertContains(response, TEST_COURSE_GOAL_OPTIONS)
 
         # Verify that enrolled users that have set a course goal are not shown the set course goal message.
-        add_course_goal_deprecated(user, verifiable_course.id, COURSE_GOAL_DISMISS_OPTION)
+        add_course_goal(user, verifiable_course.id, COURSE_GOAL_DISMISS_OPTION)
         response = self.client.get(course_home_url(verifiable_course))
         self.assertNotContains(response, TEST_COURSE_GOAL_OPTIONS)
 
         # Verify that enrolled and verified users are not shown the set course goal message.
-        get_course_goal(user, verifiable_course.id).delete()
+        remove_course_goal(user, str(verifiable_course.id))
         CourseEnrollment.enroll(user, verifiable_course.id, CourseMode.VERIFIED)
         response = self.client.get(course_home_url(verifiable_course))
         self.assertNotContains(response, TEST_COURSE_GOAL_OPTIONS)
@@ -808,7 +839,7 @@ class TestCourseHomePageAccess(CourseHomePageTestCase):
         self.assertContains(response, TEST_COURSE_GOAL_UPDATE_FIELD_HIDDEN)
 
         # Verify that enrolled users that have set a course goal are shown a visible update goal selection field.
-        add_course_goal_deprecated(user, verifiable_course.id, COURSE_GOAL_DISMISS_OPTION)
+        add_course_goal(user, verifiable_course.id, COURSE_GOAL_DISMISS_OPTION)
         response = self.client.get(course_home_url(verifiable_course))
         self.assertContains(response, TEST_COURSE_GOAL_UPDATE_FIELD)
         self.assertNotContains(response, TEST_COURSE_GOAL_UPDATE_FIELD_HIDDEN)
@@ -828,7 +859,7 @@ class CourseHomeFragmentViewTests(ModuleStoreTestCase):
     CREATE_USER = False
 
     def setUp(self):
-        super().setUp()
+        super(CourseHomeFragmentViewTests, self).setUp()  # lint-amnesty, pylint: disable=super-with-arguments
         CommerceConfiguration.objects.create(checkout_on_ecommerce_service=True)
 
         end = now() + timedelta(days=30)
@@ -867,7 +898,7 @@ class CourseHomeFragmentViewTests(ModuleStoreTestCase):
         self.assertContains(response, url)
         self.assertContains(
             response,
-            f"Upgrade (<span class='price'>${self.verified_mode.min_price}</span>)",
+            u"Upgrade (<span class='price'>${price}</span>)".format(price=self.verified_mode.min_price),
         )
 
     def test_no_upgrade_message_if_logged_out(self):

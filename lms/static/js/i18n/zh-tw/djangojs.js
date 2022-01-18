@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = 0;
-    if (typeof v === 'boolean') {
+    var v=0;
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,7 +19,10 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
+    " learner does not exist in LMS and not added to the exception list": "\u5b78\u7fd2\u8005\u4e0d\u5b58\u5728\u7cfb\u7d71\u4e2d\uff0c\u5c07\u4e0d\u52a0\u5230\u4f8b\u5916\u5217\u8868\u4e2d",
+    " learner is successfully added to the exception list": "\u5b78\u7fd2\u8005\u5df2\u7d93\u6210\u529f\u5730\u52a0\u5165\u5230\u4f8b\u5916\u5217\u8868",
+    " learners are successfully added to exception list": "\u5b78\u7fd2\u8005\u5df2\u7d93\u6210\u529f\u5730\u52a0\u5165\u5230\u4f8b\u5916\u5217\u8868",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
     "%(errorCount)s error found in form.": [
       "\u5728\u8868\u55ae\u4e2d\u767c\u73fe%(errorCount)s\u7684\u932f\u8aa4\u3002"
@@ -33,6 +35,8 @@
       "(\u5305\u542b%(student_count)s\u5b78\u751f)"
     ],
     "(optional)": "(\u53ef\u9078\u586b)",
+    "<%= user %> already in exception list.": "<%= user %> \u5df2\u5728\u7279\u4f8b\u540d\u55ae\u4e2d\u3002",
+    "<%= user %> has been successfully added to the exception list. Click Generate Exception Certificate below to send the certificate.": "\u5df2\u7d93\u6210\u529f\u65b0\u589e<%= user %>\u5230\u7279\u4f8b\u540d\u55ae\u4e2d\u3002\u8acb\u9ede\u64ca\u4e0b\u9762\u7684\u7522\u751f\u7279\u4f8b\u8b49\u66f8\u4e26\u767c\u9001\u8b49\u66f8\u3002",
     "A driver's license, passport, or other government-issued ID with your name and photo": "\u4e00\u5f35\u99d5\u7167\u3001\u8b77\u7167\uff0c\u6216\u5176\u4ed6\u653f\u5e9c\u7c3d\u767c\u7684\u8b49\u4ef6\uff0c\u9700\u5305\u542b\u60a8\u7684\u59d3\u540d\u548c\u7167\u7247\u3002",
     "A list of courses you have just enrolled in as a verified student": "\u4e00\u500b\u60a8\u525b\u8a3b\u518a\u70ba\u5df2\u9a57\u8b49\u5b78\u751f\u7684\u8ab2\u7a0b\u5217\u8868\u3002",
     "A name that identifies your team (maximum 255 characters).": "\u5718\u968a\u540d\u7a31 (\u6700\u5927\u70ba255\u500b\u5b57\u5143\u9577\u5ea6)",
@@ -158,6 +162,7 @@
     "Content-Specific Discussion Topics": "\u7279\u5b9a\u5167\u5bb9\u7684\u8a0e\u8ad6\u4e3b\u984c",
     "Copy Email To Editor": "\u8907\u88fd\u90f5\u4ef6\u5230\u7de8\u8f2f\u5668",
     "Correct failed component": "\u66f4\u6b63\u932f\u8aa4\u7d44\u4ef6",
+    "Could not find Certificate Exception in white list. Please refresh the page and try again": "\u5728\u8a31\u53ef\u540d\u55ae\u4e2d\u627e\u4e0d\u5230\u8b49\u66f8\u7279\u4f8b\u7684\u4eba\u3002\u8acb\u91cd\u65b0\u8f09\u5165\u9801\u9762\u6216\u518d\u8a66\u4e00\u6b21\u3002",
     "Could not find Certificate Invalidation in the list. Please refresh the page and try again": "\u7121\u6cd5\u5728\u9019\u4efd\u5217\u8868\u4e2d\u627e\u5230\u8b49\u66f8\u5931\u6548\u8b49\u660e\u3002\u8acb\u91cd\u65b0\u8f09\u5165\u9801\u9762\u6216\u518d\u8a66\u4e00\u6b21\u3002",
     "Could not find a user with username or email address '<%- identifier %>'.": "\u7121\u6cd5\u7528\u4f7f\u7528\u8005\u540d\u7a31\u6216\u96fb\u5b50\u90f5\u4ef6\u5730\u5740\u627e\u5230\u4f7f\u7528\u8005 '<%- identifier %>'.",
     "Could not find users associated with the following identifiers:": "\u7121\u6cd5\u6839\u64da\u4e0b\u5217\u7684\u689d\u4ef6\u627e\u5230\u7528\u6236\uff1a",
@@ -165,6 +170,7 @@
     "Could not retrieve upload url.": "\u7121\u6cd5\u627e\u5230\u4e0a\u50b3\u7db2\u5740",
     "Could not submit order": "\u7121\u6cd5\u63d0\u4ea4\u8a02\u55ae",
     "Could not submit photos": "\u7121\u6cd5\u63d0\u4ea4\u5716\u7247",
+    "Couldn't Save This Assignment": "\u4e0d\u80fd\u5132\u5b58\u9019\u4f5c\u696d",
     "Country": "\u570b\u5bb6",
     "Country of residence": "\u5c45\u4f4f\u570b\u5bb6",
     "Course Credit Requirements": "\u8ab2\u7a0b\u5b78\u5206\u8981\u6c42",
@@ -403,6 +409,7 @@
     "No Webcam Detected": "\u672a\u5075\u6e2c\u5230\u8996\u8a0a\u93e1\u982d",
     "No content-specific discussion topics exist.": "\u7121\u7279\u5b9a\u5167\u5bb9\u7684\u8a0e\u8ad6\u4e3b\u984c\u5b58\u5728\u3002",
     "No results": "\u67e5\u7121\u7d50\u679c",
+    "No results found for \"%(query_string)s\". Please try searching again.": "\u6c92\u6709\u627e\u5230 \"%(query_string)s\" \u7684\u7d50\u679c\u3002\u8acb\u518d\u5617\u8a66\u641c\u5c0b\u3002",
     "No tasks currently running.": "\u672a\u6709\u4efb\u52d9\u5728\u9032\u884c\u4e2d\u3002",
     "Not Currently Available": "\u76ee\u524d\u4e0d\u53ef\u7528",
     "Not Selected": "\u672a\u9078\u53d6",
@@ -440,6 +447,7 @@
     "Photos don't meet the requirements?": "\u7167\u7247\u4e0d\u7b26\u5408\u8981\u6c42\uff1f",
     "Placeholder": "Placeolder",
     "Please address the errors on this page first, and then save your progress.": "\u8acb\u5148\u8aaa\u660e\u672c\u9801\u9762\u51fa\u73fe\u7684\u932f\u8aa4\uff0c\u7136\u5f8c\u5132\u5b58\u60a8\u7684\u9032\u5ea6\u3002",
+    "Please correct the outlined fields.": "\u8acb\u66f4\u6b63\u7cfb\u7d71\u986f\u793a\u7684\u6b04\u4f4d\u3002",
     "Please describe this image or agree that it has no contextual value by checking the checkbox.": "\u8acb\u63cf\u8ff0\u672c\u5716\u7247\u6216\u85c9\u7531\u52fe\u9078\u8907\u9078\u6846\u4ee5\u540c\u610f\u662f\u5426\u8207\u5167\u5bb9\u76f8\u95dc\u3002",
     "Please do not use any spaces in this field.": "\u6b64\u6b04\u4f4d\u7684\u5167\u5bb9\u4e0d\u80fd\u5305\u542b\u7a7a\u683c",
     "Please do not use any spaces or special characters in this field.": "\u6b64\u6b04\u4f4d\u7684\u5167\u5bb9\u4e0d\u80fd\u5305\u542b\u7a7a\u683c\u6216\u7279\u6b8a\u5b57\u5143\u3002",
@@ -568,6 +576,7 @@
     "Status": "\u72c0\u614b",
     "Status of Your Response": "\u60a8\u7684\u4f5c\u7b54\u4e4b\u72c0\u614b",
     "Student": "\u5b78\u751f",
+    "Student Removed from certificate white list successfully.": "\u5b78\u751f\u5df2\u5f9e\u8b49\u66f8\u8a31\u53ef\u540d\u55ae\u4e2d\u79fb\u9664\u6210\u529f\u3002",
     "Student email or username": "\u5b78\u751f Email \u6216 \u4f7f\u7528\u8005\u540d\u7a31",
     "Subject": "\u4e3b\u984c",
     "Subject:": "\u4e3b\u984c :",
@@ -674,6 +683,7 @@
     "This image is for decorative purposes only and does not require a description.": "\u6b64\u5716\u7247\u50c5\u4f5c\u70ba\u8f14\u52a9\u7684\u7528\u9014\u4e26\u4e0d\u9700\u8981\u63cf\u8ff0\u3002",
     "This page contains information about orders that you have placed with {platform_name}.": "\u6b64\u9801\u5305\u542b\u60a8\u900f\u904e{platform_name}\u767c\u51fa\u7684\u8a02\u55ae\u7684\u76f8\u95dc\u8a0a\u606f\u3002",
     "This problem could not be saved.": "\u6b64\u554f\u984c\u7121\u6cd5\u5132\u5b58\u3002",
+    "This problem has already been released. Any changes will apply only to future assessments.": "\u6b64\u554f\u984c\u5df2\u7d93\u88ab\u91cb\u51fa\u4e86\u3002\u4efb\u4f55\u66f4\u6539\u90fd\u53ea\u6703\u5728\u672a\u4f86\u7684\u8a55\u5206\u4e2d\u51fa\u73fe\u3002",
     "This response could not be saved.": "\u4f5c\u7b54\u7121\u6cd5\u4fdd\u5b58\u3002",
     "This response could not be submitted.": "\u4f5c\u7b54\u7121\u6cd5\u63d0\u4ea4\u3002",
     "This response has been saved but not submitted.": "\u9019\u4e00\u4efd\u4f5c\u7b54\u5df2\u7d93\u5132\u5b58\u4e86\uff0c\u4f46\u4ecd\u672a\u63d0\u4ea4\u3002",
@@ -786,6 +796,7 @@
     "You did not select a content group": "\u60a8\u6c92\u9078\u64c7\u4e00\u500b\u5167\u5bb9\u7fa4\u7d44",
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "\u60a8\u4f3c\u4e4e\u5c1a\u672a\u5b89\u88dd Flash\u3002\u53d6\u5f97Flash\u4ee5\u7e7c\u7e8c\u60a8\u7684\u9a57\u8b49\u3002",
     "You don't seem to have a webcam connected.": "\u60a8\u4f3c\u4e4e\u5c1a\u672a\u9023\u63a5\u8996\u8a0a\u88dd\u7f6e\u3002",
+    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "\u60a8\u5fc5\u9808\u589e\u52a0\u8a55\u5206\u6a19\u6e96\u3002\u60a8\u5c07\u6703\u9700\u8981\u5728\u8a55\u5206\u7df4\u7fd2\u6b65\u9a5f\u4e2d\u9078\u64c7\u8a55\u5206\u6a19\u6e96\u9078\u9805\u3002\u8acb\u9ede\u9078\u8a2d\u5b9a\u6a19\u8b58\u4ee5\u5b8c\u6210\u6b64\u6b65\u9a5f\u3002",
     "You have already verified your ID!": "\u60a8\u5df2\u7d93\u9a57\u8b49\u60a8\u7684ID\uff01",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "\u60a8\u5df2\u7d93\u522a\u9664 \u4e00\u500b\u6a19\u6e96\u3002\u5728\u8a55\u5206\u7df4\u7fd2\u4e2d\uff0c\u8a72\u6a19\u6e96\u5df2\u7d93\u5f9e\u7bc4\u4f8b\u4f5c\u7b54\u88e1\u522a\u9664\u3002",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "\u60a8\u5df2\u7d93\u522a\u9664\u4e86\u9019\u8a55\u5206\u6a19\u6e96\u4e2d\u6240\u6709\u7684\u9078\u9805\uff0c\u5df2\u7d93\u5f9e\u7bc4\u4f8b\u4f5c\u7b54\u88e1\u522a\u9664\u8a55\u5206\u6a19\u6e96\u3002",
@@ -878,24 +889,24 @@
     ],
     "\u2026": "..."
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -905,16 +916,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -937,12 +948,15 @@
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
+      "%Y-%m-%d",
       "%m/%d/%Y %H:%M:%S",
       "%m/%d/%Y %H:%M:%S.%f",
       "%m/%d/%Y %H:%M",
+      "%m/%d/%Y",
       "%m/%d/%y %H:%M:%S",
       "%m/%d/%y %H:%M:%S.%f",
-      "%m/%d/%y %H:%M"
+      "%m/%d/%y %H:%M",
+      "%m/%d/%y"
     ],
     "DATE_FORMAT": "N j, Y",
     "DATE_INPUT_FORMATS": [
@@ -975,8 +989,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -995,5 +1009,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

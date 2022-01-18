@@ -7,17 +7,17 @@ because the Studio course outline may need these utilities.
 from enum import Enum
 from typing import Optional
 
+import six
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest
-from django.http.request import QueryDict
 from django.urls import reverse
 from opaque_keys.edx.keys import CourseKey, UsageKey
-from six.moves.urllib.parse import urlencode, urlparse
+from six.moves.urllib.parse import urlencode
 
 from lms.djangoapps.courseware.toggles import courseware_mfe_is_active
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.search import navigation_index, path_to_location  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.search import navigation_index, path_to_location
 
 User = get_user_model()
 
@@ -88,13 +88,13 @@ def _get_legacy_courseware_url(
     # args provided by the redirect.
     # Rely on index to do all error handling and access control.
     if chapter is None:
-        redirect_url = reverse('courseware', args=(str(course_key), ))
+        redirect_url = reverse('courseware', args=(six.text_type(course_key), ))
     elif section is None:
-        redirect_url = reverse('courseware_chapter', args=(str(course_key), chapter))
+        redirect_url = reverse('courseware_chapter', args=(six.text_type(course_key), chapter))
     elif position is None:
         redirect_url = reverse(
             'courseware_section',
-            args=(str(course_key), chapter, section)
+            args=(six.text_type(course_key), chapter, section)
         )
     else:
         # Here we use the navigation_index from the position returned from
@@ -102,9 +102,9 @@ def _get_legacy_courseware_url(
         # moment
         redirect_url = reverse(
             'courseware_position',
-            args=(str(course_key), chapter, section, navigation_index(position))
+            args=(six.text_type(course_key), chapter, section, navigation_index(position))
         )
-    redirect_url += "?{}".format(urlencode({'activate_block_id': str(final_target_id)}))
+    redirect_url += "?{}".format(urlencode({'activate_block_id': six.text_type(final_target_id)}))
     return redirect_url
 
 
@@ -148,7 +148,6 @@ def make_learning_mfe_courseware_url(
         course_key: CourseKey,
         sequence_key: Optional[UsageKey] = None,
         unit_key: Optional[UsageKey] = None,
-        params: Optional[QueryDict] = None,
 ) -> str:
     """
     Return a str with the URL for the specified courseware content in the Learning MFE.
@@ -177,26 +176,20 @@ def make_learning_mfe_courseware_url(
 
     `course_key`, `sequence_key`, and `unit_key` can be either OpaqueKeys or
     strings. They're only ever used to concatenate a URL string.
-    `params` is an optional QueryDict object (e.g. request.GET)
     """
-    mfe_link = f'{settings.LEARNING_MICROFRONTEND_URL}/course/{course_key}'
+    mfe_link = '{}/course/{}'.format(settings.LEARNING_MICROFRONTEND_URL, course_key)
 
     if sequence_key:
-        mfe_link += f'/{sequence_key}'
+        mfe_link += '/{}'.format(sequence_key)
 
         if unit_key:
-            mfe_link += f'/{unit_key}'
-
-    if params:
-        mfe_link += f'?{params.urlencode()}'
+            mfe_link += '/{}'.format(unit_key)
 
     return mfe_link
 
 
 def get_learning_mfe_home_url(
-        course_key: CourseKey,
-        url_fragment: Optional[str] = None,
-        params: Optional[QueryDict] = None,
+        course_key: CourseKey, view_name: Optional[str] = None
 ) -> str:
     """
     Given a course run key and view name, return the appropriate course home (MFE) URL.
@@ -206,16 +199,12 @@ def get_learning_mfe_home_url(
     http://localhost:2000/course/course-v1:edX+DemoX+Demo_Course/dates
 
     `course_key` can be either an OpaqueKey or a string.
-    `url_fragment` is an optional string.
-    `params` is an optional QueryDict object (e.g. request.GET)
+    `view_name` is an optional string.
     """
     mfe_link = f'{settings.LEARNING_MICROFRONTEND_URL}/course/{course_key}'
 
-    if url_fragment:
-        mfe_link += f'/{url_fragment}'
-
-    if params:
-        mfe_link += f'?{params.urlencode()}'
+    if view_name:
+        mfe_link += f'/{view_name}'
 
     return mfe_link
 
@@ -224,9 +213,7 @@ def is_request_from_learning_mfe(request: HttpRequest):
     """
     Returns whether the given request was made by the frontend-app-learning MFE.
     """
-    if not settings.LEARNING_MICROFRONTEND_URL:
-        return False
-
-    url = urlparse(settings.LEARNING_MICROFRONTEND_URL)
-    mfe_url_base = f'{url.scheme}://{url.netloc}'
-    return request.META.get('HTTP_REFERER', '').startswith(mfe_url_base)
+    return (
+        settings.LEARNING_MICROFRONTEND_URL and
+        request.META.get('HTTP_REFERER', '').startswith(settings.LEARNING_MICROFRONTEND_URL)
+    )

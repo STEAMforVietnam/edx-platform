@@ -7,17 +7,11 @@ import pytest
 
 from common.djangoapps.student.roles import CourseBetaTesterRole, CourseCcxCoachRole, CourseStaffRole
 from common.djangoapps.student.tests.factories import UserFactory
-from lms.djangoapps.instructor.access import (
-    allow_access,
-    list_with_level,
-    is_beta_tester,
-    revoke_access,
-    update_forum_role
-)
+from lms.djangoapps.instructor.access import allow_access, list_with_level, revoke_access, update_forum_role
 from openedx.core.djangoapps.ace_common.tests.mixins import EmailTemplateTagMixin
 from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_MODERATOR, Role
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 class TestInstructorAccessList(SharedModuleStoreTestCase):
@@ -37,22 +31,12 @@ class TestInstructorAccessList(SharedModuleStoreTestCase):
             allow_access(self.course, user, 'beta')
 
     def test_list_instructors(self):
-        instructors = list_with_level(self.course.id, 'instructor')
-        instructors_alternative = list_with_level(self.course.id, 'instructor')
+        instructors = list_with_level(self.course, 'instructor')
         assert set(instructors) == set(self.instructors)
-        assert set(instructors_alternative) == set(self.instructors)
 
     def test_list_beta(self):
-        beta_testers = list_with_level(self.course.id, 'beta')
-        beta_testers_alternative = list_with_level(self.course.id, 'beta')
+        beta_testers = list_with_level(self.course, 'beta')
         assert set(beta_testers) == set(self.beta_testers)
-        assert set(beta_testers_alternative) == set(self.beta_testers)
-
-    def test_is_beta(self):
-        beta_tester = self.beta_testers[0]
-        user = UserFactory.create()
-        assert is_beta_tester(beta_tester, self.course.id)
-        assert not is_beta_tester(user, self.course.id)
 
 
 class TestInstructorAccessAllow(EmailTemplateTagMixin, SharedModuleStoreTestCase):

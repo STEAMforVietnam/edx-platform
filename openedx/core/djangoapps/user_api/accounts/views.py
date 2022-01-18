@@ -5,8 +5,10 @@ For additional information and historical context, see:
 https://openedx.atlassian.net/wiki/display/TNL/User+API
 """
 
+
 import datetime
 import logging
+import uuid
 from functools import wraps
 
 import pytz
@@ -16,8 +18,8 @@ from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, logout
 from django.contrib.sites.models import Site
 from django.core.cache import cache
-from django.db import models, transaction
-from django.utils.translation import gettext as _
+from django.db import transaction
+from django.utils.translation import ugettext as _
 from edx_ace import ace
 from edx_ace.recipient import Recipient
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
@@ -27,7 +29,6 @@ from integrated_channels.degreed.models import DegreedLearnerDataTransmissionAud
 from integrated_channels.sap_success_factors.models import SapSuccessFactorsLearnerDataTransmissionAudit
 from rest_framework import permissions, status
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.exceptions import UnsupportedMediaType
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
@@ -37,20 +38,6 @@ from wiki.models import ArticleRevision
 from wiki.models.pluginbase import RevisionPluginRevision
 
 from common.djangoapps.entitlements.models import CourseEntitlement
-from common.djangoapps.student.models import (  # lint-amnesty, pylint: disable=unused-import
-    CourseEnrollmentAllowed,
-    LoginFailures,
-    ManualEnrollmentAudit,
-    PendingEmailChange,
-    PendingNameChange,
-    User,
-    UserProfile,
-    get_potentially_retired_user_by_username,
-    get_retired_email_by_email,
-    get_retired_username_by_username,
-    is_username_retired
-)
-from common.djangoapps.student.models_api import do_name_change_request
 from openedx.core.djangoapps.ace_common.template_context import get_base_template_context
 from openedx.core.djangoapps.api_admin.models import ApiAccessRequest
 from openedx.core.djangoapps.course_groups.models import UnregisteredLearnerCohortAssignments
@@ -62,6 +49,22 @@ from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_
 from openedx.core.djangoapps.user_authn.exceptions import AuthFailedError
 from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
 from openedx.core.lib.api.parsers import MergePatchParser
+from common.djangoapps.student.models import (  # lint-amnesty, pylint: disable=unused-import
+    AccountRecovery,
+    CourseEnrollment,
+    CourseEnrollmentAllowed,
+    LoginFailures,
+    ManualEnrollmentAudit,
+    PendingEmailChange,
+    PendingNameChange,
+    Registration,
+    User,
+    UserProfile,
+    get_potentially_retired_user_by_username,
+    get_retired_email_by_email,
+    get_retired_username_by_username,
+    is_username_retired
+)
 
 from ..errors import AccountUpdateError, AccountValidationError, UserNotAuthorized, UserNotFound
 from ..message_types import DeletionNotificationMessage
@@ -73,15 +76,10 @@ from ..models import (
     UserRetirementStatus
 )
 from .api import get_account_settings, update_account_settings
-from .permissions import CanDeactivateUser, CanGetAccountInfo, CanReplaceUsername, CanRetireUser
-from .serializers import (
-    PendingNameChangeSerializer,
-    UserRetirementPartnerReportSerializer,
-    UserRetirementStatusSerializer,
-    UserSearchEmailSerializer
-)
+from .permissions import CanDeactivateUser, CanReplaceUsername, CanRetireUser
+from .serializers import UserRetirementPartnerReportSerializer, UserRetirementStatusSerializer
 from .signals import USER_RETIRE_LMS_CRITICAL, USER_RETIRE_LMS_MISC, USER_RETIRE_MAILINGS
-from .utils import create_retirement_request_and_deactivate_account, username_suffix_generator
+from .utils import create_retirement_request_and_deactivate_account
 
 try:
     from coaching.api import has_ever_consented_to_coaching
@@ -109,7 +107,6 @@ def request_requires_username(function):
     Requires that a ``username`` key containing a truthy value exists in
     the ``request.data`` attribute of the decorated function.
     """
-
     @wraps(function)
     def wrapper(self, request):  # pylint: disable=missing-docstring
         username = request.data.get('username', None)
@@ -119,7 +116,6 @@ def request_requires_username(function):
                 data={'message': 'The user was not specified.'}
             )
         return function(self, request)
-
     return wrapper
 
 
@@ -138,8 +134,6 @@ class AccountViewSet(ViewSet):
             GET /api/user/v1/accounts/{username}/[?view=shared]
 
             PATCH /api/user/v1/accounts/{username}/{"key":"value"} "application/merge-patch+json"
-
-            POST /api/user/v1/accounts/search_emails "application/json"
 
         **Notes for PATCH requests to /accounts endpoints**
             * Requested updates to social_links are automatically merged with
@@ -169,7 +163,6 @@ class AccountViewSet(ViewSet):
             values.
 
             * id: numerical lms user id in db
-            * activation_key: auto-genrated activation key when signed up via email
             * bio: null or textual representation of user biographical
               information ("about me").
             * country: An ISO 3166 country code or null.
@@ -182,7 +175,6 @@ class AccountViewSet(ViewSet):
             * secondary_email: A secondary email address for the user. Unlike
               the email field, GET will reflect the latest update to this field
               even if changes have yet to be confirmed.
-            * verified_name: Approved verified name of the learner present in name affirmation plugin
             * gender: One of the following values:
 
                 * null
@@ -246,9 +238,6 @@ class AccountViewSet(ViewSet):
             * phone_number: The phone number for the user. String of numbers with
               an optional `+` sign at the start.
 
-            * pending_name_change: If the user has an active name change request, returns the
-              requested name.
-
             For all text fields, plain text instead of HTML is supported. The
             data is stored exactly as specified. Clients must HTML escape
             rendered values to avoid script injections.
@@ -291,8 +280,8 @@ class AccountViewSet(ViewSet):
     authentication_classes = (
         JwtAuthentication, BearerAuthenticationAllowInactiveUser, SessionAuthenticationAllowInactiveUser
     )
-    permission_classes = (permissions.IsAuthenticated, CanGetAccountInfo)
-    parser_classes = (JSONParser, MergePatchParser,)
+    permission_classes = (permissions.IsAuthenticated,)
+    parser_classes = (MergePatchParser,)
 
     def get(self, request):
         """
@@ -303,12 +292,10 @@ class AccountViewSet(ViewSet):
     def list(self, request):
         """
         GET /api/user/v1/accounts?username={username1,username2}
-        GET /api/user/v1/accounts?email={user_email} (Staff Only)
-        GET /api/user/v1/accounts?lms_user_id={lms_user_id} (Staff Only)
+        GET /api/user/v1/accounts?email={user_email}
         """
         usernames = request.GET.get('username')
         user_email = request.GET.get('email')
-        lms_user_id = request.GET.get('lms_user_id')
         search_usernames = []
 
         if usernames:
@@ -320,67 +307,13 @@ class AccountViewSet(ViewSet):
             except (UserNotFound, User.DoesNotExist):
                 return Response(status=status.HTTP_404_NOT_FOUND)
             search_usernames = [user.username]
-        elif lms_user_id:
-            try:
-                user = User.objects.get(id=lms_user_id)
-            except (UserNotFound, User.DoesNotExist):
-                return Response(status=status.HTTP_404_NOT_FOUND)
-            except ValueError:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
-            search_usernames = [user.username]
         try:
             account_settings = get_account_settings(
-                request, search_usernames, view=request.query_params.get('view')
-            )
+                request, search_usernames, view=request.query_params.get('view'))
         except UserNotFound:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         return Response(account_settings)
-
-    def search_emails(self, request):
-        """
-        POST /api/user/v1/accounts/search_emails
-        Content Type: "application/json"
-        {
-            "emails": ["edx@example.com", "staff@example.com"]
-        }
-        Response:
-        [
-            {
-                "username": "edx",
-                "email": "edx@example.com",
-                "id": 3,
-            },
-            {
-                "username": "staff",
-                "email": "staff@example.com",
-                "id": 8,
-            }
-        ]
-        """
-        if not request.user.is_staff:
-            return Response(
-                {
-                    'developer_message': 'not_found',
-                    'user_message': 'Not Found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        try:
-            user_emails = request.data['emails']
-        except KeyError as error:
-            error_message = f'{error} field is required'
-            return Response(
-                {
-                    'developer_message': error_message,
-                    'user_message': error_message
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        users = User.objects.filter(email__in=user_emails)
-        data = UserSearchEmailSerializer(users, many=True).data
-        return Response(data)
 
     def retrieve(self, request, username):
         """
@@ -402,9 +335,6 @@ class AccountViewSet(ViewSet):
         https://tools.ietf.org/html/rfc7396. The content_type must be "application/merge-patch+json" or
         else an error response with status code 415 will be returned.
         """
-        if request.content_type != MergePatchParser.media_type:
-            raise UnsupportedMediaType(request.content_type)
-
         try:
             with transaction.atomic():
                 update_account_settings(request.user, request.data, username=username)
@@ -427,48 +357,12 @@ class AccountViewSet(ViewSet):
         return Response(account_settings)
 
 
-class NameChangeView(APIView):
-    """
-    Request a profile name change. This creates a PendingNameChange to be verified later,
-    rather than updating the user's profile name directly.
-    """
-    authentication_classes = (JwtAuthentication, SessionAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def post(self, request):
-        """
-        POST /api/user/v1/accounts/name_change/
-
-        Example request:
-            {
-                "name": "Jon Doe"
-            }
-        """
-        user = request.user
-        new_name = request.data.get('name', None)
-        rationale = f'Name change requested through account API by {user.username}'
-
-        serializer = PendingNameChangeSerializer(data={'new_name': new_name})
-
-        if serializer.is_valid():
-            pending_name_change = do_name_change_request(user, new_name, rationale)[0]
-            if pending_name_change:
-                return Response(status=status.HTTP_201_CREATED)
-            else:
-                return Response(
-                    {'new_name': 'The profile name given was identical to the current name.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-        return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
-
-
 class AccountDeactivationView(APIView):
     """
     Account deactivation viewset. Currently only supports POST requests.
     Only admins can deactivate accounts.
     """
-    authentication_classes = (JwtAuthentication,)
+    authentication_classes = (JwtAuthentication, )
     permission_classes = (permissions.IsAuthenticated, CanDeactivateUser)
 
     def post(self, request, username):
@@ -514,8 +408,8 @@ class DeactivateLogoutView(APIView):
     -  Log the user out
     - Create a row in the retirement table for that user
     """
-    authentication_classes = (JwtAuthentication, SessionAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
+    authentication_classes = (JwtAuthentication, SessionAuthentication, )
+    permission_classes = (permissions.IsAuthenticated, )
 
     def post(self, request):
         """
@@ -552,7 +446,7 @@ class DeactivateLogoutView(APIView):
                     ace.send(notification)
                 except Exception as exc:
                     log.exception('Error sending out deletion notification email')
-                    raise exc
+                    raise
 
                 # Log the user out.
                 logout(request)
@@ -655,9 +549,7 @@ class AccountRetirementPartnerReportView(ViewSet):
         try:
             # if the user has ever launched a managed Zoom xblock,
             # we'll notify Zoom to delete their records.
-            # We use models.Value(1) to make use of the indexing on the field. MySQL does not
-            # support boolean types natively, and checking for False will cause a table scan.
-            if user.launchlog_set.filter(managed=models.Value(1)).count():
+            if user.launchlog_set.filter(managed=True).count():
                 orgs.add('zoom')
         except AttributeError:
             # Zoom XBlock not installed
@@ -866,7 +758,7 @@ class AccountRetirementStatusView(ViewSet):
         except ValueError:
             return Response('Invalid cool_off_days, should be integer.', status=status.HTTP_400_BAD_REQUEST)
         except KeyError as exc:
-            return Response(f'Missing required parameter: {str(exc)}',
+            return Response('Missing required parameter: {}'.format(str(exc)),
                             status=status.HTTP_400_BAD_REQUEST)
         except RetirementStateError as exc:
             return Response(str(exc), status=status.HTTP_400_BAD_REQUEST)
@@ -906,9 +798,9 @@ class AccountRetirementStatusView(ViewSet):
             return Response(serializer.data)
         # This should only occur on the datetime conversion of the start / end dates.
         except ValueError as exc:
-            return Response(f'Invalid start or end date: {str(exc)}', status=status.HTTP_400_BAD_REQUEST)
+            return Response('Invalid start or end date: {}'.format(str(exc)), status=status.HTTP_400_BAD_REQUEST)
         except KeyError as exc:
-            return Response(f'Missing required parameter: {str(exc)}',
+            return Response('Missing required parameter: {}'.format(str(exc)),
                             status=status.HTTP_400_BAD_REQUEST)
         except RetirementState.DoesNotExist:
             return Response('Unknown retirement state.', status=status.HTTP_400_BAD_REQUEST)
@@ -1217,7 +1109,7 @@ class UsernameReplacementView(APIView):
     This API will be called first, before calling the APIs in other services as this
     one handles the checks on the usernames provided.
     """
-    authentication_classes = (JwtAuthentication,)
+    authentication_classes = (JwtAuthentication, )
     permission_classes = (permissions.IsAuthenticated, CanReplaceUsername)
 
     def post(self, request):
@@ -1327,8 +1219,8 @@ class UsernameReplacementView(APIView):
         # Keep checking usernames in case desired_username + random suffix is already taken
         while True:
             if User.objects.filter(username=new_username).exists():
-                # adding a dash between user-supplied and system-generated values to avoid weird combinations
-                new_username = desired_username + '-' + username_suffix_generator(suffix_length)
+                unique_suffix = uuid.uuid4().hex[:suffix_length]
+                new_username = desired_username + unique_suffix
             else:
                 break
         return new_username

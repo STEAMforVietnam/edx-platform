@@ -10,8 +10,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils.translation import ngettext, gettext as _
 
-from xmodule.util.misc import is_xblock_an_assignment
-from openedx.core.djangolib.markup import HTML, Text
+from common.lib.xmodule.xmodule.util.misc import is_xblock_an_assignment
 from openedx.core.lib.mobile_utils import is_request_from_mobile_app
 from openedx.features.course_experience.url_helpers import is_request_from_learning_mfe
 from openedx.features.course_experience.utils import dates_banner_should_display
@@ -40,7 +39,7 @@ class PersonalizedLearnerScheduleCallToAction:
         missed_deadlines, missed_gated_content = dates_banner_should_display(course_key, request.user)
         # Not showing in the missed_gated_content case because those learners are not eligible
         # to shift due dates.
-        if missed_gated_content:
+        if not missed_deadlines or missed_gated_content:
             return []
 
         # Some checks to disable PLS calls to action until these environments (mobile and MFE) support them natively
@@ -54,7 +53,7 @@ class PersonalizedLearnerScheduleCallToAction:
             if self._is_block_shiftable(xblock, category):
                 ctas.append(self._make_reset_deadlines_cta(xblock, category, is_learning_mfe))
 
-        elif category == self.VERTICAL_BANNER and not completed and missed_deadlines:
+        elif category == self.VERTICAL_BANNER and not completed:
             # xblock is a vertical, so we'll check all the problems inside it. If there are any that will show a
             # a "shift dates" CTA under CAPA_SUBMIT_DISABLED, then we'll also show the same CTA as a vertical banner.
             if any(self._is_block_shiftable(item, category) for item in xblock.get_display_items()):
@@ -120,14 +119,9 @@ class PersonalizedLearnerScheduleCallToAction:
             'form_values': {
                 'course_id': course_key,
             },
-            'description': Text('{b_open}{header}{b_close} {explanation}').format(
-                b_open=HTML('<b>'),
-                b_close=HTML('</b>'),
-                header=_('It looks like you missed some important deadlines based on our suggested schedule.'),
-                explanation=_('To keep yourself on track, you can update this schedule and shift the past due '
-                              'assignments into the future. Don’t worry—you won’t lose any of the progress you’ve '
-                              'made when you shift your due dates.'),
-            ),
+            'description': _('To participate in this assignment, the suggested schedule for your course needs '
+                             'updating. Don’t worry, we’ll shift all the due dates for you and you won’t lose '
+                             'any of your progress.'),
         }
 
         has_attempts = hasattr(xblock, 'attempts') and hasattr(xblock, 'max_attempts')

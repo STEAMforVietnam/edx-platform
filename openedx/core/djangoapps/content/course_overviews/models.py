@@ -13,12 +13,12 @@ from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.fields import (
-    BooleanField, DateTimeField, DecimalField, FloatField, IntegerField, TextField
+    BooleanField, DateTimeField, DecimalField, FloatField, IntegerField, NullBooleanField, TextField
 )
 from django.db.models.signals import post_save, post_delete
 from django.db.utils import IntegrityError
 from django.template import defaultfilters
-
+from django.utils.encoding import python_2_unicode_compatible
 from django.utils.functional import cached_property
 from model_utils.models import TimeStampedModel
 from opaque_keys.edx.django.models import CourseKeyField, UsageKeyField
@@ -30,11 +30,12 @@ from openedx.core.djangoapps.lang_pref.api import get_closest_released_language
 from openedx.core.djangoapps.models.course_details import CourseDetails
 from openedx.core.lib.cache_utils import request_cached, RequestCache
 from common.djangoapps.static_replace.models import AssetBaseUrlConfig
-from xmodule import block_metadata_utils, course_metadata_utils  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.course_module import DEFAULT_START_DATE, CourseBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.error_module import ErrorBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.tabs import CourseTab  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule import block_metadata_utils, course_metadata_utils
+from xmodule.course_module import DEFAULT_START_DATE, CourseBlock
+from xmodule.error_module import ErrorBlock
+from xmodule.modulestore.django import modulestore
+from xmodule.tabs import CourseTab
+
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class CourseOverviewCaseMismatchException(Exception):
     pass
 
 
+@python_2_unicode_compatible
 class CourseOverview(TimeStampedModel):
     """
     Model for storing and caching basic information about a course.
@@ -54,10 +56,6 @@ class CourseOverview(TimeStampedModel):
         course catalog (courses to enroll in)
         course about (meta data about the course)
 
-    When you bump the VERSION you will invalidate all existing course overviews. This
-    will cause a slew of modulestore reads as each course needs to be re-cached into
-    the course overview.
-
     .. no_pii:
     """
 
@@ -65,7 +63,7 @@ class CourseOverview(TimeStampedModel):
         app_label = 'course_overviews'
 
     # IMPORTANT: Bump this whenever you modify this model and/or add a migration.
-    VERSION = 16
+    VERSION = 12  # this one goes to thirteen
 
     # Cache entry versioning.
     version = IntegerField()
@@ -78,15 +76,12 @@ class CourseOverview(TimeStampedModel):
     display_number_with_default = TextField()
     display_org_with_default = TextField()
 
+    # Start/end dates
+    # TODO Remove 'start' & 'end' in removing field in column renaming, DE-1822
     start = DateTimeField(null=True)
     end = DateTimeField(null=True)
-
-    # These are deprecated and unused, but cannot be dropped via simple migration due to the size of the downstream
-    # history table. See DENG-19 for details.
-    # Please use start and end above for these values.
     start_date = DateTimeField(null=True)
     end_date = DateTimeField(null=True)
-
     advertised_start = TextField(null=True)
     announcement = DateTimeField(null=True)
 
@@ -132,13 +127,7 @@ class CourseOverview(TimeStampedModel):
     eligible_for_financial_aid = BooleanField(default=True)
 
     # Course highlight info, used to guide course update emails
-    has_highlights = BooleanField(null=True, default=None)  # if None, you have to look up the answer yourself
-
-    # Proctoring
-    enable_proctored_exams = BooleanField(default=False)
-    proctoring_provider = TextField(null=True)
-    proctoring_escalation_email = TextField(null=True)
-    allow_proctoring_opt_out = BooleanField(default=False)
+    has_highlights = NullBooleanField(default=None)  # if None, you have to look up the answer yourself
 
     language = TextField(null=True)
 
@@ -205,7 +194,10 @@ class CourseOverview(TimeStampedModel):
         course_overview.display_org_with_default = course.display_org_with_default
 
         course_overview.start = start
+        # Add writes to new fields 'start_date' & 'end_date'.
+        course_overview.start_date = start
         course_overview.end = end
+        course_overview.end_date = end
         course_overview.advertised_start = course.advertised_start
         course_overview.announcement = course.announcement
 
@@ -213,18 +205,13 @@ class CourseOverview(TimeStampedModel):
         course_overview.course_image_url = course_image_url(course)
         course_overview.social_sharing_url = course.social_sharing_url
 
-        updated_available_date, updated_display_behavior = CourseDetails.validate_certificate_settings(
-            course.certificate_available_date,
-            course.certificates_display_behavior
-        )
-
-        course_overview.certificates_display_behavior = updated_display_behavior
-        course_overview.certificate_available_date = updated_available_date
+        course_overview.certificates_display_behavior = course.certificates_display_behavior
         course_overview.certificates_show_before_end = course.certificates_show_before_end
         course_overview.cert_html_view_enabled = course.cert_html_view_enabled
         course_overview.has_any_active_web_certificate = (get_active_web_certificate(course) is not None)
         course_overview.cert_name_short = course.cert_name_short
         course_overview.cert_name_long = course.cert_name_long
+        course_overview.certificate_available_date = course.certificate_available_date
         course_overview.lowest_passing_grade = lowest_passing_grade
         course_overview.end_of_course_survey_url = course.end_of_course_survey_url
 
@@ -246,11 +233,6 @@ class CourseOverview(TimeStampedModel):
         course_overview.self_paced = course.self_paced
 
         course_overview.has_highlights = cls._get_course_has_highlights(course)
-
-        course_overview.enable_proctored_exams = course.enable_proctored_exams
-        course_overview.proctoring_provider = course.proctoring_provider
-        course_overview.proctoring_escalation_email = course.proctoring_escalation_email
-        course_overview.allow_proctoring_opt_out = course.allow_proctoring_opt_out
 
         if not CatalogIntegration.is_enabled():
             course_overview.language = course.language
@@ -395,8 +377,14 @@ class CourseOverview(TimeStampedModel):
         # Regenerate the thumbnail images if they're missing (either because
         # they were never generated, or because they were flushed out after
         # a change to CourseOverviewImageConfig.
-        if course_overview and not hasattr(course_overview, 'image_set'):
-            CourseOverviewImageSet.create(course_overview)
+        if course_overview:
+            if hasattr(course_overview, 'image_set'):
+                image_set = course_overview.image_set
+                if not image_set.small_url or not image_set.large_url:
+                    CourseOverviewImageSet.objects.filter(course_overview=course_overview).delete()
+                    CourseOverviewImageSet.create(course_overview)
+            else:
+                CourseOverviewImageSet.create(course_overview)
 
         return course_overview or cls.load_from_module_store(course_id)
 
@@ -585,6 +573,19 @@ class CourseOverview(TimeStampedModel):
             return defaultfilters.date(self.start, "DATE_FORMAT")
         else:
             return None
+
+    def may_certify(self):
+        """
+        Returns whether it is acceptable to show the student a certificate
+        download link.
+        """
+        return course_metadata_utils.may_certify_for_course(
+            self.certificates_display_behavior,
+            self.certificates_show_before_end,
+            self.has_ended(),
+            self.certificate_available_date,
+            self.self_paced
+        )
 
     @property
     def pre_requisite_courses(self):
@@ -908,6 +909,7 @@ class CourseOverviewTab(models.Model):
         return self.tab_id
 
 
+@python_2_unicode_compatible
 class CourseOverviewImageSet(TimeStampedModel):
     """
     Model for Course overview images. Each column is an image type/size.
@@ -1050,6 +1052,7 @@ class CourseOverviewImageSet(TimeStampedModel):
         )
 
 
+@python_2_unicode_compatible
 class CourseOverviewImageConfig(ConfigurationModel):
     """
     This sets the size of the thumbnail images that Course Overviews will generate
@@ -1085,6 +1088,7 @@ class CourseOverviewImageConfig(ConfigurationModel):
         )
 
 
+@python_2_unicode_compatible
 class SimulateCoursePublishConfig(ConfigurationModel):
     """
     Manages configuration for a run of the simulate_publish management command.

@@ -1,19 +1,20 @@
 """Tests for effort_estimation transformers."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from crum import set_current_request
 from django.test.client import RequestFactory
-from edx_toggles.toggles.testutils import override_waffle_flag
 from edxval.api import create_video, remove_video_for_course
 
+from lms.djangoapps.experiments.testutils import override_experiment_waffle_flag
 from openedx.core.djangoapps.content.block_structure.factory import BlockStructureFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import SampleCourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.sample_courses import BlockInfo  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import SampleCourseFactory
+from xmodule.modulestore.tests.sample_courses import BlockInfo
 
 from ..block_transformers import EffortEstimationTransformer
-from ..toggles import EFFORT_ESTIMATION_DISABLED_FLAG
+from ..toggles import EFFORT_ESTIMATION_LOCATION_FLAG
 
 
 # Copied here, rather than used directly from class, just to catch any accidental changes
@@ -107,8 +108,9 @@ class TestEffortEstimationTransformer(ModuleStoreTestCase):
     def get_collection_field(self, key, name):
         return self.block_structure.get_transformer_block_field(key, EffortEstimationTransformer, name)
 
-    def assert_collected(self):
-        """Confirm we at least collected the data (but not necessarily that we injected that data into block tree)"""
+    def test_collection(self):
+        self.collect()
+
         assert self.get_collection_field(self.video_clip_key, VIDEO_DURATION) == 200
         assert self.get_collection_field(self.video_clip_key, VIDEO_CLIP_DURATION) == 40
         assert self.get_collection_field(self.video_normal_key, VIDEO_DURATION) == 30
@@ -119,10 +121,7 @@ class TestEffortEstimationTransformer(ModuleStoreTestCase):
 
         assert self.block_structure.get_transformer_data(EffortEstimationTransformer, DISABLE_ESTIMATION) is None
 
-    def test_collection(self):
-        self.collect()
-        self.assert_collected()
-
+    @override_experiment_waffle_flag(EFFORT_ESTIMATION_LOCATION_FLAG, bucket=1)
     def test_incomplete_data_collection(self):
         """Ensure that missing video data prevents any estimates from being generated"""
         remove_video_for_course(str(self.course_key), 'edxval3')
@@ -135,22 +134,44 @@ class TestEffortEstimationTransformer(ModuleStoreTestCase):
         assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_ACTIVITIES) is None
         assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_TIME) is None
 
-    @override_waffle_flag(EFFORT_ESTIMATION_DISABLED_FLAG, True)
-    def test_disabled(self):
+    @override_experiment_waffle_flag(EFFORT_ESTIMATION_LOCATION_FLAG, bucket=0)
+    def test_control_bucket(self):
         self.collect_and_transform()
-        self.assert_collected()
         assert self.block_structure.get_xblock_field(self.section_key, EFFORT_ACTIVITIES) is None
         assert self.block_structure.get_xblock_field(self.section_key, EFFORT_TIME) is None
         assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_ACTIVITIES) is None
         assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_TIME) is None
 
-    def test_enabled(self):
+    @override_experiment_waffle_flag(EFFORT_ESTIMATION_LOCATION_FLAG, bucket=1)
+    def test_section_bucket(self):
         self.collect_and_transform()
         assert self.block_structure.get_xblock_field(self.section_key, EFFORT_ACTIVITIES) == 1
         assert self.block_structure.get_xblock_field(self.section_key, EFFORT_TIME) == 121
+        assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_ACTIVITIES) is None
+        assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_TIME) is None
+
+    @override_experiment_waffle_flag(EFFORT_ESTIMATION_LOCATION_FLAG, bucket=2)
+    def test_subsection_bucket(self):
+        self.collect_and_transform()
+        assert self.block_structure.get_xblock_field(self.section_key, EFFORT_ACTIVITIES) is None
+        assert self.block_structure.get_xblock_field(self.section_key, EFFORT_TIME) is None
         assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_ACTIVITIES) == 1
         assert self.block_structure.get_xblock_field(self.subsection_key, EFFORT_TIME) == 121
 
+    def test_no_collection_no_bucket(self):
+        """
+        Test that if we don't have any collection data, we don't bucket at all.
+
+        Useful to make sure that during rollout before we re-publish a course, we aren't trying to bucket anyone.
+        """
+        where = 'openedx.features.effort_estimation.toggles.EFFORT_ESTIMATION_LOCATION_FLAG.get_bucket'
+        with patch(where, return_value=1) as mock_get_bucket:
+            self.transform()  # no collection
+        assert self.block_structure.get_xblock_field(self.section_key, EFFORT_ACTIVITIES) is None
+        assert self.block_structure.get_xblock_field(self.section_key, EFFORT_TIME) is None
+        assert mock_get_bucket.call_count == 0
+
+    @override_experiment_waffle_flag(EFFORT_ESTIMATION_LOCATION_FLAG, bucket=1)
     def test_mobile_video_support(self):
         """Clips values are ignored and web only videos should be excluded"""
         self.set_mobile_request()

@@ -7,12 +7,13 @@ from abc import ABCMeta
 from collections import OrderedDict
 from logging import getLogger
 
+from django.utils.html import escape
 from lazy import lazy
 
 from lms.djangoapps.grades.models import BlockRecord, PersistentSubsectionGrade
 from lms.djangoapps.grades.scores import compute_percent, get_score, possibly_scored
-from xmodule import block_metadata_utils, graders  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.graders import AggregatedScore, ShowCorrectness  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule import block_metadata_utils, graders
+from xmodule.graders import AggregatedScore, ShowCorrectness
 
 log = getLogger(__name__)
 
@@ -24,17 +25,12 @@ class SubsectionGradeBase(metaclass=ABCMeta):
 
     def __init__(self, subsection):
         self.location = subsection.location
-        self.display_name = block_metadata_utils.display_name_with_default(subsection)
+        self.display_name = escape(block_metadata_utils.display_name_with_default(subsection))
         self.url_name = block_metadata_utils.url_name_for_block(subsection)
 
-        self.due = getattr(subsection, 'due', None)
-        self.end = getattr(subsection, 'end', None)
         self.format = getattr(subsection, 'format', '')
+        self.due = getattr(subsection, 'due', None)
         self.graded = getattr(subsection, 'graded', False)
-        transformer_data = getattr(subsection, 'transformer_data', None)
-        hidden_content_data = transformer_data and subsection.transformer_data.get('hidden_content')
-        self.hide_after_due = hidden_content_data and hidden_content_data.fields.get('merged_hide_after_due')
-        self.self_paced = subsection.self_paced
         self.show_correctness = getattr(subsection, 'show_correctness', '')
 
         self.course_version = getattr(subsection, 'course_version', None)

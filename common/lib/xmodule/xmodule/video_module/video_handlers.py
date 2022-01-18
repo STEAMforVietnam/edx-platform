@@ -58,8 +58,6 @@ class VideoStudentViewHandlers:
     """
     Handlers for video module instance.
     """
-    global_speed = None
-    transcript_language = None
 
     def handle_ajax(self, dispatch, data):
         """
@@ -99,7 +97,7 @@ class VideoStudentViewHandlers:
                     setattr(self, key, value)
 
                     if key == 'speed':
-                        self.global_speed = self.speed
+                        self.global_speed = self.speed  # lint-amnesty, pylint: disable=attribute-defined-outside-init
 
             return json.dumps({'success': True})
 
@@ -240,14 +238,14 @@ class VideoStudentViewHandlers:
         Return value: JSON response (200 on success, 400 for malformed data)
         """
         completion_service = self.runtime.service(self, 'completion')
-        if completion_service is None:
+        if completion_service is None:  # lint-amnesty, pylint: disable=no-else-raise
             raise JsonHandlerError(500, "No completion service found")
-        if not completion_service.completion_tracking_enabled():
+        elif not completion_service.completion_tracking_enabled():
             raise JsonHandlerError(404, "Completion tracking is not enabled and API calls are unexpected")
-        if not isinstance(data['completion'], (int, float)):
+        if not isinstance(data['completion'], (int, float)):  # lint-amnesty, pylint: disable=no-else-raise
             message = "Invalid completion value {}. Must be a float in range [0.0, 1.0]"
             raise JsonHandlerError(400, message.format(data['completion']))
-        if not 0.0 <= data['completion'] <= 1.0:
+        elif not 0.0 <= data['completion'] <= 1.0:
             message = "Invalid completion value {}. Must be in range [0.0, 1.0]"
             raise JsonHandlerError(400, message.format(data['completion']))
         self.runtime.publish(self, "completion", data)
@@ -323,8 +321,8 @@ class VideoStudentViewHandlers:
                 log.info("Video: transcript facilities are not available for given language.")
                 return Response(status=404)
 
-            if language != self.transcript_language:
-                self.transcript_language = language
+            if language != self.transcript_language:  # lint-amnesty, pylint: disable=access-member-before-definition
+                self.transcript_language = language  # lint-amnesty, pylint: disable=attribute-defined-outside-init
 
             try:
                 if is_bumper:
@@ -453,9 +451,9 @@ class VideoStudioViewHandlers:
         elif (
             data['language_code'] != data['new_language_code'] and data['new_language_code'] in available_translations
         ):
-            error = _('A transcript with the "{language_code}" language code already exists.').format(
-                language_code=data['new_language_code'],
-            )
+            error = _('A transcript with the "{language_code}" language code already exists.'.format(  # lint-amnesty, pylint: disable=translation-of-non-string
+                language_code=data['new_language_code']
+            ))
         elif 'file' not in data:
             error = _('A transcript file is required.')
 

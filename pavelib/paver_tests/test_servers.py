@@ -100,6 +100,7 @@ class TestPaverServerTasks(PaverTestCase):
         [{"fast": True}],
         [{"optimized": True}],
         [{"optimized": True, "fast": True}],
+        [{"no-contracts": True}],
     )
     @ddt.unpack
     def test_devstack(self, server_options):
@@ -118,7 +119,7 @@ class TestPaverServerTasks(PaverTestCase):
                 settings=expected_settings,
             )
         ]
-        self.verify_server_task("devstack", options)
+        self.verify_server_task("devstack", options, contracts_default=True)
 
         # Then test with Studio
         options["system"] = "cms"
@@ -128,7 +129,7 @@ class TestPaverServerTasks(PaverTestCase):
                 settings=expected_settings,
             )
         ]
-        self.verify_server_task("devstack", options)
+        self.verify_server_task("devstack", options, contracts_default=True)
 
     @ddt.data(
         [{}],
@@ -192,7 +193,7 @@ class TestPaverServerTasks(PaverTestCase):
                ["echo 'import {system}.envs.{settings}' | python manage.py {system} "
                 "--settings={settings} shell --plain --pythonpath=.".format(system=system, settings=settings)]
 
-    def verify_server_task(self, task_name, options):
+    def verify_server_task(self, task_name, options, contracts_default=False):
         """
         Verify the output of a server task.
         """
@@ -201,6 +202,7 @@ class TestPaverServerTasks(PaverTestCase):
         asset_settings = options.get("asset-settings", None)
         is_optimized = options.get("optimized", False)
         is_fast = options.get("fast", False)
+        no_contracts = options.get("no-contracts", not contracts_default)
         if task_name == "devstack":
             system = options.get("system")
         elif task_name == "studio":
@@ -219,6 +221,8 @@ class TestPaverServerTasks(PaverTestCase):
                 args.append("--optimized")
             if is_fast:
                 args.append("--fast")
+            if no_contracts:
+                args.append("--no-contracts")
             call_task("pavelib.servers.devstack", args=args)
         else:
             call_task(f"pavelib.servers.{task_name}", options=options)
@@ -253,6 +257,8 @@ class TestPaverServerTasks(PaverTestCase):
             settings=expected_settings,
             port=port,
         )
+        if not no_contracts:
+            expected_run_server_command += " --contracts"
         expected_messages.append(expected_run_server_command)
         assert self.task_messages == expected_messages
 

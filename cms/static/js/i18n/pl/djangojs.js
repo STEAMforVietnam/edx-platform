@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = (n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);
-    if (typeof v === 'boolean') {
+    var v=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,9 +19,19 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
     " ${price} {currency} )": " ${price} {currency} )",
     " and ": "i",
+    " learner does not exist in LMS and not added to the exception list": "student nie figuruje w LMS i nie zostanie dodany do listy wyj\u0105tk\u00f3w",
+    " learner is already white listed and not added to the exception list": "student znajduje si\u0119 ju\u017c na bia\u0142ej li\u015bcie i nie zosta\u0142 dodany do listy wyj\u0105tk\u00f3w",
+    " learner is not enrolled in course and not added to the exception list": "student nie uczestniczy w kursie i nie zosta\u0142 dodany do listy wyj\u0105tk\u00f3w",
+    " learner is successfully added to the exception list": "student pomy\u015blnie dodany do listy wyj\u0105tk\u00f3w",
+    " learners are already white listed and not added to the exception list": "student\u00f3w znajduje si\u0119 ju\u017c na bia\u0142ej li\u015bcie i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
+    " learners are not enrolled in course and not added to the exception list": "student\u00f3w nie uczestniczy w kursie i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
+    " learners are successfully added to exception list": "student\u00f3w pomy\u015blnie dodanych do listy wyj\u0105tk\u00f3w",
+    " learners do not exist in LMS and not added to the exception list": "student\u00f3w nie figuruje w LMS i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
+    " record is not in correct format and not added to the exception list": "pozycja nie znajduje si\u0119 we w\u0142a\u015bciwym formacie i nie zosta\u0142a dodana do listy wyj\u0105tk\u00f3w",
+    " records are not in correct format and not added to the exception list": "pozycji nie znajduje si\u0119 we w\u0142a\u015bciwym formacie i nie zosta\u0142o dodanych do listy wyj\u0105tk\u00f3w",
     "${listPrice}": "${listPrice}",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
     "%(errorCount)s error found in form.": [
@@ -61,6 +70,8 @@
     "6 a.m.": "6 rano",
     "6 p.m.": "6 po po\u0142udniu",
     ": video upload complete.": ": przesy\u0142anie filmu uko\u0144czone.",
+    "<%= user %> already in exception list.": "<%= user %> ju\u017c figuruje na li\u015bcie wyj\u0105tk\u00f3w.",
+    "<%= user %> has been successfully added to the exception list. Click Generate Exception Certificate below to send the certificate.": "Student <%= user %> zosta\u0142 pomy\u015blnie dodany do listy wyj\u0105tk\u00f3w. Kliknij przycisk poni\u017cej, aby wys\u0142a\u0107 certyfikat.",
     "A driver's license, passport, or other government-issued ID with your name and photo": "Dow\u00f3d osobisty, prawo jazdy, paszport lub inny dokument to\u017csamo\u015bci zawieraj\u0105cy twoje zdj\u0119cie oraz imi\u0119 i nazwisko.",
     "A highlight to look forward to this week.": "Wskaz\u00f3wka na ten tydzie\u0144.",
     "A list of courses you have just enrolled in as a verified student": "Lista kurs\u00f3w na kt\u00f3re zapisa\u0142e\u015b si\u0119 ostatnio jako zweryfikowany student",
@@ -226,6 +237,7 @@
     "Cancel team updating.": "Anuluj edycj\u0119 zespo\u0142u",
     "Cannot delete when in use by a unit": "Nie mo\u017cna usun\u0105\u0107 je\u015bli znajduje si\u0119 w u\u017cyciu w ekranie",
     "Cannot delete when in use by an experiment": "Nie mo\u017cna usun\u0105\u0107 gdy znajduje si\u0119 w eksperymencie",
+    "Cannot drop more <%= types %> assignments than are assigned.": "Nie mo\u017cna pomin\u0105\u0107 wi\u0119cej ni\u017c <%= types %> przydzielonych zada\u0144.",
     "Caution: The last published version of this unit is live. By publishing changes you will change the student experience.": "Uwaga: Ostatnio opublikowana wersja tego ekranu znajduje si\u0119 obecnie w u\u017cyciu. Dokonuj\u0105c zmian, zmienisz stan post\u0119pu student\u00f3w.",
     "Certificate Details": "Szczeg\u00f3\u0142y certyfikatu",
     "Certificate Generated": "Certyfikat wygenerowany",
@@ -316,6 +328,7 @@
     "Copy Email To Editor": "Skopiuj e-mail do edytora",
     "Correct failed component": "Napraw b\u0142\u0119dny element",
     "Cost": "Cena",
+    "Could not find Certificate Exception in white list. Please refresh the page and try again": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 wyj\u0105tku certyfikatu na bia\u0142ej li\u015bcie. Prosz\u0119 od\u015bwie\u017cy\u0107 stron\u0119 i spr\u00f3bowa\u0107 ponownie.",
     "Could not find Certificate Invalidation in the list. Please refresh the page and try again": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 uniewa\u017cnienia certyfikatu na li\u015bcie. Prosz\u0119 od\u015bwie\u017cy\u0107 stron\u0119 i spr\u00f3bowa\u0107 ponownie.",
     "Could not find a user with username or email address '<%- identifier %>'.": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 u\u017cytkownika o nazwie lub adresie e-mail '<%- identifier %>'.",
     "Could not find users associated with the following identifiers:": "Nie uda\u0142o si\u0119 odnale\u017a\u0107 u\u017cytkownik\u00f3w o podanych identyfikatorach:",
@@ -325,6 +338,7 @@
     "Could not submit order": "Sk\u0142adanie zam\u00f3wienia nie powiod\u0142o si\u0119",
     "Could not submit photos": "Przes\u0142anie zdj\u0119cia nie powiod\u0142o si\u0119.",
     "Could not upload the video image file": "Nie uda\u0142o si\u0119 przes\u0142a\u0107 pliku obrazka filmu.",
+    "Couldn't Save This Assignment": "Nie uda\u0142o si\u0119 zapisa\u0107 tego zadania",
     "Country": "Region",
     "Country of residence": "Kraj zamieszkania",
     "Country or Region of Residence": "Kraj lub region",
@@ -446,6 +460,7 @@
     "Enable": "W\u0142\u0105cz",
     "Enable Cohorts": "W\u0142\u0105cz kohorty",
     "Enable Now": "W\u0142\u0105cz",
+    "Enable Weekly Highlight Emails": "W\u0142\u0105cz cotygodniowe e-maile podsumowuj\u0105ce",
     "Enabled": "W\u0142\u0105czone",
     "End My Exam": "Zako\u0144cz m\u00f3j egzamin",
     "Ends {end}": "Zako\u0144czy si\u0119 {end}",
@@ -499,6 +514,7 @@
     "Error listing task history for this student and problem.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie generowania historii czynno\u015bci dla tego studenta i \u0107wiczenia.",
     "Error removing user": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie usuwania u\u017cytkownika",
     "Error resetting entrance exam attempts for student '{student_id}'. Make sure student identifier is correct.": "Wyst\u0105pi\u0142 b\u0142\u0105d przy zerowaniu podej\u015b\u0107 do egzaminu wst\u0119pnego dla studenta '{student_id}'. Upewnij si\u0119, \u017ce identyfikator studenta jest poprawny. ",
+    "Error resetting problem attempts for problem '<%= problem_id %>' and student '<%- student_id %>'. Make sure that the problem and student identifiers are complete and correct.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie resetowania podej\u015b\u0107 do \u0107wiczenia '<%= problem_id %>'  studenta '<%- student_id %>'. Upewnij si\u0119, \u017ce identyfikatory \u0107wiczenia i studenta s\u0105 kompletne i poprawne.",
     "Error retrieving grading configuration.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie pobierania konfiguracji ocen.",
     "Error sending email.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie wysy\u0142ania wiadomo\u015bci e-mail.",
     "Error starting a task to override score for problem '<%- problem_id %>' for student '<%- student_id %>'. Make sure that the the score and the problem and student identifiers are complete and correct.": "Wyst\u0105pi\u0142 b\u0142\u0105d w trakcie nadpisywania wyniku \u0107wiczenia '<%- problem_id %>' dla studenta '<%- student_id %>'. Upewnij si\u0119, \u017ce wynik, oraz identyfikatory \u0107wiczenia oraz studenta s\u0105 poprawne.",
@@ -759,6 +775,7 @@
     "No posts matched your query.": "Brak wpis\u00f3w pasuj\u0105cych do zapytania.",
     "No prerequisite": "Brak wymagania wst\u0119pnego",
     "No results": "Brak wynik\u00f3w",
+    "No results found for \"%(query_string)s\". Please try searching again.": "Brak wynik\u00f3w dla \"%(query_string)s\". Spr\u00f3buj wyszuka\u0107 ponownie.",
     "No results found for {original_query}. Showing results for {suggested_query}.": "Brak wynik\u00f3w dla {original_query}. Wy\u015bwietlam wyniki dla {suggested_query}.",
     "No tasks currently running.": "Brak czynno\u015bci w toku.",
     "No transcript uploaded.": "Nie przes\u0142ano transkrypcji.",
@@ -846,6 +863,7 @@
     "Please add the instructor's title": "Prosz\u0119 poda\u0107 tytu\u0142 prowadz\u0105cego",
     "Please address the errors on this page first, and then save your progress.": "Zwr\u00f3\u0107 uwag\u0119 na b\u0142\u0119dy wskazane na tej stronie, a nast\u0119pnie zapisz sw\u00f3j post\u0119p.",
     "Please check the following validation feedbacks and reflect them in your course settings:": "Prosz\u0119 zapozna\u0107 si\u0119 z poni\u017cszymi komunikatami uwierzytelniania i nanie\u015b\u0107 stosowne zmiany do ustawie\u0144 kursu:",
+    "Please correct the outlined fields.": "Prosz\u0119 poprawi\u0107 zaznaczone pola.",
     "Please describe this image or agree that it has no contextual value by checking the checkbox.": "Prosz\u0119 opisa\u0107 ten obraz lub zaznaczy\u0107 okienko je\u015bli obraz nie posiada warto\u015bci kontekstowej.",
     "Please do not use any spaces in this field.": "Prosimy nie u\u017cywa\u0107 spacji w tym polu.",
     "Please do not use any spaces or special characters in this field.": "Prosimy nie u\u017cywa\u0107 spacji ani znak\u00f3w specjalnych.",
@@ -894,6 +912,7 @@
     "Processing Re-run Request": "Przetwarzanie \u017c\u0105dania wznowienia",
     "Proctored": "Nadzorowany",
     "Proctored Exam": "Egzamin nadzorowany",
+    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "Egzaminy nadzorowane s\u0105 egzaminami z limitem czasu i obejmuj\u0105 nagrywanie filmowe ka\u017cdego studenta w trakcie przebiegu jego egzaminu. Filmy mo\u017cna nast\u0119pnie sprawdzi\u0107 i upewni\u0107 si\u0119, \u017ce studenci stosowali si\u0119 do zasad egzaminacyjnych.",
     "Product Name": "Nazwa produktu",
     "Professional Certificate for {courseName}": "Certyfikat Edukacji Specjalistycznej kursu {courseName}",
     "Professional Education": "Edukacja Specjalistyczna",
@@ -1080,6 +1099,7 @@
     "Status": "Status",
     "Status of Your Response": "Status twojej odpowiedzi",
     "Student": "Student",
+    "Student Removed from certificate white list successfully.": "Student zosta\u0142 pomy\u015blnie usuni\u0119ty z bia\u0142ej listy certyfikat\u00f3w.",
     "Student email or username": "Nazwa u\u017cytkownika lub adres e-mail studenta",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Add to Exception List\" button.": "Pole nazwa u\u017cytkownika/adres e-mail studenta jest wymagane i nie mo\u017ce pozosta\u0107 puste. Uzupe\u0142nij brakuj\u0105ce informacje, a nast\u0119pnie kliknij \"Dodaj do listy wyj\u0105tk\u00f3w\".",
     "Student username/email field is required and can not be empty. Kindly fill in username/email and then press \"Invalidate Certificate\" button.": "Pole nazwa u\u017cytkownika/adres e-mail studenta jest wymagane i nie mo\u017ce pozosta\u0107 puste. Uzupe\u0142nij brakuj\u0105ce informacje, a nast\u0119pnie kliknij \"Uniewa\u017cnij certyfikat\".",
@@ -1183,6 +1203,7 @@
     "The post you selected has been deleted.": "Wybrany przez ciebie wpis zosta\u0142 usuni\u0119ty.",
     "The published branch version, {published}, was reset to the draft branch version, {draft}.": "Opublikowana wersja ga\u0142\u0119zi {published} zosta\u0142a zresetowana do wersji roboczej ga\u0142\u0119zi {draft}.",
     "The raw error message is:": "Surowy komunikat b\u0142\u0119du:",
+    "The refund deadline for this course has passed,so you will not receive a refund.": "Termin mo\u017cliwego zwrotu pieni\u0119dzy za ten kurs ju\u017c min\u0105\u0142, wi\u0119c nie mo\u017cesz otrzyma\u0107 zwrotu pieni\u0119dzy.",
     "The selected content group does not exist": "Wybrana grupa tre\u015bci nie istnieje",
     "The selected image must be larger than {minFileSizeInKB}.": "Wybrany obrazek musi wa\u017cy\u0107 wi\u0119cej ni\u017c {minFileSizeInKB}.",
     "The selected image must be smaller than {maxFileSizeInMB}.": "Wybrany obrazek musi wa\u017cy\u0107 mniej ni\u017c {maxFileSizeInMB}.",
@@ -1244,6 +1265,7 @@
     "This course has automatic cohorting enabled for verified track learners, but the required cohort does not exist. You must create a manually-assigned cohort named '{verifiedCohortName}' for the feature to work.": "Ten kurs wykorzystuje system automatycznych kohort dla student\u00f3w \u015bcie\u017cki zweryfikowanej, jednak wymagana kohorta nie istnieje. Musisz utworzy\u0107 r\u0119cznie przydzielon\u0105 kohort\u0119 o nazwie '{verifiedCohortName}'.",
     "This course uses automatic cohorting for verified track learners. You cannot disable cohorts, and you cannot rename the manual cohort named '{verifiedCohortName}'. To change the configuration for verified track cohorts, contact your edX partner manager.": "Ten kurs wykorzystuje system automatycznych kohort dla student\u00f3w \u015bcie\u017cki zweryfikowanej. Nie mo\u017cesz wy\u0142\u0105czy\u0107 kohort, ani zmieni\u0107 nazwy kohorty '{verifiedCohortName}'. Aby zmieni\u0107 konfiguracj\u0119 kohort \u015bcie\u017cki zweryfikowanej, skontaktuj si\u0119 ze swoim Opiekunem Partnera.",
     "This discussion could not be loaded. Refresh the page and try again.": "Nie uda\u0142o si\u0119 wczyta\u0107 dyskusji. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
+    "This feature is currently in testing. Course teams can enter highlights, but learners will not receive email messages.": "Ta funkcja znajduje si\u0119 obecnie w fazie test\u00f3w. Kadry kurs\u00f3w mog\u0105 wprowadza\u0107 szczeg\u00f3\u0142y, jednak studenci nie otrzymaj\u0105 wiadomo\u015bci e-mail.",
     "This feedback could not be submitted.": "Nie uda\u0142o si\u0119 wys\u0142a\u0107 tej opinii.",
     "This file type is not supported. Supported file type is {supportedFileFormat}.": "Ten format pliku jest niewspierany. Wspieranym formatem plik\u00f3w jest {supportedFileFormat}.",
     "This group controls access to:": "Ta grupa odpowiada za dost\u0119p do:",
@@ -1264,6 +1286,7 @@
     "This post could not be unflagged for abuse. Refresh the page and try again.": "Nie uda\u0142o si\u0119 cofn\u0105\u0107 oflagowania tego wpisu jako nieodpowiedniego. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This post could not be unpinned. Refresh the page and try again.": "Nie uda\u0142o si\u0119 odpi\u0105\u0107 tego wpisu. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This problem could not be saved.": "Nie uda\u0142o si\u0119 zapisa\u0107 \u0107wiczenia.",
+    "This problem has already been released. Any changes will apply only to future assessments.": "To \u0107wiczenie zosta\u0142o ju\u017c opublikowane. Jakiekolwiek zmiany b\u0119d\u0105 obowi\u0105zywa\u0107 tylko dla przysz\u0142ych ocen.",
     "This response could not be marked as an answer. Refresh the page and try again.": "Nie uda\u0142o si\u0119 oznaczy\u0107 tej odpowiedzi jako udzielonej odpowiedzi. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This response could not be marked as endorsed. Refresh the page and try again.": "Nie uda\u0142o si\u0119 oznaczy\u0107 tej odpowiedzi jako zatwierdzonej. Od\u015bwie\u017c stron\u0119 i spr\u00f3buj ponownie.",
     "This response could not be saved.": "Nie uda\u0142o si\u0119 zapisa\u0107 tej odpowiedzi.",
@@ -1453,6 +1476,7 @@
     "We've sent a message to {email}. Click the link in the message to reset your password. Didn't receive the message? Contact {anchorStart}technical support{anchorEnd}.": "Na adres {email} zosta\u0142a wys\u0142ana wiadomo\u015b\u0107. Kliknij w odno\u015bnik w wiadomo\u015bci, aby zresetowa\u0107 has\u0142o. Je\u015bli wiadomo\u015b\u0107 nie dotar\u0142a, skontaktuj si\u0119 z {anchorStart}pomoc\u0105 techniczn\u0105{anchorEnd}.",
     "Web:": "Sie\u0107:",
     "Webcam": "Kamerka internetowa",
+    "Weekly Highlight Emails": "Cotygodniowe e-maile podsumowuj\u0105ce",
     "Weight of Total Grade": "Waga w ocenie ko\u0144cowej",
     "What You Need for Verification": "Czego potrzebujesz do potwierdzenia to\u017csamo\u015bci",
     "What does %(platformName)s do with this photo?": "W jaki spos\u00f3b %(platformName)s dba o bezpiecze\u0144stwo danych?",
@@ -1495,7 +1519,9 @@
     "You did not select a content group": "Nie wybrano grupy tre\u015bci",
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "Wygl\u0105da na to, \u017ce nie posiadasz zainstalowanego flasha. Zainstaluj flasha, aby kontynuowa\u0107 swoj\u0105 weryfikacj\u0119.",
     "You don't seem to have a webcam connected.": "Wygl\u0105da na to, \u017ce nie masz pod\u0142\u0105czonej kamery internetowej.",
+    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "Doda\u0142e\u015b kryterium. Musisz teraz wybra\u0107 opcj\u0119 dla kryterium z poziomu Szkolenia Studenta. Aby to zrobi\u0107, kliknij na Ustawienia.",
     "You have already verified your ID!": "Ju\u017c potwierdzi\u0142e\u015b swoj\u0105 to\u017csamo\u015b\u0107!",
+    "You have been logged out of your edX account. Click Okay to log in again now. Click Cancel to stay on this page (you must log in again to save your work).": "Zosta\u0142e\u015b wylogowany ze swojego konta. Kliknij OK, aby zalogowa\u0107 si\u0119 ponownie. Kliknij anuluj, aby pozosta\u0107 na tej stronie (musisz zalogowa\u0107 si\u0119 ponownie, aby zapisa\u0107 swoj\u0105 prac\u0119).",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "Usun\u0105\u0142e\u015b kryterium. Tak wi\u0119c kryterium zosta\u0142o usuni\u0119te z przyk\u0142adowych odpowiedzi w Szkoleniu Studenta.",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "Usun\u0105\u0142e\u015b wszystkie opcje dla tego kryterium. Tak wi\u0119c kryterium zosta\u0142o usuni\u0119te z przyk\u0142adowych odpowiedzi w Szkoleniu Studenta.",
     "You have deleted an option. That option has been removed from its criterion in the sample responses in the Learner Training step. You might have to select a new option for the criterion.": "Usun\u0105\u0142e\u015b opcj\u0119. Ta opcja zosta\u0142a usuni\u0119ta z kryterium w przyk\u0142adowych odpowiedziach w Szkoleniu Studenta. By\u0107 mo\u017ce musisz teraz wybra\u0107 now\u0105 opcj\u0119 dla tego kryterium.",
@@ -1505,8 +1531,8 @@
     "You have not created any certificates yet.": "Nie stworzy\u0142e\u015b jeszcze \u017cadnych certyfikat\u00f3w.",
     "You have not created any content groups yet.": "Nie stworzy\u0142e\u015b jeszcze \u017cadnej grupy tre\u015bci.",
     "You have not created any group configurations yet.": "Nie stworzy\u0142e\u015b jeszcze \u017cadnych konfiguracji grupy.",
-    "You have selected an action, and you haven\u2019t made any changes on individual fields. You\u2019re probably looking for the Go button rather than the Save button.": "Wybrano akcj\u0119, lecz nie dokonano \u017cadnych zmian w polach. Prawdopodobnie szukasz przycisku \u201eWykonaj\u201d, a nie \u201eZapisz\u201d.",
-    "You have selected an action, but you haven\u2019t saved your changes to individual fields yet. Please click OK to save. You\u2019ll need to re-run the action.": "Wybrano akcj\u0119, lecz cz\u0119\u015b\u0107 zmian w polach nie zosta\u0142a zachowana. Kliknij OK, aby zapisa\u0107. Aby wykona\u0107 akcj\u0119, nale\u017cy j\u0105 ponownie uruchomi\u0107.",
+    "You have selected an action, and you haven't made any changes on individual fields. You're probably looking for the Go button rather than the Save button.": "Wybrano akcj\u0119, lecz nie dokonano \u017cadnych zmian w polach. Prawdopodobnie szukasz przycisku \u201eWykonaj\u201d, a nie \u201eZapisz\u201d.",
+    "You have selected an action, but you haven't saved your changes to individual fields yet. Please click OK to save. You'll need to re-run the action.": "Wybrano akcj\u0119, lecz cz\u0119\u015b\u0107 zmian w polach nie zosta\u0142a zachowana. Kliknij OK, aby zapisa\u0107. Aby wykona\u0107 akcj\u0119, nale\u017cy j\u0105 ponownie uruchomi\u0107.",
     "You have successfully signed into %(currentProvider)s, but your %(currentProvider)s account does not have a linked %(platformName)s account. To link your accounts, sign in now using your %(platformName)s password.": "Pomy\u015blnie zalogowa\u0142e\u015b si\u0119 do %(currentProvider)s, ale twoje konto %(currentProvider)s nie jest po\u0142\u0105czone z kontem w %(platformName)s. Aby po\u0142\u0105czy\u0107 konta, zaloguj si\u0119 u\u017cywaj\u0105c swojego has\u0142a w %(platformName)s.",
     "You have successfully updated your goal.": "Pomy\u015blnie zaktualizowano cel nauki.",
     "You have unsaved changes on individual editable fields. If you run an action, your unsaved changes will be lost.": "Zmiany w niekt\u00f3rych polach nie zosta\u0142y zachowane. Po wykonaniu akcji, zmiany te zostan\u0105 utracone.",
@@ -1570,18 +1596,6 @@
     "Zoom In": "Powi\u0119ksz",
     "Zoom Out": "Pomniejsz",
     "[no tags]": "[brak tag\u00f3w]",
-    "abbrev. month April\u0004Apr": "Kwi",
-    "abbrev. month August\u0004Aug": "Sie",
-    "abbrev. month December\u0004Dec": "Gru",
-    "abbrev. month February\u0004Feb": "Lut",
-    "abbrev. month January\u0004Jan": "Sty",
-    "abbrev. month July\u0004Jul": "Lip",
-    "abbrev. month June\u0004Jun": "Cze",
-    "abbrev. month March\u0004Mar": "Mar",
-    "abbrev. month May\u0004May": "Maj",
-    "abbrev. month November\u0004Nov": "Lis",
-    "abbrev. month October\u0004Oct": "Pa\u017a",
-    "abbrev. month September\u0004Sep": "Wrz",
     "and others": "i inni",
     "anonymous": "anonimowy",
     "bytes": "bajt\u00f3w",
@@ -1712,24 +1726,24 @@
     "{type} Progress": "{type} - post\u0119p",
     "\u2026": "\u2026"
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1739,16 +1753,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1771,6 +1785,7 @@
       "%d.%m.%Y %H:%M:%S",
       "%d.%m.%Y %H:%M:%S.%f",
       "%d.%m.%Y %H:%M",
+      "%d.%m.%Y",
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
@@ -1800,8 +1815,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1820,5 +1835,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

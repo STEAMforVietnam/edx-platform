@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.core import exceptions
 from django.http import Http404, HttpResponse, HttpResponseServerError
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django.views.decorators import csrf
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -21,7 +21,7 @@ import lms.djangoapps.discussion.django_comment_client.settings as cc_settings
 import openedx.core.djangoapps.django_comment_common.comment_client as cc
 from common.djangoapps.util.file import store_uploaded_file
 from lms.djangoapps.courseware.access import has_access
-from lms.djangoapps.courseware.courses import get_course_overview_with_access, get_course_with_access
+from lms.djangoapps.courseware.courses import get_course_by_id, get_course_overview_with_access, get_course_with_access
 from lms.djangoapps.courseware.exceptions import CourseAccessRedirect
 from lms.djangoapps.discussion.django_comment_client.permissions import (
     check_permissions_by_view,
@@ -39,8 +39,7 @@ from lms.djangoapps.discussion.django_comment_client.utils import (
     get_group_id_for_comments_service,
     get_user_group_ids,
     is_comment_too_deep,
-    prepare_content,
-    sanitize_body,
+    prepare_content
 )
 from openedx.core.djangoapps.django_comment_common.signals import (
     comment_created,
@@ -56,7 +55,6 @@ from openedx.core.djangoapps.django_comment_common.signals import (
     thread_voted
 )
 from openedx.core.djangoapps.django_comment_common.utils import ThreadContext
-from openedx.core.lib.courses import get_course_by_id
 
 log = logging.getLogger(__name__)
 
@@ -264,7 +262,7 @@ def create_thread(request, course_id, commentable_id):
         'course_id': str(course_key),
         'user_id': user.id,
         'thread_type': post["thread_type"],
-        'body': sanitize_body(post["body"]),
+        'body': post["body"],
         'title': post["title"],
     }
 
@@ -327,7 +325,7 @@ def update_thread(request, course_id, thread_id):
     thread = cc.Thread.find(thread_id)
     # Get thread context first in order to be safe from reseting the values of thread object later
     thread_context = getattr(thread, "context", "course")
-    thread.body = sanitize_body(request.POST["body"])
+    thread.body = request.POST["body"]
     thread.title = request.POST["title"]
     user = request.user
     # The following checks should avoid issues we've seen during deploys, where end users are hitting an updated server
@@ -382,7 +380,7 @@ def _create_comment(request, course_key, thread_id=None, parent_id=None):
         course_id=str(course_key),
         thread_id=thread_id,
         parent_id=parent_id,
-        body=sanitize_body(post["body"]),
+        body=post["body"]
     )
     comment.save()
 
@@ -442,7 +440,7 @@ def update_comment(request, course_id, comment_id):
     comment = cc.Comment.find(comment_id)
     if 'body' not in request.POST or not request.POST['body'].strip():
         return JsonError(_("Body can't be empty"))
-    comment.body = sanitize_body(request.POST["body"])
+    comment.body = request.POST["body"]
     comment.save()
 
     comment_edited.send(sender=None, user=request.user, post=comment)

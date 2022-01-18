@@ -10,6 +10,8 @@ from django.conf import settings
 from django.core.management import call_command
 from testfixtures import LogCapture
 
+from common.djangoapps.student.tests.factories import \
+    UserFactory  # lint-amnesty, pylint: disable=import-error, unused-import, useless-suppression
 from common.test.utils import MockS3BotoMixin
 from lms.djangoapps.verify_student.models import SoftwareSecurePhotoVerification, SSPVerificationRetryConfig
 from lms.djangoapps.verify_student.tests import TestVerificationBase
@@ -77,7 +79,7 @@ class TestVerifyStudentCommand(MockS3BotoMixin, TestVerificationBase):
                     log.check_present(
                         (
                             LOGGER_NAME, 'INFO',
-                            f'Attempting to retry {1} failed PhotoVerification submissions'
+                            'Attempting to retry {} failed PhotoVerification submissions'.format(1)
                         ),
                     )
 

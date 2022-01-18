@@ -8,11 +8,10 @@ import json
 
 import ddt
 
-from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.courseware.services import UserStateService
-from lms.djangoapps.courseware.tests.factories import StudentModuleFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from lms.djangoapps.courseware.tests.factories import StudentModuleFactory, UserFactory
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 @ddt.ddt

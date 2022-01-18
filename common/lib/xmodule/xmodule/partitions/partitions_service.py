@@ -6,18 +6,12 @@ persist the assignments.
 
 
 import logging
-from typing import Dict
-
 from django.conf import settings
-from django.contrib.auth import get_user_model
+
 from openedx.core.lib.cache_utils import request_cached
 from openedx.core.lib.dynamic_partitions_generators import DynamicPartitionGeneratorsPluginManager
-
 from xmodule.modulestore.django import modulestore
 from xmodule.partitions.partitions import get_partition_from_id
-from .partitions import Group
-
-User = get_user_model()
 
 log = logging.getLogger(__name__)
 
@@ -44,8 +38,7 @@ def get_all_partitions_for_course(course, active_only=False):
     return all_partitions
 
 
-def get_user_partition_groups(course_key: str, user_partitions: list, user: User,
-                              partition_dict_key: str = 'name') -> Dict[str, Group]:
+def get_user_partition_groups(course_key, user_partitions, user, partition_dict_key='name'):
     """
     Collect group ID for each partition in this course for this user.
      Arguments:

@@ -11,7 +11,7 @@ from scipy import stats
 from openedx.core.lib.api.view_utils import DeveloperErrorViewMixin, view_auth_classes
 from openedx.core.lib.cache_utils import request_cached
 from openedx.core.lib.graph_traversals import traverse_pre_order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 from .utils import course_author_access_required, get_bool_param
 
@@ -255,7 +255,10 @@ class CourseQualityView(DeveloperErrorViewMixin, GenericAPIView):
                 len(cls._get_children(block)) == 0
             )
 
-        return list(traverse_pre_order(unit, cls._get_visible_children, leaf_filter))
+        return [
+            block for block in  # lint-amnesty, pylint: disable=unnecessary-comprehension
+            traverse_pre_order(unit, cls._get_visible_children, leaf_filter)
+        ]
 
     def _stats_dict(self, data):  # lint-amnesty, pylint: disable=missing-function-docstring
         if not data:

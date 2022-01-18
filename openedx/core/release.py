@@ -8,7 +8,7 @@ import unittest
 # The release line: an Open edX release name ("ficus"), or "master".
 # This should always be "master" on the master branch, and will be changed
 # manually when we start release-line branches, like open-release/ficus.master.
-RELEASE_LINE = "master"
+RELEASE_LINE = "lilac"
 
 
 def doc_version():
@@ -19,7 +19,7 @@ def doc_version():
     if RELEASE_LINE == "master":
         return "latest"
     else:
-        return f"open-release-{RELEASE_LINE}.master"
+        return "open-release-{}.master".format(RELEASE_LINE)
 
 
 def skip_unless_master(func_or_class):

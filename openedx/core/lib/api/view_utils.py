@@ -2,17 +2,17 @@
 Utilities related to API views
 """
 
-from collections.abc import Sequence
+from collections import Sequence  # lint-amnesty, pylint: disable=no-name-in-module
 from functools import wraps
 
 from django.core.exceptions import NON_FIELD_ERRORS, ObjectDoesNotExist, ValidationError
 from django.http import Http404, HttpResponseBadRequest
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.exceptions import APIException, ErrorDetail
 from rest_framework.generics import GenericAPIView
 from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
@@ -91,7 +91,7 @@ class DeveloperErrorViewMixin:
             return exc.response
         elif isinstance(exc, APIException):
             return self._make_error_response(exc.status_code, exc.detail)
-        elif isinstance(exc, (Http404, ObjectDoesNotExist)):
+        elif isinstance(exc, Http404) or isinstance(exc, ObjectDoesNotExist):  # lint-amnesty, pylint: disable=consider-merging-isinstance
             return self._make_error_response(404, str(exc) or "Not found.")
         elif isinstance(exc, ValidationError):
             return self._make_validation_error_response(exc)
@@ -401,60 +401,33 @@ def get_course_key(request, course_id=None):
     return CourseKey.from_string(course_id)
 
 
-def verify_course_exists(missing_course_error_message=None):
+def verify_course_exists(view_func):
     """
     A decorator to wrap a view function that takes `course_key` as a parameter.
 
     Raises:
         An API error if the `course_key` is invalid, or if no `CourseOverview` exists for the given key.
     """
+    @wraps(view_func)
+    def wrapped_function(self, request, **kwargs):
+        """
+        Wraps the given view_function.
+        """
+        try:
+            course_key = get_course_key(request, kwargs.get('course_id'))
+        except InvalidKeyError:
+            raise self.api_error(  # lint-amnesty, pylint: disable=raise-missing-from
+                status_code=status.HTTP_404_NOT_FOUND,
+                developer_message='The provided course key cannot be parsed.',
+                error_code='invalid_course_key'
+            )
 
-    if not missing_course_error_message:
-        missing_course_error_message = "Unknown course {course}"
+        if not CourseOverview.course_exists(course_key):
+            raise self.api_error(
+                status_code=status.HTTP_404_NOT_FOUND,
+                developer_message="Requested grade for unknown course {course}".format(course=str(course_key)),
+                error_code='course_does_not_exist'
+            )
 
-    def _verify_course_exists(view_func):
-        @wraps(view_func)
-        def wrapped_function(self, request, **kwargs):
-            """
-            Wraps the given view_function.
-            """
-            try:
-                course_key = get_course_key(request, kwargs.get('course_id'))
-            except InvalidKeyError as error:
-                raise self.api_error(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    developer_message='The provided course key cannot be parsed.',
-                    error_code='invalid_course_key'
-                ) from error
-            if not CourseOverview.course_exists(course_key):
-                raise self.api_error(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    developer_message=missing_course_error_message.format(course=str(course_key)),
-                    error_code='course_does_not_exist'
-                )
-
-            return view_func(self, request, **kwargs)
-        return wrapped_function
-    return _verify_course_exists
-
-
-def validate_course_key(course_key_string: str) -> CourseKey:
-    """
-    Validate and parse a course_key string, if supported.
-
-    Args:
-        course_key_string (str): string course key to validate
-
-    Returns:
-        CourseKey: validated course key
-
-    Raises:
-        ValidationError: DRF Validation error in case the course key is invalid
-    """
-    try:
-        course_key = CourseKey.from_string(course_key_string)
-    except InvalidKeyError as error:
-        raise serializers.ValidationError(f"{course_key_string} is not a valid CourseKey") from error
-    if course_key.deprecated:
-        raise serializers.ValidationError("Deprecated CourseKeys (Org/Course/Run) are not supported.")
-    return course_key
+        return view_func(self, request, **kwargs)
+    return wrapped_function

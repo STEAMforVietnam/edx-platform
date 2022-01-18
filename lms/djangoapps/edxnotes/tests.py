@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from datetime import datetime
 from unittest import skipUnless
 from unittest.mock import MagicMock, patch
-from urllib.parse import parse_qs, urlparse
 
 import ddt
 import jwt
@@ -19,6 +18,7 @@ from django.test.client import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
 from oauth2_provider.models import Application
+from six.moves.urllib.parse import parse_qs, urlparse
 
 from common.djangoapps.edxmako.shortcuts import render_to_string
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, SuperuserFactory, UserFactory
@@ -28,12 +28,11 @@ from lms.djangoapps.courseware.tabs import get_course_tab_list
 from openedx.core.djangoapps.oauth_dispatch.jwt import create_jwt_for_user
 from openedx.core.djangoapps.oauth_dispatch.tests.factories import ApplicationFactory
 from openedx.core.djangoapps.user_api.models import RetirementState, UserRetirementStatus
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.tabs import CourseTab  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.tests.helpers import StubUserService  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.tabs import CourseTab
 
 from . import helpers
 from .decorators import edxnotes
@@ -82,8 +81,7 @@ class TestProblem:
         self.system = MagicMock(is_author_mode=False)
         self.scope_ids = MagicMock(usage_id="test_usage_id")
         user = user or UserFactory()
-        user_service = StubUserService(user)
-        self.runtime = MagicMock(course_id=course.id, service=lambda _a, _b: user_service)
+        self.runtime = MagicMock(course_id=course.id, get_real_user=lambda __: user)
         self.descriptor = MagicMock()
         self.descriptor.runtime.modulestore.get_course.return_value = course
 
@@ -934,7 +932,7 @@ class EdxNotesHelpersTest(ModuleStoreTestCase):
                 # verify that constructed url has only correct params and params have correct values
                 for param, value in params.items():
                     assert param in allowed_params
-                    assert f'{param}={value[0]}' in expected
+                    assert '{}={}'.format(param, value[0]) in expected
 
         next_url, previous_url = helpers.construct_pagination_urls(
             self.request,
@@ -1079,12 +1077,7 @@ class EdxNotesViewsTest(ModuleStoreTestCase):
         response = self.client.get(self.get_token_url)
         assert response.status_code == 200
         client = Application.objects.get(name='edx-notes')
-        jwt.decode(
-            response.content,
-            client.client_secret,
-            audience=client.client_id,
-            algorithms=[settings.JWT_AUTH['JWT_ALGORITHM']]
-        )
+        jwt.decode(response.content, client.client_secret, audience=client.client_id)
 
     @patch.dict("django.conf.settings.FEATURES", {"ENABLE_EDXNOTES": True})
     def test_get_id_token_anonymous(self):

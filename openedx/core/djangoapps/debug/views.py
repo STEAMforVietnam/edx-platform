@@ -8,7 +8,7 @@ in a 404 error.
 import bleach
 from django.http import HttpResponseNotFound
 from django.template import TemplateDoesNotExist
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 
 from common.djangoapps.edxmako.shortcuts import render_to_response
 from openedx.core.djangoapps.util.user_messages import PageLevelMessages
@@ -54,4 +54,4 @@ def show_reference_template(request, template):
 
         return render_to_response(template, context)
     except TemplateDoesNotExist:
-        return HttpResponseNotFound(f'Missing template {bleach.clean(template, strip=True)}')
+        return HttpResponseNotFound('Missing template {template}'.format(template=bleach.clean(template, strip=True)))

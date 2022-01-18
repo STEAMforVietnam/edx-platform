@@ -14,16 +14,15 @@ from opaque_keys.edx.locator import CourseLocator
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
 from common.djangoapps.util.testing import UrlResetMixin
-from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.certificates.api import is_passing_status
 from lms.djangoapps.certificates.tests.factories import GeneratedCertificateFactory
 from lms.envs.test import CREDENTIALS_PUBLIC_SERVICE_URL
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.site_configuration.tests.mixins import SiteMixin
 from openedx.features.learner_profile.toggles import REDIRECT_TO_PROFILE_MICROFRONTEND
 from openedx.features.learner_profile.views.learner_profile import learner_profile_context
-from xmodule.data import CertificatesDisplayBehaviors  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 @ddt.ddt
@@ -172,7 +171,7 @@ class LearnerProfileViewTest(SiteMixin, UrlResetMixin, ModuleStoreTestCase):
         cert.save()
 
         # Ensure that this test is actually using both passing and non-passing certs.
-        assert CertificateStatuses.is_passing_status(cert.status) == is_passed_status
+        assert is_passing_status(cert.status) == is_passed_status
 
         response = self.client.get(f'/u/{self.user.username}')
 
@@ -223,8 +222,7 @@ class LearnerProfileViewTest(SiteMixin, UrlResetMixin, ModuleStoreTestCase):
         """
         # add new course with certificate_available_date is future date.
         course = CourseFactory.create(
-            certificate_available_date=datetime.datetime.now() + datetime.timedelta(days=5),
-            certificates_display_behavior=CertificatesDisplayBehaviors.END_WITH_DATE
+            certificate_available_date=datetime.datetime.now() + datetime.timedelta(days=5)
         )
 
         cert = self._create_certificate(course_key=course.id)

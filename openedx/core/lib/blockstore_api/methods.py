@@ -201,7 +201,7 @@ def update_bundle(bundle_uuid, **fields):
     if "collection_uuid" in fields:
         data["collection_uuid"] = str(fields.pop("collection_uuid"))
     if fields:
-        raise ValueError(f"Unexpected extra fields passed "
+        raise ValueError(f"Unexpected extra fields passed "  # pylint: disable=dict-keys-not-iterating
                          f"to update_bundle: {fields.keys()}")
     result = api_request('patch', api_url('bundles', str(bundle_uuid)), json=data)
     return _bundle_from_response(result)

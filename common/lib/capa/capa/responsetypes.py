@@ -34,7 +34,7 @@ import six
 # specific library imports
 from calc import UndefinedVariable, UnmatchedParenthesis, evaluator
 from django.utils import html
-
+from django.utils.encoding import python_2_unicode_compatible
 from lxml import etree
 from lxml.html.soupparser import fromstring as fromstring_bs  # uses Beautiful Soup!!! FIXME?
 from pyparsing import ParseException
@@ -110,6 +110,7 @@ class StudentInputError(Exception):
 # Main base class for CAPA responsetypes
 
 
+@python_2_unicode_compatible
 class LoncapaResponse(six.with_metaclass(abc.ABCMeta, object)):
     """
     Base class for CAPA responsetypes.  Each response type (ie a capa question,
@@ -212,7 +213,7 @@ class LoncapaResponse(six.with_metaclass(abc.ABCMeta, object)):
             self.answer_id = self.answer_ids[0]
 
         # map input_id -> maxpoints
-        self.maxpoints = {}
+        self.maxpoints = dict()
         for inputfield in self.inputfields:
             # By default, each answerfield is worth 1 point
             maxpoints = inputfield.get('points', '1')
@@ -264,7 +265,7 @@ class LoncapaResponse(six.with_metaclass(abc.ABCMeta, object)):
 
         response_index = response_id.split('_')[-1]
         # Translators: index here could be 1,2,3 and so on
-        response_label = _('Question {index}').format(index=response_index)
+        response_label = _(u'Question {index}').format(index=response_index)
 
         # wrap the content inside a section
         tree = etree.Element('div')
@@ -367,13 +368,13 @@ class LoncapaResponse(six.with_metaclass(abc.ABCMeta, object)):
         # Tricky: label None means output defaults, while '' means output empty label
         if label is None:
             if correct:
-                label = _('Correct:')
+                label = _(u'Correct:')
             else:
-                label = _('Incorrect:')
+                label = _(u'Incorrect:')
 
         # self.runtime.track_function('get_demand_hint', event_info)
         # This this "feedback hint" event
-        event_info = {}
+        event_info = dict()
         event_info['module_id'] = text_type(self.capa_module.location)
         event_info['problem_part_id'] = self.id
         event_info['trigger_type'] = 'single'  # maybe be overwritten by log_extra
@@ -580,7 +581,7 @@ class LoncapaResponse(six.with_metaclass(abc.ABCMeta, object)):
         pass
 
     def __str__(self):
-        return 'LoncapaProblem Response %s' % self.xml.tag
+        return u'LoncapaProblem Response %s' % self.xml.tag
 
     def _render_response_msg_html(self, response_msg):
         """ Render a <div> for a message that applies to the entire response.
@@ -986,7 +987,7 @@ class MultipleChoiceResponse(LoncapaResponse):
     whole software stack works with just the one system of naming.
     The .has_mask() test on a response checks for masking, implemented by a
     ._has_mask attribute on the response object.
-    The logging functionality in capa_module calls the unmask functions here
+    The logging functionality in capa_base calls the unmask functions here
     to translate back to choice_0 name style for recording in the logs, so
     the logging is in terms of the regular names.
     """
@@ -1599,7 +1600,7 @@ class NumericalResponse(LoncapaResponse):
 
         _ = edx_six.get_gettext(self.capa_system.i18n)
         general_exception = StudentInputError(
-            _("Could not interpret '{student_answer}' as a number.").format(student_answer=html.escape(student_answer))
+            _(u"Could not interpret '{student_answer}' as a number.").format(student_answer=html.escape(student_answer))
         )
 
         # Begin `evaluator` block
@@ -1628,7 +1629,7 @@ class NumericalResponse(LoncapaResponse):
                 raise general_exception  # lint-amnesty, pylint: disable=raise-missing-from
         except ParseException:
             raise StudentInputError(  # lint-amnesty, pylint: disable=raise-missing-from
-                _("Invalid math syntax: '{student_answer}'").format(student_answer=html.escape(student_answer))
+                _(u"Invalid math syntax: '{student_answer}'").format(student_answer=html.escape(student_answer))
             )
         except Exception:
             raise general_exception  # lint-amnesty, pylint: disable=raise-missing-from
@@ -1659,7 +1660,7 @@ class NumericalResponse(LoncapaResponse):
 
         if self.range_tolerance:
             if isinstance(student_float, complex):
-                raise StudentInputError(_("You may not use complex numbers in range tolerance problems"))
+                raise StudentInputError(_(u"You may not use complex numbers in range tolerance problems"))
             boundaries = []
             for inclusion, answer in zip(self.inclusion, self.answer_range):
                 boundary = self.get_staff_ans(answer)
@@ -1778,7 +1779,7 @@ class NumericalResponse(LoncapaResponse):
         Returns whether this answer is in a valid form.
         """
         try:
-            evaluator({}, {}, answer)
+            evaluator(dict(), dict(), answer)
             return True
         except (StudentInputError, UndefinedVariable, UnmatchedParenthesis):
             return False
@@ -2046,7 +2047,7 @@ class StringResponse(LoncapaResponse):
                 regexp = re.compile('^' + '|'.join(expected) + '$', flags=flags | re.UNICODE)
                 result = re.search(regexp, given)
             except Exception as err:
-                msg = '[courseware.capa.responsetypes.stringresponse] {error}: {message}'.format(
+                msg = u'[courseware.capa.responsetypes.stringresponse] {error}: {message}'.format(
                     error=_('error'),
                     message=text_type(err)
                 )
@@ -2190,7 +2191,7 @@ class CustomResponse(LoncapaResponse):
             # ordered list of answers
             submission = [student_answers[k] for k in idset]
         except Exception as err:
-            msg = "[courseware.capa.responsetypes.customresponse] {message}\n idset = {idset}, error = {err}".format(
+            msg = u"[courseware.capa.responsetypes.customresponse] {message}\n idset = {idset}, error = {err}".format(
                 message=_("error getting student answer from {student_answers}").format(
                     student_answers=student_answers,
                 ),
@@ -2215,7 +2216,7 @@ class CustomResponse(LoncapaResponse):
             # default to no error message on empty answer (to be consistent with other
             # responsetypes) but allow author to still have the old behavior by setting
             # empty_answer_err attribute
-            msg = (HTML('<span class="inline-error">{0}</span>').format(_('No answer entered!'))
+            msg = (HTML(u'<span class="inline-error">{0}</span>').format(_(u'No answer entered!'))
                    if self.xml.get('empty_answer_err') else '')
             return CorrectMap(idset[0], 'incorrect', msg=msg)
 
@@ -2563,7 +2564,7 @@ class SymbolicResponse(CustomResponse):
             log.error(traceback.format_exc())
             _ = edx_six.get_gettext(self.capa_system.i18n)
             # Translators: 'SymbolicResponse' is a problem type and should not be translated.
-            msg = _("An error occurred with SymbolicResponse. The error was: {error_msg}").format(
+            msg = _(u"An error occurred with SymbolicResponse. The error was: {error_msg}").format(
                 error_msg=err,
             )
             raise Exception(msg)  # lint-amnesty, pylint: disable=raise-missing-from
@@ -2586,14 +2587,14 @@ class CodeResponse(LoncapaResponse):
     """
     Grade student code using an external queueing server, called 'xqueue'.
 
-    Expects 'xqueue' dict in LoncapaSystem with the following properties that are
+    Expects 'xqueue' dict in LoncapaSystem with the following keys that are
     needed by CodeResponse::
 
-        capa_system.xqueue = object with properties:
-            interface: XQueueInterface object.
-            construct_callback: Per-StudentModule callback URL constructor,
+        capa_system.xqueue = {
+            'interface': XQueueInterface object.
+            'construct_callback': Per-StudentModule callback URL constructor,
                 defaults to using 'score_update' as the correct dispatch (function).
-            default_queuename: Default queue name to submit request (string).
+            'default_queuename': Default queue name to submit request (string).
         }
 
     External requests are only submitted for student submission grading, not
@@ -2623,7 +2624,7 @@ class CodeResponse(LoncapaResponse):
 
         # We do not support xqueue within Studio.
         if self.capa_system.xqueue is not None:
-            default_queuename = self.capa_system.xqueue.default_queuename
+            default_queuename = self.capa_system.xqueue['default_queuename']
         else:
             default_queuename = None
         self.queue_name = xml.get('queuename', default_queuename)
@@ -2659,7 +2660,7 @@ class CodeResponse(LoncapaResponse):
             codeparam, 'initial_display', '')
         _ = edx_six.get_gettext(self.capa_system.i18n)
         self.answer = find_with_default(codeparam, 'answer_display',
-                                        _('No answer provided.'))
+                                        _(u'No answer provided.'))
 
     def get_score(self, student_answers):
         _ = edx_six.get_gettext(self.capa_system.i18n)
@@ -2678,13 +2679,13 @@ class CodeResponse(LoncapaResponse):
         if self.capa_system.xqueue is None:
             cmap = CorrectMap()
             cmap.set(self.answer_id, queuestate=None,
-                     msg=_('Error: No grader has been set up for this problem.'))
+                     msg=_(u'Error: No grader has been set up for this problem.'))
             return cmap
 
         # Prepare xqueue request
         #------------------------------------------------------------
 
-        qinterface = self.capa_system.xqueue.interface
+        qinterface = self.capa_system.xqueue['interface']
         qtime = datetime.strftime(datetime.now(UTC), xqueue_interface.dateformat)
 
         anonymous_student_id = self.capa_system.anonymous_student_id
@@ -2693,7 +2694,7 @@ class CodeResponse(LoncapaResponse):
         queuekey = xqueue_interface.make_hashkey(
             str(self.capa_system.seed) + qtime + anonymous_student_id + self.answer_id
         )
-        callback_url = self.capa_system.xqueue.construct_callback()
+        callback_url = self.capa_system.xqueue['construct_callback']()
         xheader = xqueue_interface.make_xheader(
             lms_callback_url=callback_url,
             lms_key=queuekey,
@@ -2776,7 +2777,7 @@ class CodeResponse(LoncapaResponse):
         # matches
         if oldcmap.is_right_queuekey(self.answer_id, queuekey):
             # Sanity check on returned points
-            if points < 0:  # lint-amnesty, pylint: disable=consider-using-max-builtin
+            if points < 0:
                 points = 0
             # Queuestate is consumed
             oldcmap.set(
@@ -3099,7 +3100,7 @@ class FormulaResponse(LoncapaResponse):
             try:
                 out.append(evaluator(
                     var_dict,
-                    {},
+                    dict(),
                     answer,
                     case_sensitive=self.case_sensitive,
                 ))

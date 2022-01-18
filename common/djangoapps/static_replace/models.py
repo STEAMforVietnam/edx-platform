@@ -5,8 +5,10 @@ Models for static_replace
 
 from config_models.models import ConfigurationModel
 from django.db.models.fields import TextField
+from django.utils.encoding import python_2_unicode_compatible
 
 
+@python_2_unicode_compatible
 class AssetBaseUrlConfig(ConfigurationModel):
     """
     Configuration for the base URL used for static assets.
@@ -34,6 +36,7 @@ class AssetBaseUrlConfig(ConfigurationModel):
         return str(repr(self))
 
 
+@python_2_unicode_compatible
 class AssetExcludedExtensionsConfig(ConfigurationModel):
     """
     Configuration for the the excluded file extensions when canonicalizing static asset paths.

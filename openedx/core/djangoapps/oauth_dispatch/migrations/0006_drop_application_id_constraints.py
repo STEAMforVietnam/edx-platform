@@ -10,7 +10,12 @@ DEPENDENCIES = [
     ('oauth_dispatch', '0005_applicationaccess_type'),
 ]
 RUN_BEFORE = []
-DEPENDENCIES.append(('oauth2_provider', '0001_initial'))
+if django.VERSION >= (2, 0):
+    # Using django-oauth-toolkit 1.3.2+, which squashed and deleted the original 6 migrations
+    DEPENDENCIES.append(('oauth2_provider', '0001_initial'))
+else:
+    # Using django-oauth-toolkit 1.1.3 or earlier, before the migrations squashing
+    RUN_BEFORE.append(('oauth2_provider', '0005_auto_20170514_1141'))
 
 
 class Migration(migrations.Migration):

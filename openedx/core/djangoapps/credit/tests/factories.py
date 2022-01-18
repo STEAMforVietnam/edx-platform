@@ -21,7 +21,7 @@ from openedx.core.djangoapps.credit.models import (
 from common.djangoapps.util.date_utils import to_timestamp
 
 
-class CreditCourseFactory(factory.django.DjangoModelFactory):
+class CreditCourseFactory(factory.DjangoModelFactory):
     class Meta:
         model = CreditCourse
 
@@ -29,14 +29,14 @@ class CreditCourseFactory(factory.django.DjangoModelFactory):
     enabled = True
 
 
-class CreditRequirementFactory(factory.django.DjangoModelFactory):
+class CreditRequirementFactory(factory.DjangoModelFactory):
     class Meta:
         model = CreditRequirement
 
     course = factory.SubFactory(CreditCourseFactory)
 
 
-class CreditRequirementStatusFactory(factory.django.DjangoModelFactory):
+class CreditRequirementStatusFactory(factory.DjangoModelFactory):
     class Meta:
         model = CreditRequirementStatus
 
@@ -44,7 +44,7 @@ class CreditRequirementStatusFactory(factory.django.DjangoModelFactory):
     status = CreditRequirementStatus.REQUIREMENT_STATUS_CHOICES[0][0]
 
 
-class CreditProviderFactory(factory.django.DjangoModelFactory):
+class CreditProviderFactory(factory.DjangoModelFactory):
     class Meta:
         model = CreditProvider
 
@@ -52,14 +52,14 @@ class CreditProviderFactory(factory.django.DjangoModelFactory):
     provider_url = FuzzyText(prefix='http://')
 
 
-class CreditEligibilityFactory(factory.django.DjangoModelFactory):
+class CreditEligibilityFactory(factory.DjangoModelFactory):
     class Meta:
         model = CreditEligibility
 
     course = factory.SubFactory(CreditCourseFactory)
 
 
-class CreditRequestFactory(factory.django.DjangoModelFactory):
+class CreditRequestFactory(factory.DjangoModelFactory):
     class Meta:
         model = CreditRequest
 

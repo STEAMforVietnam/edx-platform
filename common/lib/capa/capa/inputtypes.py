@@ -53,7 +53,7 @@ import pyparsing
 import six
 from calc.preview import latex_preview
 from chem import chemcalc
-
+from django.utils.encoding import python_2_unicode_compatible
 from lxml import etree
 from six import text_type
 
@@ -73,6 +73,7 @@ log = logging.getLogger(__name__)
 registry = TagRegistry()  # pylint: disable=invalid-name
 
 
+@python_2_unicode_compatible
 class Status(object):
     """
     Problem status
@@ -112,7 +113,7 @@ class Status(object):
             )
         )
         self.display_name = names.get(status, six.text_type(status))
-        self.display_tooltip = tooltips.get(status, '')
+        self.display_tooltip = tooltips.get(status, u'')
         self._status = status or ''
 
     def __str__(self):
@@ -255,7 +256,7 @@ class InputTypeBase(object):
             self.setup()
         except Exception as err:  # lint-amnesty, pylint: disable=broad-except
             # Something went wrong: add xml to message, but keep the traceback
-            msg = "Error in xml '{x}': {err} ".format(
+            msg = u"Error in xml '{x}': {err} ".format(
                 x=etree.tostring(xml), err=text_type(err))
             six.reraise(Exception, Exception(msg), sys.exc_info()[2])
 
@@ -335,7 +336,7 @@ class InputTypeBase(object):
         }
 
         # Generate the list of ids to be used with the aria-describedby field.
-        descriptions = []
+        descriptions = list()
 
         # If there is trailing text, add the id as the first element to the list before adding the status id
         if 'trailing_text' in self.loaded_attributes and self.loaded_attributes['trailing_text']:
@@ -941,7 +942,7 @@ class MatlabInput(CodeInput):
         queue_msg = self.queue_msg
         if len(self.queue_msg) > 0:  # An empty string cannot be parsed as XML but is okay to include in the template.
             try:
-                etree.XML(HTML('<div>{0}</div>').format(HTML(self.queue_msg)))
+                etree.XML(HTML(u'<div>{0}</div>').format(HTML(self.queue_msg)))
             except etree.XMLSyntaxError:
                 try:
                     html5lib.parseFragment(self.queue_msg, treebuilder='lxml', namespaceHTMLElements=False)[0]
@@ -994,9 +995,9 @@ class MatlabInput(CodeInput):
         response = data['submission']
 
         # construct xqueue headers
-        qinterface = self.capa_system.xqueue.interface
+        qinterface = self.capa_system.xqueue['interface']
         qtime = datetime.utcnow().strftime(xqueue_interface.dateformat)
-        callback_url = self.capa_system.xqueue.construct_callback('ungraded_response')
+        callback_url = self.capa_system.xqueue['construct_callback']('ungraded_response')
         anonymous_student_id = self.capa_system.anonymous_student_id
         # TODO: Why is this using self.capa_system.seed when we have self.seed???
         queuekey = xqueue_interface.make_hashkey(str(self.capa_system.seed) + qtime +
@@ -1362,7 +1363,7 @@ class DragAndDropInput(InputTypeBase):
                     dict{'name': smth, 'label': smth, 'icon': smth,
                     'can_reuse': smth}.
             """
-            tag_attrs = {}
+            tag_attrs = dict()
             tag_attrs['draggable'] = {
                 'id': Attribute._sentinel,  # lint-amnesty, pylint: disable=protected-access
                 'label': "", 'icon': "",
@@ -1377,7 +1378,7 @@ class DragAndDropInput(InputTypeBase):
                 'h': Attribute._sentinel  # lint-amnesty, pylint: disable=protected-access
             }
 
-            dic = {}
+            dic = dict()
 
             for attr_name in tag_attrs[tag_type].keys():
                 dic[attr_name] = Attribute(attr_name,
@@ -1396,7 +1397,7 @@ class DragAndDropInput(InputTypeBase):
         self.no_labels = Attribute('no_labels',
                                    default="False").parse_from_xml(self.xml)
 
-        to_js = {}
+        to_js = dict()
 
         # image drag and drop onto
         to_js['base_image'] = Attribute('img').parse_from_xml(self.xml)

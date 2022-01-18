@@ -5,7 +5,7 @@
     'use strict';
 
     this.Sequence = (function() {
-        function Sequence(element, runtime) {
+        function Sequence(element) {
             var self = this;
 
             this.removeBookmarkIconFromActiveNavItem = function(event) {
@@ -54,8 +54,7 @@
             this.sr_container = this.$('.sr-is-focusable');
             this.num_contents = this.contents.length;
             this.id = this.el.data('id');
-            this.getCompletionUrl = runtime.handlerUrl(element, 'get_completion');
-            this.gotoPositionUrl = runtime.handlerUrl(element, 'goto_position');
+            this.ajaxUrl = this.el.data('ajax-url');
             this.nextUrl = this.el.data('next-url');
             this.prevUrl = this.el.data('prev-url');
             this.savePosition = this.el.data('save-position');
@@ -228,7 +227,7 @@
         };
 
         Sequence.prototype.render = function(newPosition) {
-            var bookmarked, currentTab, sequenceLinks,
+            var bookmarked, currentTab, modxFullUrl, sequenceLinks,
                 self = this;
             if (this.position !== newPosition) {
                 if (this.position) {
@@ -237,9 +236,10 @@
                         this.update_completion(this.position);
                     }
                     if (this.savePosition) {
-                        $.postWithPrefix(this.gotoPositionUrl, JSON.stringify({
+                        modxFullUrl = '' + this.ajaxUrl + '/goto_position';
+                        $.postWithPrefix(modxFullUrl, {
                             position: newPosition
-                        }));
+                        });
                     }
                 }
 
@@ -364,7 +364,7 @@
 
             if ((direction === 'next') && (this.position >= this.contents.length)) {
                 targetUrl = this.nextUrl;
-            } else if ((direction === 'previous')) {
+            } else if ((direction === 'previous') && (this.position === 1)) {
                 targetUrl = this.prevUrl;
             }
 
@@ -414,12 +414,13 @@
 
         Sequence.prototype.update_completion = function(position) {
             var element = this.link_for(position);
+            var completionUrl = this.ajaxUrl + '/get_completion';
             var usageKey = element[0].attributes['data-id'].value;
             var completionIndicators = element.find('.check-circle');
             if (completionIndicators.length) {
-                $.postWithPrefix(this.getCompletionUrl, JSON.stringify({
+                $.postWithPrefix(completionUrl, {
                     usage_key: usageKey
-                }), function(data) {
+                }, function(data) {
                     if (data.complete === true) {
                         completionIndicators.removeClass('is-hidden');
                     }

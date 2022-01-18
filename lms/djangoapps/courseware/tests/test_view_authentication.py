@@ -9,19 +9,21 @@ from unittest.mock import patch
 import pytz
 from django.urls import reverse
 
-from common.djangoapps.student.tests.factories import BetaTesterFactory
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import InstructorFactory
-from common.djangoapps.student.tests.factories import OrgInstructorFactory
-from common.djangoapps.student.tests.factories import OrgStaffFactory
-from common.djangoapps.student.tests.factories import StaffFactory
 from lms.djangoapps.courseware.access import has_access
+from lms.djangoapps.courseware.tests.factories import (
+    BetaTesterFactory,
+    GlobalStaffFactory,
+    InstructorFactory,
+    OrgInstructorFactory,
+    OrgStaffFactory,
+    StaffFactory
+)
 from lms.djangoapps.courseware.tests.helpers import CourseAccessTestMixin, LoginEnrollmentTestCase
 from openedx.features.enterprise_support.tests.mixins.enterprise import EnterpriseTestConsentRequired
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 class TestViewAuth(EnterpriseTestConsentRequired, ModuleStoreTestCase, LoginEnrollmentTestCase):

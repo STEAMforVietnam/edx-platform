@@ -16,7 +16,6 @@ from .accounts.views import (
     AccountViewSet,
     DeactivateLogoutView,
     LMSAccountRetirementView,
-    NameChangeView,
     UsernameReplacementView
 )
 from . import views as user_api_views
@@ -30,10 +29,6 @@ ME = AccountViewSet.as_view({
 
 ACCOUNT_LIST = AccountViewSet.as_view({
     'get': 'list',
-})
-
-ACCOUNT_SEARCH_EMAILS = AccountViewSet.as_view({
-    'post': 'search_emails',
 })
 
 ACCOUNT_DETAIL = AccountViewSet.as_view({
@@ -94,11 +89,6 @@ urlpatterns = [
         name='accounts_detail_api'
     ),
     url(
-        r'^v1/accounts/search_emails$',
-        ACCOUNT_SEARCH_EMAILS,
-        name='accounts_search_emails_api'
-    ),
-    url(
         fr'^v1/accounts/{settings.USERNAME_PATTERN}$',
         ACCOUNT_DETAIL,
         name='accounts_api'
@@ -117,11 +107,6 @@ urlpatterns = [
         r'^v1/accounts/deactivate_logout/$',
         DeactivateLogoutView.as_view(),
         name='deactivate_logout'
-    ),
-    url(
-        r'^v1/accounts/name_change/$',
-        NameChangeView.as_view(),
-        name='name_change'
     ),
     url(
         fr'^v1/accounts/{settings.USERNAME_PATTERN}/verification_status/$',

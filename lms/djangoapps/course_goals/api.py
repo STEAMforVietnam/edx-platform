@@ -3,52 +3,37 @@ Course Goals Python API
 """
 
 
+from django.conf import settings
 from opaque_keys.edx.keys import CourseKey
 from rest_framework.reverse import reverse
 
 from common.djangoapps.course_modes.models import CourseMode
-from lms.djangoapps.course_goals.models import CourseGoal, GOAL_KEY_CHOICES
 from openedx.features.course_experience import ENABLE_COURSE_GOALS
 
+from . import models
 
-def add_course_goal_deprecated(user, course_id, goal_key):
+
+def add_course_goal(user, course_id, goal_key):
     """
     Add a new course goal for the provided user and course. If the goal
     already exists, simply update and save the goal.
-    This method is for the deprecated version of course goals and will be removed as soon
-    as the newer number of days version of course goals is fully implemented.
 
     Arguments:
         user: The user that is setting the goal
         course_id (string): The id for the course the goal refers to
         goal_key (string): The goal key for the new goal.
+
     """
     course_key = CourseKey.from_string(str(course_id))
-    CourseGoal.objects.update_or_create(
-        user=user, course_key=course_key, defaults={'goal_key': goal_key}
-    )
-
-
-def add_course_goal(user, course_id, subscribed_to_reminders, days_per_week=None):
-    """
-    Add a new course goal for the provided user and course. If the goal
-    already exists, simply update and save the goal.
-
-    Arguments:
-        user: The user that is setting the goal
-        course_id (string): The id for the course the goal refers to
-        subscribed_to_reminders (bool): whether the learner wants to receive email reminders about their goal
-        days_per_week (int): (optional) number of days learner wants to learn per week
-    """
-    course_key = CourseKey.from_string(str(course_id))
-    defaults = {
-        'subscribed_to_reminders': subscribed_to_reminders,
-    }
-    if days_per_week:
-        defaults['days_per_week'] = days_per_week
-    CourseGoal.objects.update_or_create(
-        user=user, course_key=course_key, defaults=defaults
-    )
+    current_goal = get_course_goal(user, course_key)
+    if current_goal:
+        # If a course goal already exists, simply update it.
+        current_goal.goal_key = goal_key
+        current_goal.save(update_fields=['goal_key'])
+    else:
+        # Otherwise, create and save a new course goal.
+        new_goal = models.CourseGoal(user=user, course_key=course_key, goal_key=goal_key)
+        new_goal.save()
 
 
 def get_course_goal(user, course_key):
@@ -60,7 +45,18 @@ def get_course_goal(user, course_key):
     if user.is_anonymous:
         return None
 
-    return CourseGoal.objects.filter(user=user, course_key=course_key).first()
+    course_goals = models.CourseGoal.objects.filter(user=user, course_key=course_key)
+    return course_goals[0] if course_goals else None
+
+
+def remove_course_goal(user, course_id):
+    """
+    Given a user and a course_id, remove the course goal.
+    """
+    course_key = CourseKey.from_string(course_id)
+    course_goal = get_course_goal(user, course_key)
+    if course_goal:
+        course_goal.delete()
 
 
 def get_goal_api_url(request):
@@ -79,7 +75,8 @@ def has_course_goal_permission(request, course_id, user_access):
     """
     course_key = CourseKey.from_string(course_id)
     has_verified_mode = CourseMode.has_verified_mode(CourseMode.modes_for_course_dict(course_key))
-    return user_access['is_enrolled'] and has_verified_mode and ENABLE_COURSE_GOALS.is_enabled(course_key)
+    return user_access['is_enrolled'] and has_verified_mode and ENABLE_COURSE_GOALS.is_enabled(course_key) \
+        and settings.FEATURES.get('ENABLE_COURSE_GOALS')
 
 
 def get_course_goal_options():
@@ -87,7 +84,7 @@ def get_course_goal_options():
     Returns the valid options for goal keys, mapped to their translated
     strings, as defined by theCourseGoal model.
     """
-    return dict(GOAL_KEY_CHOICES)
+    return {goal_key: goal_text for goal_key, goal_text in models.GOAL_KEY_CHOICES}  # lint-amnesty, pylint: disable=unnecessary-comprehension
 
 
 def get_course_goal_text(goal_key):
@@ -108,11 +105,11 @@ def valid_course_goals_ordered(include_unsure=False):
     goal_options = get_course_goal_options()
 
     ordered_goal_options = []
-    ordered_goal_options.append((GOAL_KEY_CHOICES.certify, goal_options[GOAL_KEY_CHOICES.certify]))
-    ordered_goal_options.append((GOAL_KEY_CHOICES.complete, goal_options[GOAL_KEY_CHOICES.complete]))
-    ordered_goal_options.append((GOAL_KEY_CHOICES.explore, goal_options[GOAL_KEY_CHOICES.explore]))
+    ordered_goal_options.append((models.GOAL_KEY_CHOICES.certify, goal_options[models.GOAL_KEY_CHOICES.certify]))
+    ordered_goal_options.append((models.GOAL_KEY_CHOICES.complete, goal_options[models.GOAL_KEY_CHOICES.complete]))
+    ordered_goal_options.append((models.GOAL_KEY_CHOICES.explore, goal_options[models.GOAL_KEY_CHOICES.explore]))
 
     if include_unsure:
-        ordered_goal_options.append((GOAL_KEY_CHOICES.unsure, goal_options[GOAL_KEY_CHOICES.unsure]))
+        ordered_goal_options.append((models.GOAL_KEY_CHOICES.unsure, goal_options[models.GOAL_KEY_CHOICES.unsure]))
 
     return ordered_goal_options

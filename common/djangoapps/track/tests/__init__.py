@@ -18,11 +18,11 @@ IN_MEMORY_BACKEND_CONFIG = {
 }
 
 
-class InMemoryBackend:
+class InMemoryBackend(object):
     """A backend that simply stores all events in memory"""
 
     def __init__(self):
-        super().__init__()  # lint-amnesty, pylint: disable=super-with-arguments
+        super(InMemoryBackend, self).__init__()  # lint-amnesty, pylint: disable=super-with-arguments
         self.events = []
 
     def send(self, event):
@@ -48,7 +48,7 @@ class EventTrackingTestCase(TestCase):
         freezer.start()
         self.addCleanup(freezer.stop)
 
-        super().setUp()  # lint-amnesty, pylint: disable=super-with-arguments
+        super(EventTrackingTestCase, self).setUp()  # lint-amnesty, pylint: disable=super-with-arguments
 
         self.recreate_tracker()
 

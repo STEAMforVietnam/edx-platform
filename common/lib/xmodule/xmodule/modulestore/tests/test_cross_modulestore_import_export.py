@@ -23,7 +23,6 @@ import ddt
 from path import Path as path
 
 from openedx.core.lib.tests import attr
-from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.utils import (
     CONTENTSTORE_SETUPS,
     MODULESTORE_SETUPS,
@@ -87,7 +86,7 @@ class CrossStoreXMLRoundtrip(CourseComparisonTest, PartitionTestCase):
 
                         import_course_from_xml(
                             source_store,
-                            ModuleStoreEnum.UserID.test,
+                            'test_user',
                             TEST_DATA_DIR,
                             source_dirs=[course_data_name],
                             static_content_store=source_content,
@@ -106,7 +105,7 @@ class CrossStoreXMLRoundtrip(CourseComparisonTest, PartitionTestCase):
 
                         import_course_from_xml(
                             dest_store,
-                            ModuleStoreEnum.UserID.test,
+                            'test_user',
                             self.export_dir,
                             source_dirs=[EXPORTED_COURSE_DIR_NAME],
                             static_content_store=dest_content,
@@ -170,7 +169,7 @@ class CrossStoreXMLRoundtrip(CourseComparisonTest, PartitionTestCase):
 
                         import_course_from_xml(
                             source_store,
-                            ModuleStoreEnum.UserID.test,
+                            'test_user',
                             TEST_DATA_DIR,
                             source_dirs=['split_course_with_static_tabs'],
                             static_content_store=source_content,
@@ -198,7 +197,7 @@ class CrossStoreXMLRoundtrip(CourseComparisonTest, PartitionTestCase):
 
                         import_course_from_xml(
                             dest_store,
-                            ModuleStoreEnum.UserID.test,
+                            'test_user',
                             self.export_dir,
                             source_dirs=[EXPORTED_COURSE_DIR_NAME],
                             static_content_store=dest_content,

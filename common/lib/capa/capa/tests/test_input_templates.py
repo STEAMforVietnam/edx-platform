@@ -542,7 +542,7 @@ class TextlineTemplateTest(TemplateTestCase):
         self.context['do_math'] = True
         xml = self.render_to_xml(self.context)
 
-        xpath = "//input[@class='mw-100 math']"
+        xpath = "//input[@class='math']"
         self.assert_has_xpath(xml, xpath, self.context)
 
         xpath = "//div[@class='equation']"

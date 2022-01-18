@@ -6,8 +6,8 @@ Specialized models for oauth_dispatch djangoapp
 from datetime import datetime
 
 from django.db import models
-
-from django.utils.translation import gettext_lazy as _
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext_lazy as _
 from django_mysql.models import ListCharField
 from oauth2_provider.settings import oauth2_settings
 from organizations.models import Organization
@@ -17,6 +17,7 @@ from openedx.core.djangolib.markup import HTML
 from openedx.core.lib.request_utils import get_request_or_stub
 
 
+@python_2_unicode_compatible
 class RestrictedApplication(models.Model):
     """
     This model lists which django-oauth-toolkit Applications are considered 'restricted'
@@ -56,6 +57,7 @@ class RestrictedApplication(models.Model):
         return access_token.expires == datetime(1970, 1, 1, tzinfo=utc)
 
 
+@python_2_unicode_compatible
 class ApplicationAccess(models.Model):
     """
     Specifies access control information for the associated Application.
@@ -121,6 +123,7 @@ class ApplicationAccess(models.Model):
         )
 
 
+@python_2_unicode_compatible
 class ApplicationOrganization(models.Model):
     """
     DEPRECATED: Associates a DOT Application to an Organization.

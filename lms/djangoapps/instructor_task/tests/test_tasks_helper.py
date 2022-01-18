@@ -21,24 +21,28 @@ import unicodecsv
 from django.conf import settings
 from django.test.utils import override_settings
 from edx_django_utils.cache import RequestCache
+from edx_toggles.toggles.testutils import override_waffle_flag
 from freezegun import freeze_time
 from pytz import UTC
 
 import openedx.core.djangoapps.user_api.course_tag.api as course_tag_api
-from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.student.models import CourseEnrollment, CourseEnrollmentAllowed
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
-from lms.djangoapps.certificates.data import CertificateStatuses
-from lms.djangoapps.certificates.models import GeneratedCertificate
-from lms.djangoapps.certificates.tests.factories import CertificateAllowlistFactory, GeneratedCertificateFactory
+from lms.djangoapps.certificates.generation_handler import CERTIFICATES_USE_ALLOWLIST
+from lms.djangoapps.certificates.models import CertificateStatuses, GeneratedCertificate
+from lms.djangoapps.certificates.tests.factories import CertificateWhitelistFactory, GeneratedCertificateFactory
 from lms.djangoapps.courseware.models import StudentModule
 from lms.djangoapps.grades.course_data import CourseData
 from lms.djangoapps.grades.models import PersistentCourseGrade, PersistentSubsectionGradeOverride
 from lms.djangoapps.grades.subsection_grade import CreateSubsectionGrade
 from lms.djangoapps.grades.transformer import GradesTransformer
 from lms.djangoapps.instructor_analytics.basic import UNAVAILABLE, list_problem_responses
-from lms.djangoapps.instructor_task.tasks_helper.certs import generate_students_certificates
+from lms.djangoapps.instructor_task.tasks_helper.certs import (
+    generate_students_certificates,
+    _invalidate_generated_certificates
+)
 from lms.djangoapps.instructor_task.tasks_helper.enrollments import upload_may_enroll_csv, upload_students_csv
 from lms.djangoapps.instructor_task.tasks_helper.grades import (
     ENROLLED_IN_COURSE,
@@ -68,10 +72,10 @@ from openedx.core.djangoapps.credit.tests.factories import CreditCourseFactory
 from openedx.core.djangoapps.user_api.partition_schemes import RandomUserPartitionScheme
 from openedx.core.djangoapps.util.testing import ContentGroupTestCase, TestConditionalContent
 from openedx.core.lib.teams_config import TeamsConfig
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.partitions.partitions import Group, UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, check_mongo_calls
+from xmodule.partitions.partitions import Group, UserPartition
 
 from ..models import ReportStore
 from ..tasks_helper.utils import UPDATE_STATUS_FAILED, UPDATE_STATUS_SUCCEEDED
@@ -90,7 +94,7 @@ class InstructorGradeReportTestCase(TestReportMixin, InstructorTaskCourseTestCas
         Verify cell data in the grades CSV for a particular user.
         """
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            result = CourseGradeReport.generate(None, None, course_id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, course_id, None, 'graded')
             self.assertDictContainsSubset({'attempted': num_rows, 'succeeded': num_rows, 'failed': 0}, result)
             report_store = ReportStore.from_config(config_name='GRADES_DOWNLOAD')
             report_csv_filename = report_store.links_for(course_id)[0][0]
@@ -125,7 +129,7 @@ class TestInstructorGradeReport(InstructorGradeReportTestCase):
         self.current_task.update_state = Mock()
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task') as mock_current_task:
             mock_current_task.return_value = self.current_task
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
         num_students = len(emails)
         self.assertDictContainsSubset({'attempted': num_students, 'succeeded': num_students, 'failed': 0}, result)
 
@@ -139,11 +143,11 @@ class TestInstructorGradeReport(InstructorGradeReportTestCase):
         mock_grades_iter.return_value = [
             (self.create_student('username', 'student@example.com'), None, TypeError('Cannot grade student'))
         ]
-        result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+        result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
         self.assertDictContainsSubset({'attempted': 1, 'succeeded': 0, 'failed': 1}, result)
 
         report_store = ReportStore.from_config(config_name='GRADES_DOWNLOAD')
-        assert any(('grade_report_err' in item[0]) for item in report_store.links_for(self.course.id))
+        assert any((('grade_report_err' in item[0]) for item in report_store.links_for(self.course.id)))
 
     def test_cohort_data_in_grading(self):
         """
@@ -323,7 +327,7 @@ class TestInstructorGradeReport(InstructorGradeReportTestCase):
                 None,
             )
         ]
-        result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+        result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
         self.assertDictContainsSubset({'attempted': 1, 'succeeded': 1, 'failed': 0}, result)
 
     def test_certificate_eligibility(self):
@@ -371,11 +375,11 @@ class TestInstructorGradeReport(InstructorGradeReportTestCase):
         self._verify_cell_data_for_user(verified_user.username, course.id, 'Certificate Eligible', 'Y', num_rows=2)
 
     @ddt.data(
-        (ModuleStoreEnum.Type.mongo, 4, 46),
-        (ModuleStoreEnum.Type.split, 3, 46),
+        (ModuleStoreEnum.Type.mongo, 4),
+        (ModuleStoreEnum.Type.split, 3),
     )
     @ddt.unpack
-    def test_query_counts(self, store_type, mongo_count, expected_query_count):
+    def test_query_counts(self, store_type, mongo_count):
         with self.store.default_store(store_type):
             experiment_group_a = Group(2, 'Expériment Group A')
             experiment_group_b = Group(3, 'Expériment Group B')
@@ -401,10 +405,11 @@ class TestInstructorGradeReport(InstructorGradeReportTestCase):
 
         RequestCache.clear_all_namespaces()
 
+        expected_query_count = 46
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
             with check_mongo_calls(mongo_count):
                 with self.assertNumQueries(expected_query_count):
-                    CourseGradeReport.generate(None, None, course.id, {}, 'graded')
+                    CourseGradeReport.generate(None, None, course.id, None, 'graded')
 
     def test_inactive_enrollments(self):
         """
@@ -418,7 +423,7 @@ class TestInstructorGradeReport(InstructorGradeReportTestCase):
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task') as mock_current_task:
             mock_current_task.return_value = self.current_task
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
 
         self._verify_cell_data_for_user('active-student', self.course.id, 'Enrollment Status', ENROLLED_IN_COURSE)
         self._verify_cell_data_for_user('inactive-student', self.course.id, 'Enrollment Status', NOT_ENROLLED_IN_COURSE)
@@ -808,7 +813,7 @@ class TestProblemGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
         Verify that we see no grade information for a course with no graded
         problems.
         """
-        result = ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+        result = ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
         self.assertDictContainsSubset({'action_name': 'graded', 'attempted': 2, 'succeeded': 2, 'failed': 0}, result)
         self.verify_rows_in_csv([
             dict(list(zip(
@@ -832,7 +837,7 @@ class TestProblemGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
         self.define_option_problem('Problem1', parent=vertical)
 
         self.submit_student_answer(self.student_1.username, 'Problem1', ['Option 1'])
-        result = ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+        result = ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
         self.assertDictContainsSubset({'action_name': 'graded', 'attempted': 2, 'succeeded': 2, 'failed': 0}, result)
         problem_name = 'Homework 1: Subsection - Problem1'
         header_row = self.csv_header_row + [problem_name + ' (Earned)', problem_name + ' (Possible)']
@@ -876,7 +881,7 @@ class TestProblemGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
 
             self.submit_student_answer(self.student_1.username, 'Problem1', ['Option 1'])
             self.submit_student_answer(student_verified.username, 'Problem1', ['Option 1'])
-            result = ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.assertDictContainsSubset(
                 {'action_name': 'graded', 'attempted': 1, 'succeeded': 1, 'failed': 0}, result
             )
@@ -896,7 +901,7 @@ class TestProblemGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
         self.define_option_problem('Problem1', parent=vertical)
 
         self.submit_student_answer(self.student_1.username, 'Problem1', ['Option 1'])
-        result = ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+        result = ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
         self.assertDictContainsSubset({'action_name': 'graded', 'attempted': 3, 'succeeded': 3, 'failed': 0}, result)
         problem_name = 'Homework 1: Subsection - Problem1'
         header_row = self.csv_header_row + [problem_name + ' (Earned)', problem_name + ' (Possible)']
@@ -967,7 +972,7 @@ class TestProblemReportSplitTestContent(TestReportMixin, TestConditionalContent,
         self.submit_student_answer(self.student_b.username, self.problem_b_url, [self.OPTION_1, self.OPTION_2])
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            result = ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.assertDictContainsSubset(
                 {'action_name': 'graded', 'attempted': 2, 'succeeded': 2, 'failed': 0}, result
             )
@@ -1062,7 +1067,7 @@ class TestProblemReportSplitTestContent(TestReportMixin, TestConditionalContent,
             header_row += [problem + ' (Earned)', problem + ' (Possible)']
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
         assert self.get_csv_row_with_headers() == header_row
 
 
@@ -1119,7 +1124,7 @@ class TestProblemReportCohortedContent(TestReportMixin, ContentGroupTestCase, In
         self.submit_student_answer(self.beta_user.username, 'Problem1', ['Option 1', 'Option 2'])
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            result = ProblemGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = ProblemGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.assertDictContainsSubset(
                 {'action_name': 'graded', 'attempted': 5, 'succeeded': 5, 'failed': 0}, result
             )
@@ -1276,36 +1281,6 @@ class TestStudentReport(TestReportMixin, InstructorTaskCourseTestCase):
         assert len(links) == 1
         self.assertDictContainsSubset({'attempted': 1, 'succeeded': 1, 'failed': 0}, result)
 
-    def test_custom_directory(self):
-        self.create_student('student', 'student@example.com')
-        directory_name = 'test_dir'
-        task_input = {'features': [], 'upload_parent_dir': directory_name}
-        patched_upload = patch('lms.djangoapps.instructor_task.tasks_helper.enrollments.upload_csv_to_report_store')
-
-        with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            with patched_upload as mock_upload_report:
-                upload_students_csv(None, None, self.course.id, task_input, 'calculated')
-
-        mock_upload_report.assert_called_once_with(
-            [[], []],
-            'student_profile_info',
-            self.course.id,
-            ANY,
-            parent_dir=directory_name
-        )
-
-    def test_custom_filename(self):
-        self.create_student('student', 'student@example.com')
-        filename = "test_filename"
-        task_input = {'features': [], 'filename': filename}
-        patched_upload = patch('lms.djangoapps.instructor_task.tasks_helper.enrollments.upload_csv_to_report_store')
-
-        with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            with patched_upload as mock_upload_report:
-                upload_students_csv(None, None, self.course.id, task_input, 'calculated')
-
-        mock_upload_report.assert_called_once_with([[], []], filename, self.course.id, ANY, parent_dir='')
-
     @ddt.data(['student', 'student\xec'])
     def test_unicode_usernames(self, students):
         """
@@ -1349,13 +1324,11 @@ class TestTeamStudentReport(TestReportMixin, InstructorTaskCourseTestCase):
         """ Run the upload_students_csv task and verify that the correct team was added to the CSV. """
         current_task = Mock()
         current_task.update_state = Mock()
-        task_input = {
-            'features': [
-                'id', 'username', 'name', 'email', 'language', 'location',
-                'year_of_birth', 'gender', 'level_of_education', 'mailing_address',
-                'goals', 'team'
-            ]
-        }
+        task_input = [
+            'id', 'username', 'name', 'email', 'language', 'location',
+            'year_of_birth', 'gender', 'level_of_education', 'mailing_address',
+            'goals', 'team'
+        ]
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task') as mock_current_task:
             mock_current_task.return_value = current_task
             result = upload_students_csv(None, None, self.course.id, task_input, 'calculated')
@@ -1450,7 +1423,7 @@ class MockDefaultStorage:
 
     def open(self, file_name):
         """Mock out DefaultStorage.open with standard python open"""
-        return open(file_name)  # lint-amnesty, pylint: disable=bad-option-value, open-builtin  # lint-amnesty, pylint: disable=consider-using-with
+        return open(file_name)  # lint-amnesty, pylint: disable=bad-option-value, open-builtin
 
 
 @patch('lms.djangoapps.instructor_task.tasks_helper.misc.DefaultStorage', new=MockDefaultStorage)
@@ -1777,7 +1750,7 @@ class TestGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
             metadata={'graded': True, 'format': 'Homework', 'start': in_the_future},
             display_name='Unreleased'
         )
-        self.define_option_problem('Unreleased', parent=self.unreleased_section)
+        self.define_option_problem(u'Unreleased', parent=self.unreleased_section)
 
     @patch.dict(settings.FEATURES, {'DISABLE_START_DATES': False})
     @ddt.data(True, False)
@@ -1786,7 +1759,7 @@ class TestGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'), \
              patch.dict(settings.FEATURES, {'PERSISTENT_GRADES_ENABLED_FOR_ALL_TESTS': persistent_grades_enabled}):
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.assertDictContainsSubset(
                 {'action_name': 'graded', 'attempted': 1, 'succeeded': 1, 'failed': 0},
                 result,
@@ -1808,27 +1781,6 @@ class TestGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
                 ignore_other_columns=True,
             )
 
-    def test_grade_report_custom_directory(self):
-        self.submit_student_answer(self.student.username, 'Problem1', ['Option 1'])
-
-        directory_name = "test_dir"
-        task_input = {
-            "upload_parent_dir": directory_name
-        }
-
-        patched_upload = patch('lms.djangoapps.instructor_task.tasks_helper.grades.upload_csv_to_report_store')
-        with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            with patched_upload as mock_upload_report:
-                CourseGradeReport.generate(None, None, self.course.id, task_input, 'graded')
-
-        mock_upload_report.assert_called_once_with(
-            [ANY, ANY],
-            'grade_report',
-            self.course.id,
-            ANY,
-            parent_dir=directory_name
-        )
-
     def test_grade_report_with_overrides(self):
         course_data = CourseData(self.student, course=self.course)
         subsection_grade = CreateSubsectionGrade(self.unattempted_section, course_data.structure, {}, {})
@@ -1845,7 +1797,7 @@ class TestGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
         self.submit_student_answer(self.student.username, 'Problem1', ['Option 1'])
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.assertDictContainsSubset(
                 {'action_name': 'graded', 'attempted': 1, 'succeeded': 1, 'failed': 0},
                 result,
@@ -1889,7 +1841,7 @@ class TestGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
 
             self.submit_student_answer(student_1.username, 'Problem1', ['Option 1'])
             self.submit_student_answer(student_verified.username, 'Problem1', ['Option 1'])
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.assertDictContainsSubset(
                 {'action_name': 'graded', 'attempted': 1, 'succeeded': 1, 'failed': 0}, result
             )
@@ -1901,7 +1853,7 @@ class TestGradeReport(TestReportMixin, InstructorTaskModuleTestCase):
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'), \
              patch('lms.djangoapps.grades.course_data.get_course_blocks') as mock_course_blocks, \
              patch('lms.djangoapps.grades.subsection_grade.get_score') as mock_get_score:
-            CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             assert not mock_course_blocks.called
             assert not mock_get_score.called
 
@@ -1957,7 +1909,7 @@ class TestGradeReportEnrollmentAndCertificateInfo(TestReportMixin, InstructorTas
         Verify grade report data.
         """
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             report_store = ReportStore.from_config(config_name='GRADES_DOWNLOAD')
             report_csv_filename = report_store.links_for(self.course.id)[0][0]
             report_path = report_store.path_to(self.course.id, report_csv_filename)
@@ -1973,6 +1925,7 @@ class TestGradeReportEnrollmentAndCertificateInfo(TestReportMixin, InstructorTas
     def _create_user_data(self,
                           user_enroll_mode,
                           has_passed,
+                          whitelisted,
                           verification_status,
                           certificate_status,
                           certificate_mode):
@@ -1985,7 +1938,7 @@ class TestGradeReportEnrollmentAndCertificateInfo(TestReportMixin, InstructorTas
         if has_passed:
             self.submit_student_answer('u1', 'test_problem', ['choice_1'])
 
-        CertificateAllowlistFactory.create(user=user, course_id=self.course.id)
+        CertificateWhitelistFactory.create(user=user, course_id=self.course.id, whitelist=whitelisted)
 
         if user_enroll_mode in CourseMode.VERIFIED_MODES:
             SoftwareSecurePhotoVerificationFactory.create(user=user, status=verification_status)
@@ -2001,19 +1954,19 @@ class TestGradeReportEnrollmentAndCertificateInfo(TestReportMixin, InstructorTas
 
     @ddt.data(
         (
-            'verified', False, 'approved', 'notpassing', 'honor',
-            ['verified', 'ID Verified', 'Y', 'N', 'N/A']
+            'verified', False, False, 'approved', 'notpassing', 'honor',
+            ['verified', 'ID Verified', 'N', 'N', 'N/A']
         ),
         (
-            'verified', False, 'approved', 'downloadable', 'verified',
+            'verified', False, True, 'approved', 'downloadable', 'verified',
             ['verified', 'ID Verified', 'Y', 'Y', 'verified']
         ),
         (
-            'honor', True, 'approved', 'restricted', 'honor',
+            'honor', True, True, 'approved', 'restricted', 'honor',
             ['honor', 'N/A', 'Y', 'N', 'N/A']
         ),
         (
-            'verified', True, 'must_retry', 'downloadable', 'honor',
+            'verified', True, True, 'must_retry', 'downloadable', 'honor',
             ['verified', 'Not ID Verified', 'Y', 'Y', 'honor']
         ),
     )
@@ -2022,6 +1975,7 @@ class TestGradeReportEnrollmentAndCertificateInfo(TestReportMixin, InstructorTas
             self,
             user_enroll_mode,
             has_passed,
+            whitelisted,
             verification_status,
             certificate_status,
             certificate_mode,
@@ -2031,6 +1985,7 @@ class TestGradeReportEnrollmentAndCertificateInfo(TestReportMixin, InstructorTas
         user = self._create_user_data(
             user_enroll_mode,
             has_passed,
+            whitelisted,
             verification_status,
             certificate_status,
             certificate_mode
@@ -2056,21 +2011,21 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         """
         Verify that certificates generated for all eligible students enrolled in a course.
         """
-        # Create 10 students
+        # create 10 students
         students = self._create_students(10)
 
-        # Grant 2 students downloadable certs
+        # mark 2 students to have certificates generated already
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.downloadable,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Allowlist 5 students
+        # white-list 5 students
         for student in students[2:7]:
-            CertificateAllowlistFactory.create(user=student, course_id=self.course.id,)
+            CertificateWhitelistFactory.create(user=student, course_id=self.course.id, whitelist=True)
 
         task_input = {'student_set': None}
         expected_results = {
@@ -2081,7 +2036,18 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
             'failed': 0,
             'skipped': 2
         }
-        with self.assertNumQueries(82):
+        with self.assertNumQueries(170):
+            self.assertCertificatesGenerated(task_input, expected_results)
+
+        expected_results = {
+            'action_name': 'certificates generated',
+            'total': 10,
+            'attempted': 0,
+            'succeeded': 0,
+            'failed': 0,
+            'skipped': 10
+        }
+        with self.assertNumQueries(3):
             self.assertCertificatesGenerated(task_input, expected_results)
 
     @ddt.data(
@@ -2090,21 +2056,20 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         CertificateStatuses.notpassing,
         CertificateStatuses.audit_passing,
     )
-    def test_certificate_generation_all_allowlisted(self, status):
+    def test_certificate_generation_all_whitelisted(self, status):
         """
-        Verify that certificates are generated for all allowlisted students,
+        Verify that certificates are generated for all white-listed students,
         whether or not they already had certs generated for them.
         """
-        # Create 5 students
         students = self._create_students(5)
 
-        # Allowlist 3 students
+        # whitelist 3
         for student in students[:3]:
-            CertificateAllowlistFactory.create(
-                user=student, course_id=self.course.id
+            CertificateWhitelistFactory.create(
+                user=student, course_id=self.course.id, whitelist=True
             )
 
-        # Grant certs to 2 students
+        # generate certs for 2
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
@@ -2112,9 +2077,8 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
                 status=status,
             )
 
-        task_input = {'student_set': 'all_allowlisted'}
-
-        # Only certificates for the 3 allowlisted students should have been run
+        task_input = {'student_set': 'all_whitelisted'}
+        # only certificates for the 3 whitelisted students should have been run
         expected_results = {
             'action_name': 'certificates generated',
             'total': 3,
@@ -2125,6 +2089,16 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         }
         self.assertCertificatesGenerated(task_input, expected_results)
 
+        # the first 3 students (who were whitelisted) have passing
+        # certificate statuses
+        for student in students[:3]:
+            assert GeneratedCertificate.certificate_for_student(student, self.course.id).status in\
+                   CertificateStatuses.PASSED_STATUSES
+
+        # The last 2 students still don't have certs
+        for student in students[3:]:
+            assert GeneratedCertificate.certificate_for_student(student, self.course.id) is None
+
     @ddt.data(
         (CertificateStatuses.downloadable, 2),
         (CertificateStatuses.generating, 2),
@@ -2132,15 +2106,15 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         (CertificateStatuses.audit_passing, 4),
     )
     @ddt.unpack
-    def test_certificate_generation_allowlist_not_generated(self, status, expected_certs):
+    def test_certificate_generation_whitelisted_not_generated(self, status, expected_certs):
         """
         Verify that certificates are generated only for those students
         who do not have `downloadable` or `generating` certificates.
         """
-        # Create 5 students
+        # create 5 students
         students = self._create_students(5)
 
-        # Grant certs to 2 students
+        # mark 2 students to have certificates generated already
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
@@ -2148,15 +2122,15 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
                 status=status,
             )
 
-        # Allowlist 4 students
+        # white-list 4 students
         for student in students[:4]:
-            CertificateAllowlistFactory.create(
-                user=student, course_id=self.course.id
+            CertificateWhitelistFactory.create(
+                user=student, course_id=self.course.id, whitelist=True
             )
 
-        task_input = {'student_set': 'allowlisted_not_generated'}
+        task_input = {'student_set': 'whitelisted_not_generated'}
 
-        # Certificates should only be generated for the allowlisted students
+        # certificates should only be generated for the whitelisted students
         # who do not yet have passing certificates.
         expected_results = {
             'action_name': 'certificates generated',
@@ -2171,12 +2145,21 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
             expected_results
         )
 
+        # the first 4 students have passing certificate statuses since
+        # they either were whitelisted or had one before
+        for student in students[:4]:
+            assert GeneratedCertificate.certificate_for_student(student, self.course.id).status in\
+                   CertificateStatuses.PASSED_STATUSES
+
+        # The last student still doesn't have a cert
+        assert GeneratedCertificate.certificate_for_student(students[4], self.course.id) is None
+
     def test_certificate_generation_specific_student(self):
         """
         Tests generating a certificate for a specific student.
         """
         student = self.create_student(username="Hamnet", email="ham@ardenforest.co.uk")
-        CertificateAllowlistFactory.create(user=student, course_id=self.course.id)
+        CertificateWhitelistFactory.create(user=student, course_id=self.course.id, whitelist=True)
         task_input = {
             'student_set': 'specific_student',
             'specific_student_id': student.id
@@ -2216,39 +2199,39 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         Verify that certificates are regenerated for all eligible students enrolled in a course whose generated
         certificate statuses lies in the list 'statuses_to_regenerate' given in task_input.
         """
-        # Create 10 students
+        # create 10 students
         students = self._create_students(10)
 
-        # Grant downloadable certs to 2 students
+        # mark 2 students to have certificates generated already
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.downloadable,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Grant error certs to 3 students
+        # mark 3 students to have certificates generated with status 'error'
         for student in students[2:5]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.error,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Grant a deleted cert to the 6th student
+        # mark 6th students to have certificates generated with status 'deleted'
         for student in students[5:6]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.deleted,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Allowlist 7 students
+        # white-list 7 students
         for student in students[:7]:
-            CertificateAllowlistFactory.create(user=student, course_id=self.course.id)
+            CertificateWhitelistFactory.create(user=student, course_id=self.course.id, whitelist=True)
 
         # Certificates should be regenerated for students having generated certificates with status
         # 'downloadable' or 'error' which are total of 5 students in this test case
@@ -2276,52 +2259,55 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         # Default grade for students
         default_grade = '-1'
 
-        # Create 10 students
+        # create 10 students
         students = self._create_students(10)
 
-        # Grant downloadable certs to 2 students
+        # mark 2 students to have certificates generated already
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.downloadable,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Grant error certs to 3 students
+        # mark 3 students to have certificates generated with status 'error'
         for student in students[2:5]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.error,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Grant a deleted cert to the 6th student
+        # mark 6th students to have certificates generated with status 'deleted'
         for student in students[5:6]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.deleted,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Grant generating certs to 4 students
+        # mark rest of the 4 students with having generated certificates with status 'generating'
+        # These students are not added in white-list and they have not completed grades so certificate generation
+        # for these students should fail other than the one student that has been added to white-list
+        # so from these students 3 failures and 1 success
         for student in students[6:]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.generating,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Allowlist 7 students
+        # white-list 7 students
         for student in students[:7]:
-            CertificateAllowlistFactory.create(user=student, course_id=self.course.id)
+            CertificateWhitelistFactory.create(user=student, course_id=self.course.id, whitelist=True)
 
         # Regenerated certificates for students having generated certificates with status
         # 'deleted' or 'generating'
@@ -2338,6 +2324,26 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
 
         self.assertCertificatesGenerated(task_input, expected_results)
 
+        generated_certificates = GeneratedCertificate.eligible_certificates.filter(
+            user__in=students,
+            course_id=self.course.id,
+            mode='honor'
+        )
+        certificate_statuses = [generated_certificate.status for generated_certificate in generated_certificates]
+        certificate_grades = [generated_certificate.grade for generated_certificate in generated_certificates]
+
+        # Verify from results from database
+        # Certificates are being generated for 2 white-listed students that had statuses in 'deleted'' and 'generating'
+        assert certificate_statuses.count(CertificateStatuses.generating) == 2
+        # 5 students are skipped that had Certificate Status 'downloadable' and 'error'
+        assert certificate_statuses.count(CertificateStatuses.downloadable) == 2
+        assert certificate_statuses.count(CertificateStatuses.error) == 3
+
+        # grades will be '0.0' as students are either white-listed or ending in error
+        assert certificate_grades.count('0.0') == 5
+        # grades will be '-1' for students that were skipped
+        assert certificate_grades.count(default_grade) == 5
+
     def test_certificate_regeneration_with_existing_unavailable_status(self):
         """
         Verify that certificates are regenerated for all eligible students enrolled in a course whose generated
@@ -2347,52 +2353,52 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         # Default grade for students
         default_grade = '-1'
 
-        # Create 10 students
+        # create 10 students
         students = self._create_students(10)
 
-        # Grant downloadable certs to 2 students
+        # mark 2 students to have certificates generated already
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.downloadable,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Grant error certs to 3 students
+        # mark 3 students to have certificates generated with status 'error'
         for student in students[2:5]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.error,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Grant unavailable certs to 2 students
+        # mark 2 students to have generated certificates with status 'unavailable'
         for student in students[5:7]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.unavailable,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Grant generating certs to 3 students
+        # mark 3 students to have generated certificates with status 'generating'
         for student in students[7:]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.generating,
-                mode=GeneratedCertificate.CourseMode.VERIFIED,
+                mode='honor',
                 grade=default_grade
             )
 
-        # Allowlist all students
+        # white-list all students
         for student in students[:]:
-            CertificateAllowlistFactory.create(user=student, course_id=self.course.id)
+            CertificateWhitelistFactory.create(user=student, course_id=self.course.id, whitelist=True)
 
         # Regenerated certificates for students having generated certificates with status
         # 'downloadable', 'error' or 'generating'
@@ -2418,56 +2424,82 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
             expected_results
         )
 
+        generated_certificates = GeneratedCertificate.eligible_certificates.filter(
+            user__in=students,
+            course_id=self.course.id,
+            mode='honor'
+        )
+        certificate_statuses = [generated_certificate.status for generated_certificate in generated_certificates]
+        certificate_grades = [generated_certificate.grade for generated_certificate in generated_certificates]
+
+        # Verify from results from database
+        # Certificates are being generated for 8 students that had statuses in 'downloadable', 'error' and 'generating'
+        assert certificate_statuses.count(CertificateStatuses.generating) == 8
+        # 2 students are skipped that had Certificate Status 'unavailable'
+        assert certificate_statuses.count(CertificateStatuses.unavailable) == 2
+
+        # grades will be '0.0' as students are white-listed and have not completed any tasks
+        assert certificate_grades.count('0.0') == 8
+        # grades will be '-1' for students that have not been processed
+        assert certificate_grades.count(default_grade) == 2
+
+        # Verify that students with status 'unavailable were skipped
+        unavailable_certificates = \
+            [cert for cert in generated_certificates
+             if cert.status == CertificateStatuses.unavailable and cert.grade == default_grade]
+
+        assert len(unavailable_certificates) == 2
+
     def test_certificate_regeneration_for_students(self):
         """
         Verify that certificates are regenerated for all students passed in task_input.
         """
-        # Create 10 students
+        # create 10 students
         students = self._create_students(10)
 
-        # Grant downloadable certs to 2 students
+        # mark 2 students to have certificates generated already
         for student in students[:2]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.downloadable,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Grant error certs to 3 students
+        # mark 3 students to have certificates generated with status 'error'
         for student in students[2:5]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.error,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Grant a deleted cert to the 6th student
+        # mark 6th students to have certificates generated with status 'deleted'
         for student in students[5:6]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.deleted,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Grant a notpassing cert to the 7th student
+        # mark 7th students to have certificates generated with status 'notpassing'
         for student in students[6:7]:
             GeneratedCertificateFactory.create(
                 user=student,
                 course_id=self.course.id,
                 status=CertificateStatuses.notpassing,
-                mode=GeneratedCertificate.CourseMode.VERIFIED
+                mode='honor'
             )
 
-        # Allowlist 7 students
+        # white-list 7 students
         for student in students[:7]:
-            CertificateAllowlistFactory.create(user=student, course_id=self.course.id)
+            CertificateWhitelistFactory.create(user=student, course_id=self.course.id, whitelist=True)
 
         # Certificates should be regenerated for students having generated certificates with status
         # 'downloadable' or 'error' which are total of 5 students in this test case
-        task_input = {'student_set': "all_allowlisted"}
+        task_input = {'student_set': "all_whitelisted"}
 
         expected_results = {
             'action_name': 'certificates generated',
@@ -2479,6 +2511,38 @@ class TestCertificateGeneration(InstructorTaskModuleTestCase):
         }
 
         self.assertCertificatesGenerated(task_input, expected_results)
+
+    @override_waffle_flag(CERTIFICATES_USE_ALLOWLIST, active=True)
+    def test_invalidation(self):
+        # Create students
+        students = self._create_students(2)
+        s1 = students[0]
+        s2 = students[1]
+
+        # Generate certificates
+        for s in students:
+            GeneratedCertificateFactory.create(
+                user=s,
+                course_id=self.course.id,
+                status=CertificateStatuses.downloadable,
+                mode='verified'
+            )
+
+        # Whitelist a student
+        CertificateWhitelistFactory.create(user=s1, course_id=self.course.id)
+
+        statuses = [CertificateStatuses.downloadable]
+        _invalidate_generated_certificates(self.course.id, students, statuses)
+
+        certs = GeneratedCertificate.objects.filter(user=s1, course_id=self.course.id)
+        assert certs.count() == 1
+        downloadable_cert = certs.first()
+        assert downloadable_cert.status == CertificateStatuses.downloadable
+
+        certs = GeneratedCertificate.objects.filter(user=s2, course_id=self.course.id)
+        assert certs.count() == 1
+        invalidated_cert = certs.first()
+        assert invalidated_cert.status == CertificateStatuses.unavailable
 
     def assertCertificatesGenerated(self, task_input, expected_results):
         """
@@ -2577,7 +2641,7 @@ class TestInstructorOra2Report(SharedModuleStoreTestCase):
             filename = f'{course_id_string}_ORA_data_{timestamp_str}.csv'
 
             assert return_val == UPDATE_STATUS_SUCCEEDED
-            mock_store_rows.assert_called_once_with(self.course.id, filename, [test_header] + test_rows, '')
+            mock_store_rows.assert_called_once_with(self.course.id, filename, [test_header] + test_rows)
 
 
 class TestInstructorOra2AttachmentsExport(SharedModuleStoreTestCase):
@@ -2627,10 +2691,10 @@ class TestInstructorOra2AttachmentsExport(SharedModuleStoreTestCase):
 
                     timestamp_str = datetime.now(UTC).strftime('%Y-%m-%d-%H%M')
                     course_id_string = quote(str(self.course.id).replace('/', '_'))
-                    filename = f'{course_id_string}_ORA_summary_{timestamp_str}.csv'
+                    filename = '{}_ORA_summary_{}.csv'.format(course_id_string, timestamp_str)
 
                     self.assertEqual(return_val, UPDATE_STATUS_SUCCEEDED)
-                    mock_store_rows.assert_called_once_with(self.course.id, filename, [test_header] + test_rows, '')
+                    mock_store_rows.assert_called_once_with(self.course.id, filename, [test_header] + test_rows)
 
     def test_export_fails_if_error_on_create_zip_step(self):
         with ExitStack() as stack:

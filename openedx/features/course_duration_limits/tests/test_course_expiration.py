@@ -13,13 +13,15 @@ from django.utils.timezone import now
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.student.models import CourseEnrollment, FBEEnrollmentExclusion
 from common.djangoapps.student.roles import CourseInstructorRole
-from common.djangoapps.student.tests.factories import BetaTesterFactory
 from common.djangoapps.student.tests.factories import TEST_PASSWORD, CourseEnrollmentFactory, UserFactory
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import InstructorFactory
-from common.djangoapps.student.tests.factories import OrgInstructorFactory
-from common.djangoapps.student.tests.factories import OrgStaffFactory
-from common.djangoapps.student.tests.factories import StaffFactory
+from lms.djangoapps.courseware.tests.factories import (
+    BetaTesterFactory,
+    GlobalStaffFactory,
+    InstructorFactory,
+    OrgInstructorFactory,
+    OrgStaffFactory,
+    StaffFactory
+)
 from lms.djangoapps.courseware.tests.helpers import MasqueradeMixin
 from lms.djangoapps.discussion.django_comment_client.tests.factories import RoleFactory
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
@@ -35,9 +37,9 @@ from openedx.features.content_type_gating.helpers import CONTENT_GATING_PARTITIO
 from openedx.features.course_duration_limits.access import get_user_course_expiration_date
 from openedx.features.course_duration_limits.models import CourseDurationLimitConfig
 from openedx.features.course_experience.tests.views.helpers import add_course_mode
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
+from xmodule.partitions.partitions import ENROLLMENT_TRACK_PARTITION_ID
 
 
 # pylint: disable=no-member

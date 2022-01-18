@@ -9,12 +9,17 @@ users through the LMS, though it is also available to Studio for pushing data
 into the system. The first API this app implements is computing the Course
 Outline.
 
-.. important::
 This package should _not_ depend on the modulestore directly.
 
-The primary path which feeds course outline data into learning sequence models
-is a signal handler upon a Studio course publish. However, you can also seed
-data into it by using the ``update_course_outline`` management command.
+---------------
+Direction: Keep
+---------------
+
+This package is being actively developed, but in a very early state. We're not
+going to start feeding data into it (by triggering off of publish) until it's a
+little more complete, so that it's easier to make drastic changes to the data
+model if necessary. During development, you can seed data into it by using the
+``update_course_outline`` management command.
 
 -----
 Usage
@@ -44,7 +49,7 @@ rules will have to be reimplmented–as we've already seen with mobile APIs?
    a single sequence.
 3. Block Transformers are extremely powerful, but also complex and slow.
    Optimizing them to suit our use case would be a lot of work and result in
-   even more complexity. Sequence- and outline-related metadata is much smaller,
+   even more complexity. Sequence and outline related metadata is much smaller,
    and we can make simplifying assumptions like treating the outline as a tree
    and not a DAG (i.e. each Sequence being in only one Section).
 
@@ -54,8 +59,7 @@ How to Extend?
 
 This app is experimenting with some new conventions, so please read the decision
 docs (``docs/decisions``). Many of the modules also have a long top-level
-docstring explaining for what they should be used – please read these docstrings.
-Many of the
+docstring explaining what they should be used for–please read these. Many of the
 conventions are there to promote predictable behavior and are dramatically less
 effective if broken even in little ways.
 
@@ -67,7 +71,7 @@ The public data types are in ``api/data.py``. Database persistence is in
 dumb. All real business logic should happen in a module within the ``api``
 package. Currently, all the existing API logic is handled in ``api/outlines.py``
 and re-exported at the top level in ``api/__init__.py``. If your new
-functionality is outline-related, please follow this convention. Otherwise, you
+functionality is outlines related, please follow this convention. Otherwise, you
 can create a new module in ``api/`` (e.g. ``api/sequences.py``) to hold your
 logic, and re-export that via the top level ``api/__init__.py``.
 
@@ -75,8 +79,8 @@ I want to add a new rule affecting how sequences show up in the outline.
 ========================================================================
 
 You probably want to create or modify an OutlineProcessor (``api/processors``).
-This interface is not yet pluggable, though it was designed to make it easy to
-become pluggable. Please see the docstrings in ``api/processors/base.py`` for
+This is not yet a pluggable interface, though it was designed to make it easy to
+turn into one. Please see the docstrings in ``api/processors/base.py`` for
 details on how to write one.
 
 I want to pull data from ModuleStore or Block Structures.

@@ -9,7 +9,7 @@ import os
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.http import HttpResponse, HttpResponseNotFound
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from edxval.api import (
     create_or_update_video_transcript,
@@ -20,14 +20,12 @@ from edxval.api import (
     update_transcript_credentials_state_for_org
 )
 from opaque_keys.edx.keys import CourseKey
-from rest_framework.decorators import api_view
 
 from common.djangoapps.student.auth import has_studio_write_access
 from common.djangoapps.util.json_request import JsonResponse, expect_json
 from openedx.core.djangoapps.video_config.models import VideoTranscriptEnabledFlag
 from openedx.core.djangoapps.video_pipeline.api import update_3rd_party_transcription_service_credentials
-from openedx.core.lib.api.view_utils import view_auth_classes
-from xmodule.video_module.transcripts_utils import Transcript, TranscriptsGenerationException  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.video_module.transcripts_utils import Transcript, TranscriptsGenerationException
 
 from .videos import TranscriptProvider
 
@@ -35,8 +33,7 @@ __all__ = [
     'transcript_credentials_handler',
     'transcript_download_handler',
     'transcript_upload_handler',
-    'transcript_delete_handler',
-    'transcript_upload_api',
+    'transcript_delete_handler'
 ]
 
 LOGGER = logging.getLogger(__name__)
@@ -72,7 +69,7 @@ def validate_transcript_credentials(provider, **credentials):
             must_have_props = ['api_key', 'username']
 
         missing = [
-            must_have_prop for must_have_prop in must_have_props if must_have_prop not in list(credentials.keys())   # lint-amnesty, pylint: disable=consider-iterating-dictionary
+            must_have_prop for must_have_prop in must_have_props if must_have_prop not in list(credentials.keys())
         ]
         if missing:
             error_message = '{missing} must be specified.'.format(missing=' and '.join(missing))
@@ -176,49 +173,6 @@ def transcript_download_handler(request):
     return response
 
 
-def upload_transcript(request):
-    """
-    Upload a transcript file
-
-    Arguments:
-        request: A WSGI request object
-
-        Transcript file in SRT format
-    """
-    edx_video_id = request.POST['edx_video_id']
-    language_code = request.POST['language_code']
-    new_language_code = request.POST['new_language_code']
-    transcript_file = request.FILES['file']
-    try:
-        # Convert SRT transcript into an SJSON format
-        # and upload it to S3.
-        sjson_subs = Transcript.convert(
-            content=transcript_file.read().decode('utf-8'),
-            input_format=Transcript.SRT,
-            output_format=Transcript.SJSON
-        ).encode()
-        create_or_update_video_transcript(
-            video_id=edx_video_id,
-            language_code=language_code,
-            metadata={
-                'provider': TranscriptProvider.CUSTOM,
-                'file_format': Transcript.SJSON,
-                'language_code': new_language_code
-            },
-            file_data=ContentFile(sjson_subs),
-        )
-        response = JsonResponse(status=201)
-    except (TranscriptsGenerationException, UnicodeDecodeError):
-        LOGGER.error("Unable to update transcript on edX video %s for language %s", edx_video_id, new_language_code)
-        response = JsonResponse(
-            {'error': _('There is a problem with this transcript file. Try to upload a different file.')},
-            status=400
-        )
-    finally:
-        LOGGER.info("Updated transcript on edX video %s for language %s", edx_video_id, new_language_code)
-    return response
-
-
 def validate_transcript_upload_data(data, files):
     """
     Validates video transcript file.
@@ -248,30 +202,6 @@ def validate_transcript_upload_data(data, files):
     return error
 
 
-@api_view(['POST'])
-@view_auth_classes()
-@expect_json
-def transcript_upload_api(request):
-    """
-    API View for uploading transcript files.
-
-    Arguments:
-        request: A WSGI request object
-
-        Transcript file in SRT format
-
-        Returns:
-            - A 400 if any validation fails
-            - A 200 if the transcript has been uploaded successfully
-    """
-    error = validate_transcript_upload_data(data=request.POST, files=request.FILES)
-    if error:
-        response = JsonResponse({'error': error}, status=400)
-    else:
-        response = upload_transcript(request)
-    return response
-
-
 @login_required
 @require_POST
 def transcript_upload_handler(request):
@@ -292,7 +222,35 @@ def transcript_upload_handler(request):
     if error:
         response = JsonResponse({'error': error}, status=400)
     else:
-        response = upload_transcript(request)
+        edx_video_id = request.POST['edx_video_id']
+        language_code = request.POST['language_code']
+        new_language_code = request.POST['new_language_code']
+        transcript_file = request.FILES['file']
+        try:
+            # Convert SRT transcript into an SJSON format
+            # and upload it to S3.
+            sjson_subs = Transcript.convert(
+                content=transcript_file.read().decode('utf-8'),
+                input_format=Transcript.SRT,
+                output_format=Transcript.SJSON
+            ).encode()
+            create_or_update_video_transcript(
+                video_id=edx_video_id,
+                language_code=language_code,
+                metadata={
+                    'provider': TranscriptProvider.CUSTOM,
+                    'file_format': Transcript.SJSON,
+                    'language_code': new_language_code
+                },
+                file_data=ContentFile(sjson_subs),
+            )
+            response = JsonResponse(status=201)
+        except (TranscriptsGenerationException, UnicodeDecodeError):
+            response = JsonResponse(
+                {'error': _('There is a problem with this transcript file. Try to upload a different file.')},
+                status=400
+            )
+
     return response
 
 

@@ -18,7 +18,7 @@ from django.http import HttpResponseRedirect
 from django.http.request import QueryDict
 from django.urls import reverse
 from django.utils.translation import ngettext
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ugettext_lazy as _
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 
@@ -41,12 +41,11 @@ from common.djangoapps.student.models import (
     Registration,
     RegistrationCookieConfiguration,
     UserAttribute,
-    UserCelebration,
     UserProfile,
     UserTestGroup
 )
 from common.djangoapps.student.roles import REGISTERED_ACCESS_ROLES
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 User = get_user_model()  # pylint:disable=invalid-name
 
@@ -539,33 +538,9 @@ class CourseEnrollmentCelebrationAdmin(DisableEnrollmentAdminMixin, admin.ModelA
     user.short_description = 'User'
 
 
-@admin.register(UserCelebration)
-class UserCelebrationAdmin(admin.ModelAdmin):
-    """Admin interface for the UserCelebration model."""
-    readonly_fields = ('user', )
-
-    class Meta:
-        model = UserCelebration
-
-    # Disables the index view to avoid possible performance issues when
-    # a large number of user celebrations are present.
-    def has_module_permission(self, request):
-        return False
-
-
-@admin.register(PendingNameChange)
-class PendingNameChangeAdmin(admin.ModelAdmin):
-    """Admin interface for the Pending Name Change model"""
-    readonly_fields = ('user', )
-    list_display = ('user', 'new_name', 'rationale')
-    search_fields = ('user', 'new_name')
-
-    class Meta:
-        model = PendingNameChange
-
-
 admin.site.register(UserTestGroup)
 admin.site.register(Registration)
+admin.site.register(PendingNameChange)
 admin.site.register(AccountRecoveryConfiguration, ConfigurationModelAdmin)
 admin.site.register(DashboardConfiguration, ConfigurationModelAdmin)
 admin.site.register(RegistrationCookieConfiguration, ConfigurationModelAdmin)

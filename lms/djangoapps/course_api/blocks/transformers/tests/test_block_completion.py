@@ -12,7 +12,7 @@ from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.course_api.blocks.transformers.block_completion import BlockCompletionTransformer
 from lms.djangoapps.course_blocks.api import get_course_blocks
 from lms.djangoapps.course_blocks.transformers.tests.helpers import ModuleStoreTestCase, TransformerRegistryTestMixin
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 class StubAggregatorXBlock(XBlock):
@@ -21,7 +21,6 @@ class StubAggregatorXBlock(XBlock):
     when transforming aggregator XBlock.
     """
     completion_mode = XBlockCompletionMode.AGGREGATOR
-    has_children = True
 
 
 class StubExcludedXBlock(XBlock):
@@ -37,6 +36,7 @@ class StubCompletableXBlock(XBlock, CompletableXBlockMixin):
     XBlock to test behaviour of BlockCompletionTransformer
     when transforming completable XBlock.
     """
+    pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
 
 class BlockCompletionTransformerTestCase(TransformerRegistryTestMixin, CompletionWaffleTestMixin, ModuleStoreTestCase):
@@ -44,9 +44,7 @@ class BlockCompletionTransformerTestCase(TransformerRegistryTestMixin, Completio
     Tests behaviour of BlockCompletionTransformer
     """
     TRANSFORMER_CLASS_TO_TEST = BlockCompletionTransformer
-    # Has to be 1.0 for 'complete' to function properly. The Completion api only uses 0.0 and 1.0 right now
-    # so this better reflects reality anyway. Should be updated if Completion api ever supports more.
-    COMPLETION_TEST_VALUE = 1.0
+    COMPLETION_TEST_VALUE = 0.4
 
     def setUp(self):
         super().setUp()
@@ -55,54 +53,31 @@ class BlockCompletionTransformerTestCase(TransformerRegistryTestMixin, Completio
         self.override_waffle_switch(True)
 
     @XBlock.register_temp_plugin(StubAggregatorXBlock, identifier='aggregator')
-    @XBlock.register_temp_plugin(StubCompletableXBlock, identifier='comp')
-    def test_transform_aggregators(self):
-        """
-        If there is an aggregator (such as a unit) that contains no children for some reason
-        (likely a mistake by the course team), it should be marked 'complete'. 'completion' should
-        still be None.
-        We mark 'complete' so learners are still able to have their subsections/sections/course
-        marked as complete and are not blocked by this one empty aggregator.
-        """
+    def test_transform_gives_none_for_aggregator(self):
         course = CourseFactory.create()
-        # Have to have at least one complete block to trigger entering the marking 'complete' flow
-        filled_aggregator = ItemFactory.create(category='aggregator', parent=course)
-        block = ItemFactory.create(category='comp', parent=filled_aggregator)
-        BlockCompletion.objects.submit_completion(
-            user=self.user,
-            block_key=block.location,
-            completion=self.COMPLETION_TEST_VALUE,
+        block = ItemFactory.create(category='aggregator', parent=course)
+        block_structure = get_course_blocks(
+            self.user, course.location, self.transformers
         )
-        empty_aggregator = ItemFactory.create(category='aggregator', parent=course)
-        block_structure = get_course_blocks(self.user, course.location, self.transformers)
 
-        self._assert_block_has_proper_completion_values(
-            block_structure, block.location, self.COMPLETION_TEST_VALUE, True
-        )
-        self._assert_block_has_proper_completion_values(
-            block_structure, filled_aggregator.location, None, True
-        )
-        self._assert_block_has_proper_completion_values(
-            block_structure, empty_aggregator.location, None, True
+        self._assert_block_has_proper_completion_value(
+            block_structure, block.location, None
         )
 
     @XBlock.register_temp_plugin(StubExcludedXBlock, identifier='excluded')
     def test_transform_gives_none_for_excluded(self):
-        """
-        Excluded blocks always receive None for 'completion' and False for 'complete'
-        """
         course = CourseFactory.create()
         block = ItemFactory.create(category='excluded', parent=course)
-        block_structure = get_course_blocks(self.user, course.location, self.transformers)
+        block_structure = get_course_blocks(
+            self.user, course.location, self.transformers
+        )
 
-        self._assert_block_has_proper_completion_values(block_structure, block.location, None, False)
+        self._assert_block_has_proper_completion_value(
+            block_structure, block.location, None
+        )
 
     @XBlock.register_temp_plugin(StubCompletableXBlock, identifier='comp')
     def test_transform_gives_value_for_completable(self):
-        """
-        If a block is actually complete, make sure that value shows up in the transformed fields.
-        'completion' should have the value and 'complete' should be True in these cases.
-        """
         course = CourseFactory.create()
         block = ItemFactory.create(category='comp', parent=course)
         BlockCompletion.objects.submit_completion(
@@ -110,33 +85,34 @@ class BlockCompletionTransformerTestCase(TransformerRegistryTestMixin, Completio
             block_key=block.location,
             completion=self.COMPLETION_TEST_VALUE,
         )
-        block_structure = get_course_blocks(self.user, course.location, self.transformers)
+        block_structure = get_course_blocks(
+            self.user, course.location, self.transformers
+        )
 
-        self._assert_block_has_proper_completion_values(
-            block_structure, block.location, self.COMPLETION_TEST_VALUE, True
+        self._assert_block_has_proper_completion_value(
+            block_structure, block.location, self.COMPLETION_TEST_VALUE
         )
 
     def test_transform_gives_zero_for_ordinary_block(self):
-        """
-        I _think_ this is testing 'completion' is 0.0 before an ordinary block is viewed.
-        'html' blocks end up receiving a 'completion' of 1.0 after being viewed.
-        """
         course = CourseFactory.create()
         block = ItemFactory.create(category='html', parent=course)
-        block_structure = get_course_blocks(self.user, course.location, self.transformers)
+        block_structure = get_course_blocks(
+            self.user, course.location, self.transformers
+        )
 
-        self._assert_block_has_proper_completion_values(block_structure, block.location, 0.0, False)
+        self._assert_block_has_proper_completion_value(
+            block_structure, block.location, 0.0
+        )
 
-    def _assert_block_has_proper_completion_values(
-            self, block_structure, block_key, expected_completion, expected_complete
+    def _assert_block_has_proper_completion_value(
+            self, block_structure, block_key, expected_value
     ):
         """
-        Checks whether block's completion and complete have expected values.
+        Checks whether block's completion has expected value.
         """
-        block_data = block_structure.get_transformer_block_data(block_key, self.TRANSFORMER_CLASS_TO_TEST)
+        block_data = block_structure.get_transformer_block_data(
+            block_key, self.TRANSFORMER_CLASS_TO_TEST
+        )
         completion_value = block_data.fields['completion']
-        # complete isn't saved as a transformer field, but just a regular xblock field /shrug
-        complete_value = block_structure.get_xblock_field(block_key, 'complete', False)
 
-        assert completion_value == expected_completion
-        assert complete_value == expected_complete
+        assert completion_value == expected_value

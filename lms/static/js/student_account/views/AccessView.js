@@ -55,7 +55,6 @@
                     };
 
                     this.thirdPartyAuthHint = options.third_party_auth_hint || null;
-                    this.edxUserInfoCookieName = options.edx_user_info_cookie_name || 'edx-user-info';
 
                     // Account activation messages
                     this.accountActivationMessages = options.account_activation_messages || [];
@@ -82,8 +81,9 @@
                     this.enterpriseSlugLoginURL = options.enterprise_slug_login_url || '';
                     this.isEnterpriseEnable = options.is_enterprise_enable || false;
                     this.isAccountRecoveryFeatureEnabled = options.is_account_recovery_feature_enabled || false;
+                    this.isMultipleUserEnterprisesFeatureEnabled =
+                        options.is_multiple_user_enterprises_feature_enabled || false;
                     this.is_require_third_party_auth_enabled = options.is_require_third_party_auth_enabled || false;
-                    this.enable_coppa_compliance = options.enable_coppa_compliance;
 
                 // The login view listens for 'sync' events from the reset model
                     this.resetModel = new PasswordResetModel({}, {
@@ -173,7 +173,7 @@
                         this.listenTo(this.subview.login, 'password-help', this.resetPassword);
 
                     // Listen for 'auth-complete' event so we can enroll/redirect the user appropriately.
-                        if (!isTpaSaml) {
+                        if (this.isMultipleUserEnterprisesFeatureEnabled === true && !isTpaSaml) {
                             this.listenTo(this.subview.login, 'auth-complete', this.loginComplete);
                         } else {
                             this.listenTo(this.subview.login, 'auth-complete', this.authComplete);
@@ -199,8 +199,7 @@
                     register: function(data) {
                         var model = new RegisterModel({}, {
                             method: data.method,
-                            url: data.submit_url,
-                            nextUrl: this.nextUrl
+                            url: data.submit_url
                         });
 
                         this.subview.register = new RegisterView({
@@ -209,8 +208,7 @@
                             thirdPartyAuth: this.thirdPartyAuth,
                             platformName: this.platformName,
                             hideAuthWarnings: this.hideAuthWarnings,
-                            is_require_third_party_auth_enabled: this.is_require_third_party_auth_enabled,
-                            enableCoppaCompliance: this.enable_coppa_compliance,
+                            is_require_third_party_auth_enabled: this.is_require_third_party_auth_enabled
                         });
 
                     // Listen for 'auth-complete' event so we can enroll/redirect the user appropriately.
@@ -321,13 +319,10 @@
              */
                 loginComplete: function() {
                     if (this.thirdPartyAuth && this.thirdPartyAuth.finishAuthUrl) {
-                        multipleEnterpriseInterface.check(
-                            this.thirdPartyAuth.finishAuthUrl,
-                            this.edxUserInfoCookieName
-                        );
+                        multipleEnterpriseInterface.check(this.thirdPartyAuth.finishAuthUrl);
                     // Note: the third party auth URL likely contains another redirect URL embedded inside
                     } else {
-                        multipleEnterpriseInterface.check(this.nextUrl, this.edxUserInfoCookieName);
+                        multipleEnterpriseInterface.check(this.nextUrl);
                     }
                 },
 

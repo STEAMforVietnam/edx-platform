@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = (n != 1);
-    if (typeof v === 'boolean') {
+    var v=(n != 1);
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,7 +19,7 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
     "\n                    Make sure you are on a computer with a webcam, and that you have valid photo identification\n                    such as a driver's license or passport, before you continue.\n                ": "\n                    Assegureu-vos que sou en una computadora amb una c\u00e0mera web i que tingueu una identificaci\u00f3 amb foto v\u00e0lida\n                    com ara una llic\u00e8ncia de conduir o un passaport, abans de continuar.\n                ",
     "\n                    Your verification attempt failed. Please read our guidelines to make\n                    sure you understand the requirements for successfully completing verification,\n                    then try again.\n                ": "\n                    Ha fallat l'intent de verificaci\u00f3. Llegiu les nostres directrius per\n                    assegurar-vos d'entendre els requisits per completar la verificaci\u00f3 amb \u00e8xit,\n                    torneu-ho a provar.\n                ",
     "\n                    Your verification has expired. You must successfully complete a new identity verification\n                    before you can start the proctored exam.\n                ": "\n                    La teva verificaci\u00f3 ha caducat. Heu de completar amb \u00e8xit una nova verificaci\u00f3 d'identitat\n                    abans de poder iniciar l'examen supervisat.\n                ",
@@ -193,6 +192,7 @@
     "Cancel team updating.": "Cancel\u00b7la l'actualitzaci\u00f3 de l'equip.",
     "Cannot delete when in use by a unit": "No es pot eliminar quan est\u00e0 en \u00fas per una unitat",
     "Cannot delete when in use by an experiment": "No es pot esborrar quan s'utilitza una prova",
+    "Cannot drop more <%= types %> assignments than are assigned.": "No es poden deixar caure m\u00e9s <%= types %> assignacions que s'assignen.",
     "Caution: The last published version of this unit is live. By publishing changes you will change the student experience.": "Precauci\u00f3: l'\u00faltima versi\u00f3 publicada d'aquesta unitat \u00e9s en viu. En publicar canvis, canviar\u00e0s l'experi\u00e8ncia dels estudiants.",
     "Certificate Details": "Detalls del certificat",
     "Certificate Generated": "Certificat generat",
@@ -369,6 +369,7 @@
     "Enable": "Activa",
     "Enable Cohorts": "Activa les cohorts",
     "Enable Now": "Habilitar ara",
+    "Enable Weekly Highlight Emails": "Activa els correus electr\u00f2nics de resum setmanals",
     "Enabled": "Habilitat",
     "End My Exam": "Finalitza el meu examen",
     "Engage with posts": "Participa amb publicacions",
@@ -694,6 +695,7 @@
     "Proctored Exam": "Ex\u00e0men supervisat",
     "Proctored Option Available": "Opci\u00f3 Supervisat disponible",
     "Proctored Option No Longer Available": "L'opci\u00f3 Supervisat ja no est\u00e0 disponible",
+    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "Els ex\u00e0mens supervisats s\u00f3n cronometrats i graven el v\u00eddeo de cada alumne que pren l'examen. Els v\u00eddeos es revisen per garantir que els alumnes segueixin totes les regles d'examen.",
     "Product Name": "nom del producte",
     "Professional Certificate for {courseName}": "Certificat professional per {courseName}",
     "Program Record": "Registre del programa",
@@ -934,6 +936,7 @@
     "This configuration is currently used in content experiments. If you make changes to the groups, you may need to edit those experiments.": "Actualment, aquesta configuraci\u00f3 s'utilitza en experiments de contingut. Si feu canvis als grups, \u00e9s possible que h\u00e0giu d'editar aquests experiments.",
     "This content group is used in one or more units.": "Aquest grup de contingut s'utilitza en una o m\u00e9s unitats.",
     "This exam has a time limit associated with it.": "Aquest examen t\u00e9 un l\u00edmit de temps associat.",
+    "This feature is currently in testing. Course teams can enter highlights, but learners will not receive email messages.": "Actualment aquesta funci\u00f3 est\u00e0 en proves. Els equips de cursos poden entrar a destacar, per\u00f2 els alumnes no rebran missatges de correu electr\u00f2nic.",
     "This file type is not supported. Supported file type is {supportedFileFormat}.": "Aquest tipus de fitxer no \u00e9s compatible. El tipus de fitxer compatible \u00e9s {supportedFileFormat}.",
     "This group controls access to:": "Aquest grup controla l'acc\u00e9s a:",
     "This group no longer exists. Choose another group or do not restrict access to this unit.": "Aquest grup ja no existeix. Trieu un altre grup o no restringiu l'acc\u00e9s a aquesta unitat.",
@@ -1071,6 +1074,7 @@
     "We use the highest levels of security available to encrypt your photo and send it to our authorization service for review. Your photo and information are not saved or visible anywhere on %(platformName)s after the verification process is complete.": "Utilitzem els nivells m\u00e9s alts de seguretat disponibles per xifrar la vostra foto i enviar-la al nostre servei d'autoritzaci\u00f3 per a la seva revisi\u00f3. La vostra foto i la vostra informaci\u00f3 no es guarden ni es poden visualitzar a cap part de %(platformName)s despr\u00e9s de completar el proc\u00e9s de verificaci\u00f3.",
     "Web:": "Web:",
     "Webcam": "C\u00e0mera web",
+    "Weekly Highlight Emails": "Correus electr\u00f2nics destacats setmanals",
     "Weight of Total Grade": "Pes total de la Nota",
     "What You Need for Verification": "El que necessiteu per a la verificaci\u00f3",
     "What does %(platformName)s do with this photo?": "Qu\u00e8 fa amb %(platformName)s amb aquesta foto?",
@@ -1220,24 +1224,24 @@
     "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}": "{transcriptClientTitle} _ {transcriptLanguageCode}. {fileExtension}",
     "\u2026": "..."
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1247,16 +1251,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1310,8 +1314,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1330,5 +1334,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

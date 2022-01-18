@@ -8,10 +8,11 @@ from collections import OrderedDict, defaultdict
 
 from ccx_keys.locator import CCXLocator
 from django.conf import settings
+from django.utils.encoding import python_2_unicode_compatible
 from lazy import lazy
 
 from openedx.core.lib.grade_utils import round_away_from_zero
-from xmodule import block_metadata_utils  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule import block_metadata_utils
 
 from .config import assume_zero_if_absent
 from .scores import compute_percent
@@ -19,6 +20,7 @@ from .subsection_grade import ZeroSubsectionGrade
 from .subsection_grade_factory import SubsectionGradeFactory
 
 
+@python_2_unicode_compatible
 class CourseGradeBase:
     """
     Base class for Course Grades.
@@ -219,7 +221,8 @@ class CourseGradeBase:
         """
         chapter_subsection_grades = self._get_subsection_grades(course_structure, chapter.location)
         return {
-            'display_name': block_metadata_utils.display_name_with_default(chapter),
+            # xss-lint: disable=python-deprecated-display-name
+            'display_name': block_metadata_utils.display_name_with_default_escaped(chapter),
             'url_name': block_metadata_utils.url_name_for_block(chapter),
             'sections': chapter_subsection_grades,
         }

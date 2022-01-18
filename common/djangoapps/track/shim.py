@@ -3,9 +3,6 @@
 
 import json
 
-from opaque_keys import InvalidKeyError
-from opaque_keys.edx.keys import CourseKey
-
 from .transformers import EventTransformerRegistry
 
 CONTEXT_FIELDS_TO_INCLUDE = [
@@ -19,7 +16,7 @@ CONTEXT_FIELDS_TO_INCLUDE = [
 ]
 
 
-class LegacyFieldMappingProcessor:
+class LegacyFieldMappingProcessor(object):
     """Ensures all required fields are included in emitted events"""
 
     def __call__(self, event):
@@ -76,7 +73,7 @@ def remove_shim_context(event):
                 del context[field]
 
 
-class GoogleAnalyticsProcessor:
+class GoogleAnalyticsProcessor(object):
     """Adds course_id as label, and sets nonInteraction property"""
 
     # documentation of fields here: https://segment.com/docs/integrations/google-analytics/
@@ -88,22 +85,13 @@ class GoogleAnalyticsProcessor:
         copied_event = event.copy()
         if course_id is not None:
             copied_event['label'] = course_id
-            # The value stored as course_id is not always a courserun_key.
-            # It may, for example, be a library instead.  So we parse it first to be sure.
-            # We add a str() call to the input so that sentinel values don't cause
-            # CourseKey to spit up with a different error.
-            try:
-                courserun_key = CourseKey.from_string(str(course_id))
-                copied_event['courserun_key'] = str(courserun_key)
-            except InvalidKeyError:
-                pass
 
         copied_event['nonInteraction'] = 1
 
         return copied_event
 
 
-class PrefixedEventProcessor:
+class PrefixedEventProcessor(object):
     """
     Process any events whose name or prefix (ending with a '.') is registered
     as an EventTransformer.

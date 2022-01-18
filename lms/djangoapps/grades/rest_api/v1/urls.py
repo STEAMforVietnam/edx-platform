@@ -2,44 +2,44 @@
 
 
 from django.conf import settings
-from django.urls import path, re_path
+from django.conf.urls import url
 
 from lms.djangoapps.grades.rest_api.v1 import gradebook_views, views
 
 app_name = 'lms.djangoapps.grades'
 
 urlpatterns = [
-    path(
-        'courses/',
+    url(
+        r'^courses/$',
         views.CourseGradesView.as_view(),
         name='course_grades'
     ),
-    re_path(
+    url(
         fr'^courses/{settings.COURSE_ID_PATTERN}/$',
         views.CourseGradesView.as_view(),
         name='course_grades'
     ),
-    re_path(
+    url(
         fr'^policy/courses/{settings.COURSE_ID_PATTERN}/$',
         views.CourseGradingPolicy.as_view(),
         name='course_grading_policy'
     ),
-    re_path(
+    url(
         fr'^gradebook/{settings.COURSE_ID_PATTERN}/$',
         gradebook_views.GradebookView.as_view(),
         name='course_gradebook'
     ),
-    re_path(
+    url(
         fr'^gradebook/{settings.COURSE_ID_PATTERN}/bulk-update$',
         gradebook_views.GradebookBulkUpdateView.as_view(),
         name='course_gradebook_bulk_update'
     ),
-    re_path(
+    url(
         fr'^gradebook/{settings.COURSE_ID_PATTERN}/grading-info$',
         gradebook_views.CourseGradingView.as_view(),
         name='course_gradebook_grading_info'
     ),
-    re_path(
+    url(
         r'^subsection/(?P<subsection_id>.*)/$',
         gradebook_views.SubsectionGradeView.as_view(),
         name='course_grade_overrides'

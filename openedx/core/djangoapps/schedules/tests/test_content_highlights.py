@@ -1,4 +1,3 @@
-# lint-amnesty, pylint: disable=missing-module-docstring
 import datetime
 from unittest.mock import patch
 import pytest
@@ -12,8 +11,8 @@ from openedx.core.djangoapps.schedules.exceptions import CourseUpdateDoesNotExis
 from openedx.core.djangolib.testing.utils import skip_unless_lms
 from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.tests.factories import UserFactory
-from xmodule.modulestore.tests.django_utils import TEST_DATA_SPLIT_MODULESTORE, ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import TEST_DATA_SPLIT_MODULESTORE, ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 @skip_unless_lms
@@ -166,7 +165,7 @@ class TestContentHighlights(ModuleStoreTestCase):  # lint-amnesty, pylint: disab
         mock_get_module.return_value = None
 
         with self.store.bulk_operations(self.course_key):
-            self._create_chapter(highlights=['Test highlight'])
+            self._create_chapter(highlights='Test highlight')
 
         with self.assertRaisesRegex(CourseUpdateDoesNotExist, 'Course module .* not found'):
             get_week_highlights(self.user, self.course_key, 1)

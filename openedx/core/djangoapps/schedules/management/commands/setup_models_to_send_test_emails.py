@@ -18,8 +18,8 @@ from openedx.core.djangoapps.schedules.tests.factories import (
     ScheduleExperienceFactory,
     ScheduleFactory
 )
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import XMODULE_FACTORY_LOCK, CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.factories import XMODULE_FACTORY_LOCK, CourseFactory
 
 
 class ThreeDayNudgeSchedule(ScheduleFactory):

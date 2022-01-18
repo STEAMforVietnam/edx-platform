@@ -14,17 +14,18 @@ import bleach
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseServerError
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django.views.decorators.http import require_GET, require_POST
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 
 from common.djangoapps.student.models import CourseEnrollment, User
 from common.djangoapps.util.json_request import JsonResponse
-from lms.djangoapps.certificates.api import generate_certificate_task, get_certificates_for_user
+from lms.djangoapps.certificates.api import get_certificates_for_user, regenerate_user_certificates
 from lms.djangoapps.certificates.permissions import GENERATE_ALL_CERTIFICATES, VIEW_ALL_CERTIFICATES
 from lms.djangoapps.instructor_task.api import generate_certificates_for_students
-from openedx.core.djangoapps.content.course_overviews.api import get_course_overview_or_none
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)
 
@@ -112,15 +113,15 @@ def search_certificates(request):
         except InvalidKeyError:
             return HttpResponseBadRequest(_("Course id '{course_id}' is not valid").format(course_id=course_id))
         else:
-            course_overview = get_course_overview_or_none(course_key)
-            if not course_overview:
+            try:
+                if CourseOverview.get_from_id(course_key):
+                    certificates = [certificate for certificate in certificates
+                                    if certificate['course_key'] == course_id]
+                    if not certificates:
+                        return JsonResponse([{'username': user.username, 'course_key': course_id, 'regenerate': False}])
+            except CourseOverview.DoesNotExist:
                 msg = _("The course does not exist against the given key '{course_key}'").format(course_key=course_key)
                 return HttpResponseBadRequest(msg)
-
-            certificates = [certificate for certificate in certificates
-                            if certificate['course_key'] == course_id]
-            if not certificates:
-                return JsonResponse([{'username': user.username, 'course_key': course_id, 'regenerate': False}])
 
     return JsonResponse(certificates)
 
@@ -183,34 +184,37 @@ def regenerate_certificate_for_user(request):
     if response is not None:
         return response
 
-    user = params["user"]
-    course_key = params["course_key"]
-
-    course_overview = get_course_overview_or_none(course_key)
-    if not course_overview:
-        msg = _("The course {course_key} does not exist").format(course_key=course_key)
+    # Check that the course exists
+    course = modulestore().get_course(params["course_key"])
+    if course is None:
+        msg = _("The course {course_key} does not exist").format(course_key=params["course_key"])
         return HttpResponseBadRequest(msg)
 
     # Check that the user is enrolled in the course
-    if not CourseEnrollment.is_enrolled(user, course_key):
-        msg = _("User {user_id} is not enrolled in the course {course_key}").format(
-            user_id=user.id,
-            course_key=course_key
+    if not CourseEnrollment.is_enrolled(params["user"], params["course_key"]):
+        msg = _("User {username} is not enrolled in the course {course_key}").format(
+            username=params["user"].username,
+            course_key=params["course_key"]
         )
         return HttpResponseBadRequest(msg)
 
     # Attempt to regenerate certificates
     try:
-        generate_certificate_task(user, course_key)
+        regenerate_user_certificates(params["user"], params["course_key"], course=course)
     except:  # pylint: disable=bare-except
         # We are pessimistic about the kinds of errors that might get thrown by the
         # certificates API.  This may be overkill, but we're logging everything so we can
         # track down unexpected errors.
-        log.exception(f"Could not regenerate certificate for user {user.id} in course {course_key}")
+        log.exception(
+            "Could not regenerate certificates for user %s in course %s",
+            params["user"].id,
+            params["course_key"]
+        )
         return HttpResponseServerError(_("An unexpected error occurred while regenerating certificates."))
 
     log.info(
-        f"Started regenerating certificates for user {user.id} in course {course_key} from the support page."
+        "Started regenerating certificates for user %s in course %s from the support page.",
+        params["user"].id, params["course_key"]
     )
     return HttpResponse(200)
 
@@ -244,24 +248,26 @@ def generate_certificate_for_user(request):
     if response is not None:
         return response
 
-    course_overview = get_course_overview_or_none(params["course_key"])
-    if not course_overview:
+    try:
+        # Check that the course exists
+        CourseOverview.get_from_id(params["course_key"])
+    except CourseOverview.DoesNotExist:
         msg = _("The course {course_key} does not exist").format(course_key=params["course_key"])
         return HttpResponseBadRequest(msg)
+    else:
+        # Check that the user is enrolled in the course
+        if not CourseEnrollment.is_enrolled(params["user"], params["course_key"]):
+            msg = _("User {username} is not enrolled in the course {course_key}").format(
+                username=params["user"].username,
+                course_key=params["course_key"]
+            )
+            return HttpResponseBadRequest(msg)
 
-    # Check that the user is enrolled in the course
-    if not CourseEnrollment.is_enrolled(params["user"], params["course_key"]):
-        msg = _("User {username} is not enrolled in the course {course_key}").format(
-            username=params["user"].username,
-            course_key=params["course_key"]
+        # Attempt to generate certificate
+        generate_certificates_for_students(
+            request,
+            params["course_key"],
+            student_set="specific_student",
+            specific_student_id=params["user"].id
         )
-        return HttpResponseBadRequest(msg)
-
-    # Attempt to generate certificate
-    generate_certificates_for_students(
-        request,
-        params["course_key"],
-        student_set="specific_student",
-        specific_student_id=params["user"].id
-    )
-    return HttpResponse(200)
+        return HttpResponse(200)

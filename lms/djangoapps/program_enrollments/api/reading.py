@@ -5,15 +5,12 @@ Outside of this subpackage, import these functions
 from `lms.djangoapps.program_enrollments.api`.
 """
 
-import re
-from functools import reduce
-from operator import or_
 
-from django.db.models import Q
 from organizations.models import Organization
 from social_django.models import UserSocialAuth
 
 from common.djangoapps.student.roles import CourseStaffRole
+from common.djangoapps.third_party_auth.models import SAMLProviderConfig
 from openedx.core.djangoapps.catalog.utils import get_programs
 
 from ..constants import ProgramCourseEnrollmentRoles
@@ -21,6 +18,7 @@ from ..exceptions import (
     BadOrganizationShortNameException,
     ProgramDoesNotExistException,
     ProgramHasNoAuthoringOrganizationException,
+    ProviderConfigurationException,
     ProviderDoesNotExistException
 )
 from ..models import ProgramCourseEnrollment, ProgramEnrollment
@@ -63,7 +61,7 @@ def get_program_enrollment(
         raise ValueError(_STUDENT_ARG_ERROR_MESSAGE)
     filters = {
         "user": user,
-        "external_user_key__iexact": external_user_key,
+        "external_user_key": external_user_key,
         "curriculum_uuid": curriculum_uuid,
     }
     return ProgramEnrollment.objects.get(
@@ -101,7 +99,7 @@ def get_program_course_enrollment(
         raise ValueError(_STUDENT_ARG_ERROR_MESSAGE)
     filters = {
         "program_enrollment__user": user,
-        "program_enrollment__external_user_key__iexact": external_user_key,
+        "program_enrollment__external_user_key": external_user_key,
         "program_enrollment__curriculum_uuid": curriculum_uuid,
     }
     return ProgramCourseEnrollment.objects.get(
@@ -143,13 +141,10 @@ def fetch_program_enrollments(
         raise ValueError(
             _REALIZED_FILTER_ERROR_TEMPLATE.format("realized_only", "waiting_only")
         )
-    external_user_key_regex = None
-    if external_user_keys:
-        external_user_key_regex = r'^(' + '|'.join([re.escape(b) for b in external_user_keys]) + ')$'
     filters = {
         "curriculum_uuid__in": curriculum_uuids,
         "user__in": users,
-        "external_user_key__iregex": external_user_key_regex,
+        "external_user_key__in": external_user_keys,
         "status__in": program_enrollment_statuses,
     }
     if realized_only:
@@ -206,13 +201,10 @@ def fetch_program_course_enrollments(
         raise ValueError(
             _REALIZED_FILTER_ERROR_TEMPLATE.format("realized_only", "waiting_only")
         )
-    external_user_key_regex = None
-    if external_user_keys:
-        external_user_key_regex = r'^(' + '|'.join([re.escape(b) for b in external_user_keys]) + ')$'
     filters = {
         "program_enrollment__curriculum_uuid__in": curriculum_uuids,
         "program_enrollment__user__in": users,
-        "program_enrollment__external_user_key__iregex": external_user_key_regex,
+        "program_enrollment__external_user_key__in": external_user_keys,
         "program_enrollment__status__in": program_enrollment_statuses,
         "program_enrollment__in": program_enrollments,
     }
@@ -267,7 +259,7 @@ def fetch_program_enrollments_by_student(
         )
     filters = {
         "user": user,
-        "external_user_key__iexact": external_user_key,
+        "external_user_key": external_user_key,
         "program_uuid__in": program_uuids,
         "curriculum_uuid__in": curriculum_uuids,
         "status__in": program_enrollment_statuses,
@@ -308,12 +300,9 @@ def fetch_program_enrollments_by_students(
         raise ValueError(
             _REALIZED_FILTER_ERROR_TEMPLATE.format("realized_only", "waiting_only")
         )
-    external_user_key_regex = None
-    if external_user_keys:
-        external_user_key_regex = r'^(' + '|'.join([re.escape(b) for b in external_user_keys]) + ')$'
     filters = {
         "user__in": users,
-        "external_user_key__iregex": external_user_key_regex,
+        "external_user_key__in": external_user_keys,
         "status__in": program_enrollment_statuses,
     }
     if realized_only:
@@ -367,12 +356,9 @@ def fetch_program_course_enrollments_by_students(
         raise ValueError(
             _REALIZED_FILTER_ERROR_TEMPLATE.format("realized_only", "waiting_only")
         )
-    external_user_key_regex = None
-    if external_user_keys:
-        external_user_key_regex = r'^(' + '|'.join([re.escape(b) for b in external_user_keys]) + ')$'
     filters = {
         "program_enrollment__user__in": users,
-        "program_enrollment__external_user_key__iregex": external_user_key_regex,
+        "program_enrollment__external_user_key__in": external_user_keys,
         "program_enrollment__program_uuid__in": program_uuids,
         "program_enrollment__curriculum_uuid__in": curriculum_uuids,
         "course_key__in": course_keys,
@@ -418,25 +404,18 @@ def get_users_by_external_keys_and_org_key(external_user_keys, org_key):
     Raises:
         BadOrganizationShortNameException
         ProviderDoesNotExistsException
+        ProviderConfigurationException
     """
-    saml_providers = get_saml_providers_by_org_key(org_key)
-    found_users_by_external_keys = {}
-    # if the same external id exists in multiple providers (for this organization)
-    # it is expected both providers return the same user
-    for saml_provider in saml_providers:
-        social_auth_uids = {
-            saml_provider.get_social_auth_uid(external_user_key)
-            for external_user_key in external_user_keys
-        }
-        if social_auth_uids:
-            # Filter should be case insensitive
-            query_filter = reduce(or_, [Q(uid__iexact=uid) for uid in social_auth_uids])
-            social_auths = UserSocialAuth.objects.filter(query_filter)
-            found_users_by_external_keys.update({
-                saml_provider.get_remote_id_from_social_auth(social_auth): social_auth.user
-                for social_auth in social_auths
-            })
-
+    saml_provider = get_saml_provider_by_org_key(org_key)
+    social_auth_uids = {
+        saml_provider.get_social_auth_uid(external_user_key)
+        for external_user_key in external_user_keys
+    }
+    social_auths = UserSocialAuth.objects.filter(uid__in=social_auth_uids)
+    found_users_by_external_keys = {
+        saml_provider.get_remote_id_from_social_auth(social_auth): social_auth.user
+        for social_auth in social_auths
+    }
     # Default all external keys to None, because external keys
     # without a User will not appear in `found_users_by_external_keys`.
     users_by_external_keys = {key: None for key in external_user_keys}
@@ -465,6 +444,7 @@ def get_users_by_external_keys(program_uuid, external_user_keys):
         ProgramHasNoAuthoringOrganizationException
         BadOrganizationShortNameException
         ProviderDoesNotExistsException
+        ProviderConfigurationException
     """
     org_key = get_org_key_for_program(program_uuid)
     return get_users_by_external_keys_and_org_key(external_user_keys, org_key)
@@ -497,17 +477,14 @@ def get_external_key_by_user_and_course(user, course_key):
     return relevant_pce.program_enrollment.external_user_key
 
 
-def get_saml_providers_by_org_key(org_key):
+def get_saml_provider_by_org_key(org_key):
     """
-    Returns a list of SAML providers associated with the provided org_key.
-    In most cases an organization will only have one configured provider.
-    However, multiple may be returned during a migration between two active
-    providers.
+    Returns the SAML provider associated with the provided org_key
 
     Arguments:
         org_key (str)
 
-    Returns: list[SAMLProvider]
+    Returns: SAMLProvider
 
     Raises:
         BadOrganizationShortNameException
@@ -516,7 +493,7 @@ def get_saml_providers_by_org_key(org_key):
         organization = Organization.objects.get(short_name=org_key)
     except Organization.DoesNotExist:
         raise BadOrganizationShortNameException(org_key)  # lint-amnesty, pylint: disable=raise-missing-from
-    return get_saml_providers_for_organization(organization)
+    return get_saml_provider_for_organization(organization)
 
 
 def get_org_key_for_program(program_uuid):
@@ -543,25 +520,26 @@ def get_org_key_for_program(program_uuid):
     return org_key
 
 
-def get_saml_providers_for_organization(organization):
+def get_saml_provider_for_organization(organization):
     """
-    Return currently configured SAML provider(s) for the given Organization.
-    In most cases an organization will only have one configured provider.
-    However, multiple may be returned during a migration between two active
-    providers.
+    Return currently configured SAML provider for the given Organization.
 
     Arguments:
         organization: Organization
 
-    Returns: list[SAMLProvider]
+    Returns: SAMLProvider
 
     Raises:
         ProviderDoesNotExistsException
+        ProviderConfigurationException
     """
-    provider_configs = organization.samlproviderconfig_set.current_set().filter(enabled=True)
-    if not provider_configs:
+    try:
+        provider_config = organization.samlproviderconfig_set.current_set().get(enabled=True)
+    except SAMLProviderConfig.DoesNotExist:
         raise ProviderDoesNotExistException(organization)  # lint-amnesty, pylint: disable=raise-missing-from
-    return list(provider_configs)
+    except SAMLProviderConfig.MultipleObjectsReturned:
+        raise ProviderConfigurationException(organization)  # lint-amnesty, pylint: disable=raise-missing-from
+    return provider_config
 
 
 def get_provider_slug(provider_config):

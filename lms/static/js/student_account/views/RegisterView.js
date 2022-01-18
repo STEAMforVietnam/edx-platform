@@ -31,6 +31,7 @@
                     'name',
                     'username',
                     'password',
+                    'confirm_password',
                     'email',
                     'confirm_email',
                     'country',
@@ -64,8 +65,7 @@
                     this.autoRegisterWelcomeMessage = data.thirdPartyAuth.autoRegisterWelcomeMessage || '';
                     this.registerFormSubmitButtonText =
                         data.thirdPartyAuth.registerFormSubmitButtonText || _('Create Account');
-                    this.is_require_third_party_auth_enabled = data.is_require_third_party_auth_enabled;
-                    this.enableCoppaCompliance = data.enableCoppaCompliance;
+                    this.is_require_third_party_auth_enabled = data.is_require_third_party_auth_enabled || false;
 
                     this.listenTo(this.model, 'sync', this.saveSuccess);
                     this.listenTo(this.model, 'validation', this.renderLiveValidations);
@@ -86,7 +86,7 @@
                         html.push(HtmlUtils.template(fieldTpl)($.extend(fields[i], {
                             form: this.formType,
                             requiredStr: this.requiredStr,
-                            optionalStr: fields[i].name === 'marketing_emails_opt_in' ? '' : this.optionalStr,
+                            optionalStr: this.optionalStr,
                             supplementalText: fields[i].supplementalText || '',
                             supplementalLink: fields[i].supplementalLink || ''
                         })));
@@ -101,8 +101,7 @@
                         field,
                         len = data.length,
                         requiredFields = [],
-                        optionalFields = [],
-                        exposedOptionalFields = [];
+                        optionalFields = [];
 
                     this.fields = data;
 
@@ -124,21 +123,13 @@
                                 // input elements that are visible on the page.
                                 this.hasOptionalFields = true;
                             }
-
-                            if (field.exposed) {
-                                exposedOptionalFields.push(field);
-                            } else {
-                                optionalFields.push(field);
-                            }
+                            optionalFields.push(field);
                         }
                     }
 
                     html = this.renderFields(requiredFields, 'required-fields');
 
-                    html.push.apply(html, this.renderFields(exposedOptionalFields, 'exposed-optional-fields'));
-                    html.push.apply(html, this.renderFields(
-                      optionalFields, `optional-fields ${!this.enableCoppaCompliance ? '' : 'full-length-fields'}`
-                    ));
+                    html.push.apply(html, this.renderFields(optionalFields, 'optional-fields'));
 
                     this.render(html.join(''));
                 },
@@ -258,14 +249,6 @@
                         $('.optional-fields').toggleClass('hidden');
                     });
 
-                    // Since the honor TOS text has a composed css selector, it is more future proof
-                    // to insert the not toggled optional fields before .honor_tos_combined's parent
-                    // that is the container for the honor TOS text and checkbox.
-                    // xss-lint: disable=javascript-jquery-insert-into-target
-                    $('.exposed-optional-fields').insertBefore(
-                        $('.honor_tos_combined').parent()
-                    );
-
                     // We are swapping the order of these elements here because the honor code agreement
                     // is a required checkbox field and the optional fields toggle is a cosmetic
                     // improvement so that we don't have to show all the optional fields.
@@ -296,6 +279,9 @@
                         }
                     });
                     $('#register-confirm_email').bind('cut copy paste', function(e) {
+                        e.preventDefault();
+                    });
+                    $('#register-confirm_password').bind('cut copy paste', function(e) {
                         e.preventDefault();
                     });
                     setTimeout(handleAutocomplete, 1000);

@@ -45,7 +45,7 @@ from lms.djangoapps.instructor_task.tasks import (
     send_bulk_course_email,
     generate_anonymous_ids_for_course
 )
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 
 class SpecificStudentIdMissingError(Exception):
@@ -345,31 +345,31 @@ def submit_calculate_problem_responses_csv(
     return submit_task(request, task_type, task_class, course_key, task_input, task_key)
 
 
-def submit_calculate_grades_csv(request, course_key, **task_kwargs):
+def submit_calculate_grades_csv(request, course_key):
     """
     AlreadyRunningError is raised if the course's grades are already being updated.
     """
     task_type = 'grade_course'
     task_class = calculate_grades_csv
-    task_input = task_kwargs
+    task_input = {}
     task_key = ""
 
     return submit_task(request, task_type, task_class, course_key, task_input, task_key)
 
 
-def submit_problem_grade_report(request, course_key, **task_kwargs):
+def submit_problem_grade_report(request, course_key):
     """
     Submits a task to generate a CSV grade report containing problem
     values.
     """
     task_type = 'grade_problems'
     task_class = calculate_problem_grade_report
-    task_input = task_kwargs
+    task_input = {}
     task_key = ""
     return submit_task(request, task_type, task_class, course_key, task_input, task_key)
 
 
-def submit_calculate_students_features_csv(request, course_key, features, **task_kwargs):
+def submit_calculate_students_features_csv(request, course_key, features):
     """
     Submits a task to generate a CSV containing student profile info.
 
@@ -377,7 +377,7 @@ def submit_calculate_students_features_csv(request, course_key, features, **task
     """
     task_type = 'profile_info_csv'
     task_class = calculate_students_features_csv
-    task_input = dict(features=features, **task_kwargs)
+    task_input = features
     task_key = ""
 
     return submit_task(request, task_type, task_class, course_key, task_input, task_key)
@@ -485,8 +485,8 @@ def generate_certificates_for_students(request, course_key, student_set=None, sp
         course_key  : Course Key
         student_set : Semantic for student collection for certificate generation.
                       Options are:
-                      'all_allowlisted': All students on the certificate allowlist.
-                      'allowlisted_not_generated': Students on certificate allowlist who do not have certificates yet.
+                      'all_whitelisted': All Whitelisted students.
+                      'whitelisted_not_generated': Whitelisted students which does not got certificates yet.
                       'specific_student': Single student for certificate generation.
         specific_student_id : Student ID when student_set is 'specific_student'
 

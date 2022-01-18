@@ -11,13 +11,13 @@ from django.test.utils import override_settings
 from django.urls import reverse
 
 from edx_toggles.toggles.testutils import override_waffle_flag
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
+from lms.djangoapps.courseware.tests.factories import GlobalStaffFactory
 from lms.djangoapps.courseware.tests.helpers import LoginEnrollmentTestCase
 from openedx.features.course_experience import DISABLE_COURSE_OUTLINE_PAGE_FLAG
 from common.djangoapps.student.tests.factories import UserFactory
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 class TestNavigation(SharedModuleStoreTestCase, LoginEnrollmentTestCase):

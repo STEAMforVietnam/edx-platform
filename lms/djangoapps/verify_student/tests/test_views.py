@@ -42,10 +42,10 @@ from lms.djangoapps.verify_student.views import PayAndVerifyView, checkout_with_
 from openedx.core.djangoapps.embargo.test_utils import restrict_course
 from openedx.core.djangoapps.theming.tests.test_util import with_comprehensive_theme
 from openedx.core.djangoapps.user_api.accounts.api import get_account_settings
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 def mock_render_to_response(*args, **kwargs):
@@ -115,7 +115,7 @@ class StartView(TestCase):
     """
 
     def start_url(self, course_id=""):
-        return f"/verify_student/{urllib.parse.quote(course_id)}"
+        return "/verify_student/{}".format(urllib.parse.quote(course_id))
 
     def test_start_new_verification(self):
         """
@@ -906,7 +906,7 @@ class TestPayAndVerifyView(UrlResetMixin, ModuleStoreTestCase, XssTestMixin, Tes
             # ensure the mock api call was made.  NOTE: the following line
             # approximates the check - if the headers were empty it means
             # there was no last request.
-            assert httpretty.last_request().headers
+            assert httpretty.last_request().headers != {}
         return response
 
     def _assert_displayed_mode(self, response, expected_mode):
@@ -1233,8 +1233,6 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
     IMAGE_DATA = "data:image/png;base64,1234"
     FULL_NAME = "Ḟüḷḷ Ṅäṁë"
     EXPERIMENT_NAME = "test-experiment"
-    PORTRAIT_PHOTO_MODE = "upload"
-    ID_PHOTO_MODE = "camera"
 
     def setUp(self):
         super().setUp()
@@ -1256,8 +1254,7 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
         # Verify that the user's name wasn't changed
         self._assert_user_name(self.user.profile.name)
 
-    @ddt.data(True, False)
-    def test_submit_photos_and_change_name(self, flag_on):
+    def test_submit_photos_and_change_name(self):
         # Submit the photos, along with a name change
         self._submit_photos(
             face_image=self.IMAGE_DATA,
@@ -1265,10 +1262,8 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
             full_name=self.FULL_NAME
         )
 
-        # Since we are giving a full name, it should be written into the attempt
-        # whether or not the user name was updated
-        attempt = SoftwareSecurePhotoVerification.objects.get(user=self.user)
-        self.assertEqual(attempt.name, self.FULL_NAME)
+        # Check that the user's name was changed in the database
+        self._assert_user_name(self.FULL_NAME)
 
     def test_submit_photos_sends_confirmation_email(self):
         self._submit_photos(
@@ -1359,6 +1354,15 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
         }
         self._submit_photos(expected_status_code=status_code, **params)
 
+    def test_invalid_name(self):
+        response = self._submit_photos(
+            face_image=self.IMAGE_DATA,
+            photo_id_image=self.IMAGE_DATA,
+            full_name="",
+            expected_status_code=400
+        )
+        assert response.content.decode('utf-8') == 'Name must be at least 1 character long.'
+
     def test_missing_required_param(self):
         # Missing face image parameter
         params = {
@@ -1388,14 +1392,12 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
         self._submit_photos(face_image=self.IMAGE_DATA)
 
     @patch('lms.djangoapps.verify_student.views.segment.track')
-    def test_experiment_params(self, mock_segment_track):
+    def test_experiment_name_param(self, mock_segment_track):
         # Submit the photos
         self._submit_photos(
             face_image=self.IMAGE_DATA,
             photo_id_image=self.IMAGE_DATA,
-            experiment_name=self.EXPERIMENT_NAME,
-            portrait_photo_mode=self.PORTRAIT_PHOTO_MODE,
-            id_photo_mode=self.ID_PHOTO_MODE
+            experiment_name=self.EXPERIMENT_NAME
         )
 
         # Verify that the attempt is created in the database
@@ -1403,23 +1405,15 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
         assert attempt.status == 'submitted'
 
         # assert that segment tracking has been called with experiment name
-        experiment_data = {
+        data = {
             "attempt_id": attempt.id,
             "experiment_name": self.EXPERIMENT_NAME
         }
-        mock_segment_track.assert_any_call(self.user.id, "edx.bi.experiment.verification.attempt", experiment_data)
-
-        mode_data = {
-            "attempt_id": attempt.id,
-            "portrait_photo_mode": self.PORTRAIT_PHOTO_MODE,
-            "id_photo_mode": self.ID_PHOTO_MODE
-        }
-        mock_segment_track.assert_any_call(self.user.id, "edx.bi.experiment.verification.attempt.photo.mode", mode_data)
+        mock_segment_track.assert_any_call(self.user.id, "edx.bi.experiment.verification.attempt", data)
 
     def _submit_photos(
         self, face_image=None, photo_id_image=None,
-        full_name=None, experiment_name=None,
-        portrait_photo_mode=None, id_photo_mode=None, expected_status_code=200
+        full_name=None, experiment_name=None, expected_status_code=200
     ):
         """Submit photos for verification.
 
@@ -1449,12 +1443,6 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
         if experiment_name is not None:
             params['experiment_name'] = experiment_name
 
-        if portrait_photo_mode is not None:
-            params['portrait_photo_mode'] = portrait_photo_mode
-
-        if id_photo_mode is not None:
-            params['id_photo_mode'] = id_photo_mode
-
         with self.immediate_on_commit():
             response = self.client.post(url, params)
         assert response.status_code == expected_status_code
@@ -1473,7 +1461,7 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
             # Verify that photo submission confirmation email was not sent
             assert len(mail.outbox) == 0
 
-    def _assert_user_name(self, full_name, equality=True):
+    def _assert_user_name(self, full_name):
         """Check the user's name.
 
         Arguments:
@@ -1486,10 +1474,7 @@ class TestSubmitPhotosForVerification(MockS3BotoMixin, TestVerificationBase):
         request = RequestFactory().get('/url')
         request.user = self.user
         account_settings = get_account_settings(request)[0]
-        if equality:
-            assert account_settings['name'] == full_name
-        else:
-            assert not account_settings['name'] == full_name
+        assert account_settings['name'] == full_name
 
     def _get_post_data(self):
         """Retrieve POST data from the last request. """
@@ -1618,8 +1603,9 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase, TestVerification
         mock.Mock(side_effect=mocked_has_valid_signature)
     )
     @patch('lms.djangoapps.verify_student.views.log.error')
+    @patch('sailthru.sailthru_client.SailthruClient.send')
     @patch('lms.djangoapps.verify_student.views.segment.track')
-    def test_passed_status_template(self, mock_segment_track, _mock_log_error):
+    def test_passed_status_template(self, mock_segment_track, _mock_sailthru_send, _mock_log_error):
         """
         Test for verification passed.
         """
@@ -1660,38 +1646,14 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase, TestVerification
         }
         mock_segment_track.assert_called_with(attempt.user.id, "edx.bi.experiment.verification.attempt.result", data)
 
-    @patch.dict(settings.VERIFY_STUDENT, {'USE_DJANGO_MAIL': True})
-    def test_approved_email_without_ace(self):
-        """
-        Test basic email for verification approved.
-        """
-        expiration_datetime = now() + timedelta(
-            days=settings.VERIFY_STUDENT["DAYS_GOOD_FOR"]
-        )
-
-        data = {
-            "EdX-ID": self.receipt_id,
-            "Result": "PASS",
-            "Reason": "",
-            "MessageType": "You have been verified."
-        }
-        json_data = json.dumps(data)
-        self.client.post(
-            reverse('verify_student_results_callback'), data=json_data,
-            content_type='application/json',
-            HTTP_AUTHORIZATION='test BBBBBBBBBBBBBBBBBBBB:testing',
-            HTTP_DATE='testdate'
-        )
-
-        self._assert_verification_approved_email(expiration_datetime.date())
-
     @patch(
         'lms.djangoapps.verify_student.ssencrypt.has_valid_signature',
         mock.Mock(side_effect=mocked_has_valid_signature)
     )
     @patch('lms.djangoapps.verify_student.views.log.error')
+    @patch('sailthru.sailthru_client.SailthruClient.send')
     @patch('lms.djangoapps.verify_student.views.segment.track')
-    def test_first_time_verification(self, mock_segment_track, _mock_log_error):
+    def test_first_time_verification(self, mock_segment_track, mock_sailthru_send, mock_log_error):  # pylint: disable=unused-argument
         """
         Test for verification passed if the learner does not have any previous verification
         """
@@ -1731,8 +1693,9 @@ class TestPhotoVerificationResultsCallback(ModuleStoreTestCase, TestVerification
         mock.Mock(side_effect=mocked_has_valid_signature)
     )
     @patch('lms.djangoapps.verify_student.views.log.error')
+    @patch('sailthru.sailthru_client.SailthruClient.send')
     @patch('lms.djangoapps.verify_student.views.segment.track')
-    def test_failed_status_template(self, mock_segment_track, _mock_log_error):
+    def test_failed_status_template(self, mock_segment_track, _mock_sailthru_send, _mock_log_error):
         """
         Test for failed verification.
         """

@@ -16,7 +16,7 @@ from lms.djangoapps.courseware.masquerade import (
 )
 from openedx.core.djangoapps.verified_track_content.models import VerifiedTrackCohortedCourse
 from common.djangoapps.student.models import CourseEnrollment
-from xmodule.partitions.partitions import Group, UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import Group, UserPartition
 
 LOGGER = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
     'use strict';
     var CourseOutlineXBlockModal, SettingsXBlockModal, PublishXBlockModal, HighlightsXBlockModal,
         AbstractEditor, BaseDateEditor,
-        ReleaseDateEditor, DueDateEditor, SelfPacedDueDateEditor, GradingEditor, PublishEditor, AbstractVisibilityEditor,
+        ReleaseDateEditor, DueDateEditor, GradingEditor, PublishEditor, AbstractVisibilityEditor,
         StaffLockEditor, UnitAccessEditor, ContentVisibilityEditor, TimedExaminationPreferenceEditor,
         AccessEditor, ShowCorrectnessEditor, HighlightsEditor, HighlightsEnableXBlockModal, HighlightsEnableEditor;
 
@@ -389,92 +389,6 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
         }
     });
 
-    SelfPacedDueDateEditor = AbstractEditor.extend({
-        fieldName: 'relative_weeks_due',
-        templateName: 'self-paced-due-date-editor',
-        className: 'modal-section-content has-actions due-date-input grading-due-date',
-        events: {
-            'change #due_in': 'validateDueIn',
-            'keyup #due_in': 'validateDueIn',
-            'blur #due_in': 'validateDueIn',
-        },
-
-        getValue: function() {
-            return parseInt(this.$('#due_in').val());
-        },
-
-        showProjectedDate: function() {
-            if (!this.getValue() || !course.get('start')) return;
-            var startDate = new Date(course.get('start'));
-            // The value returned by toUTCString() is a string in the form Www, dd Mmm yyyy hh:mm:ss GMT
-            var startDateList = startDate.toUTCString().split(' ')
-            // This text will look like Mmm dd, yyyy (i.e. Jul 26, 2021)
-            this.$("#relative_weeks_due_start_date").text(startDateList[2] + ' ' + startDateList[1] + ', ' + startDateList[3]);
-            var projectedDate = new Date(startDate)
-            projectedDate.setDate(projectedDate.getDate() + this.getValue()*7);
-            var projectedDateList = projectedDate.toUTCString().split(' ');
-            this.$("#relative_weeks_due_projected_due_in").text(projectedDateList[2] + ' ' + projectedDateList[1] + ', ' + projectedDateList[3]);
-            this.$('#relative_weeks_due_projected').show();
-        },
-
-        validateDueIn: function() {
-            this.$('#relative_weeks_due_projected').hide();
-            if (this.getValue() > 18){
-                this.$('#relative_weeks_due_warning_max').show();
-                BaseModal.prototype.disableActionButton.call(this.parent, 'save');
-            }
-            else if (this.getValue() < 1){
-                this.$('#relative_weeks_due_warning_min').show()
-                BaseModal.prototype.disableActionButton.call(this.parent, 'save');
-            }
-            else {
-                this.$('#relative_weeks_due_warning_max').hide();
-                this.$('#relative_weeks_due_warning_min').hide();
-                this.showProjectedDate();
-                BaseModal.prototype.enableActionButton.call(this.parent, 'save');
-            }
-        },
-
-        afterRender: function() {
-            AbstractEditor.prototype.afterRender.call(this);
-            if (this.model.get('graded')) {
-                this.$('#relative_date_input').show()
-            }
-            else {
-                this.$('#relative_date_input').hide()
-            }
-            this.$('.field-due-in input').val(this.model.get('relative_weeks_due'));
-            this.$('#relative_weeks_due_projected').hide();
-            this.showProjectedDate();
-        },
-
-        getRequestData: function() {
-            // Grab all the sections, map them to their block_ids, then return as an Array
-            var sectionIds = $('.outline-section').map(function(){return this.id;}).get()
-            // Grab all the subsections, map them to their block_ids, then return as an Array
-            var subsectionIds = $('.outline-subsection').map(function(){return this.id;}).get()
-            var relative_weeks_due = null;
-            if (this.getValue() < 19 && this.getValue() > 0 && $('#grading_type').val() !== 'notgraded') {
-                relative_weeks_due = this.getValue()
-            }
-            window.analytics.track('edx.bi.studio.relative_date.saved', {
-                block_id: this.model.get('id'),
-                courserun_key: course.get('id'),
-                num_of_sections_in_course: $('.outline-section').length,
-                num_of_subsections_in_course: $('.outline-subsection').length,
-                order_in_sections: sectionIds.indexOf(this.parent.options.parentInfo.get('id')) + 1,
-                order_in_subsections: subsectionIds.indexOf(this.model.get('id')) + 1,
-                org_key: course.get('org'),
-                relative_weeks_due: relative_weeks_due,
-            });
-            return {
-                metadata: {
-                    relative_weeks_due: relative_weeks_due
-                }
-            };
-        },
-    });
-
     ReleaseDateEditor = BaseDateEditor.extend({
         fieldName: 'start',
         templateName: 'release-date-editor',
@@ -521,8 +435,6 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
             'change input.onboarding_exam': 'setSpecialExamWithoutRules',
             'focusout .field-time-limit input': 'timeLimitFocusout'
         },
-        startingExamType: '',
-
         notTimedExam: function(event) {
             event.preventDefault();
             this.$('.exam-options').hide();
@@ -577,7 +489,6 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
             this.$('.field-exam-review-rules').hide();
 
             if (!isTimeLimited) {
-                this.startingExamType = 'no_special_exam';
                 this.$('input.no_special_exam').prop('checked', true);
                 return;
             }
@@ -586,13 +497,10 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
 
             if (this.options.enable_proctored_exams && isProctoredExam) {
                 if (isOnboardingExam) {
-                    this.startingExamType = 'onboarding_exam';
                     this.$('input.onboarding_exam').prop('checked', true);
                 } else if (isPracticeExam) {
-                    this.startingExamType = 'practice_exam';
                     this.$('input.practice_exam').prop('checked', true);
                 } else {
-                    this.startingExamType = 'proctored_exam';
                     this.$('input.proctored_exam').prop('checked', true);
                     this.$('.field-exam-review-rules').show();
                 }
@@ -600,7 +508,6 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
                 // Since we have an early exit at the top of the method
                 // if the subsection is not time limited, then
                 // here we rightfully assume that it just a timed exam
-                this.startingExamType = 'timed_exam';
                 this.$('input.timed_exam').prop('checked', true);
             }
         },
@@ -638,27 +545,20 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
             var timeLimit = this.getExamTimeLimit();
             var examReviewRules = this.$('.field-exam-review-rules textarea').val();
 
-            var metadata = {
-                is_practice_exam: isPracticeExamChecked,
-                is_time_limited: !isNoSpecialExamChecked,
-                exam_review_rules: examReviewRules,
-                // We have to use the legacy field name
-                // as the Ajax handler directly populates
-                // the xBlocks fields. We will have to
-                // update this call site when we migrate
-                // seq_module.py to use 'is_proctored_exam'
-                is_proctored_enabled: isProctoredExamChecked || isPracticeExamChecked || isOnboardingExamChecked,
-                default_time_limit_minutes: this.convertTimeLimitToMinutes(timeLimit),
-                is_onboarding_exam: isOnboardingExamChecked
-            };
-
-            // If setting as a proctored exam, set to hide after due by default
-            if (isProctoredExamChecked && this.startingExamType !== 'proctored_exam') {
-                metadata.hide_after_due = true;
-            }
-
             return {
-                metadata: metadata
+                metadata: {
+                    is_practice_exam: isPracticeExamChecked,
+                    is_time_limited: !isNoSpecialExamChecked,
+                    exam_review_rules: examReviewRules,
+                    // We have to use the legacy field name
+                    // as the Ajax handler directly populates
+                    // the xBlocks fields. We will have to
+                    // update this call site when we migrate
+                    // seq_module.py to use 'is_proctored_exam'
+                    is_proctored_enabled: isProctoredExamChecked || isPracticeExamChecked || isOnboardingExamChecked,
+                    default_time_limit_minutes: this.convertTimeLimitToMinutes(timeLimit),
+                    is_onboarding_exam: isOnboardingExamChecked
+                }
             };
         }
     });
@@ -739,18 +639,6 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
     GradingEditor = AbstractEditor.extend({
         templateName: 'grading-editor',
         className: 'edit-settings-grading',
-        events: {
-            'change #grading_type': 'handleGradingSelect',
-        },
-
-        handleGradingSelect: function(event) {
-            event.preventDefault();
-            if (this.$('#grading_type').val() !== 'notgraded' && course.get('self_paced') && course.get('is_custom_relative_dates_active')) {
-                $('#relative_date_input').show();
-            } else {
-                $('#relative_date_input').hide();
-            }
-        },
 
         afterRender: function() {
             AbstractEditor.prototype.afterRender.call(this);
@@ -1189,9 +1077,7 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
                 } else if (xblockInfo.isSequential()) {
                     tabs[0].editors = [ReleaseDateEditor, GradingEditor, DueDateEditor];
                     tabs[1].editors = [ContentVisibilityEditor, ShowCorrectnessEditor];
-                    if (course.get('self_paced') && course.get('is_custom_relative_dates_active')) {
-                        tabs[0].editors.push(SelfPacedDueDateEditor);
-                    }
+
                     if (options.enable_proctored_exams || options.enable_timed_exams) {
                         advancedTab.editors.push(TimedExaminationPreferenceEditor);
                     }
@@ -1215,19 +1101,6 @@ define(['jquery', 'backbone', 'underscore', 'gettext', 'js/views/baseview',
                 });
             }
 
-            return new SettingsXBlockModal($.extend({
-                tabs: tabs,
-                editors: editors,
-                model: xblockInfo
-            }, options));
-        },
-
-        /**
-         * This function allows comprehensive themes to create custom editors without adding boilerplate code.
-         *
-         * A simple example theme for this can be found at https://github.com/open-craft/custom-unit-icons-theme
-         **/
-        getCustomEditModal: function(tabs, editors, xblockInfo, options) {
             return new SettingsXBlockModal($.extend({
                 tabs: tabs,
                 editors: editors,

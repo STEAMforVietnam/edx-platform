@@ -16,12 +16,12 @@ sessions. Assumes structure:
 import os
 from uuid import uuid4
 
-from django.utils.translation import gettext_lazy
+from django.utils.translation import ugettext_lazy
 from path import Path as path
 
 from openedx.core.lib.derived import derive_settings
 
-from xmodule.modulestore.modulestore_settings import update_module_store_settings  # pylint: disable=wrong-import-order
+from xmodule.modulestore.modulestore_settings import update_module_store_settings
 
 from .common import *
 
@@ -46,8 +46,8 @@ from lms.envs.test import (  # pylint: disable=wrong-import-order
 
 # Include a non-ascii character in STUDIO_NAME and STUDIO_SHORT_NAME to uncover possible
 # UnicodeEncodeErrors in tests. Also use lazy text to reveal possible json dumps errors
-STUDIO_NAME = gettext_lazy("Your Platform 𝓢𝓽𝓾𝓭𝓲𝓸")
-STUDIO_SHORT_NAME = gettext_lazy("𝓢𝓽𝓾𝓭𝓲𝓸")
+STUDIO_NAME = ugettext_lazy("Your Platform 𝓢𝓽𝓾𝓭𝓲𝓸")
+STUDIO_SHORT_NAME = ugettext_lazy("𝓢𝓽𝓾𝓭𝓲𝓸")
 
 # Allow all hosts during tests, we use a lot of different ones all over the codebase.
 ALLOWED_HOSTS = [
@@ -138,7 +138,6 @@ LMS_ROOT_URL = f"http://{LMS_BASE}"
 FEATURES['PREVIEW_LMS_BASE'] = "preview.localhost"
 
 COURSE_AUTHORING_MICROFRONTEND_URL = "http://course-authoring-mfe"
-DISCUSSIONS_MICROFRONTEND_URL = "http://discussions-mfe"
 
 CACHES = {
     # This is the cache used for most things. Askbot will not work without a
@@ -264,7 +263,7 @@ ENABLE_ELASTICSEARCH_FOR_TESTS = os.environ.get(
 
 TEST_ELASTICSEARCH_USE_SSL = os.environ.get(
     'EDXAPP_TEST_ELASTICSEARCH_USE_SSL', 'no').lower() in ('true', 'yes', '1')
-TEST_ELASTICSEARCH_HOST = os.environ.get('EDXAPP_TEST_ELASTICSEARCH_HOST', 'edx.devstack.elasticsearch710')
+TEST_ELASTICSEARCH_HOST = os.environ.get('EDXAPP_TEST_ELASTICSEARCH_HOST', 'edx.devstack.elasticsearch')
 TEST_ELASTICSEARCH_PORT = int(os.environ.get('EDXAPP_TEST_ELASTICSEARCH_PORT', '9200'))
 
 ########################## AUTHOR PERMISSION #######################

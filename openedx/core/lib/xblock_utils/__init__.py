@@ -12,6 +12,7 @@ import uuid
 
 import markupsafe
 import webpack_loader.utils
+from contracts import contract
 from django.conf import settings
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.contrib.staticfiles.storage import staticfiles_storage
@@ -28,10 +29,10 @@ from xblock.scorable import ScorableXBlockMixin
 
 from common.djangoapps import static_replace
 from common.djangoapps.edxmako.shortcuts import render_to_string
-from xmodule.seq_module import SequenceBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.util.xmodule_django import add_webpack_to_fragment  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.vertical_block import VerticalBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.x_module import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.seq_module import SequenceBlock
+from xmodule.util.xmodule_django import add_webpack_to_fragment
+from xmodule.vertical_block import VerticalBlock
+from xmodule.x_module import (
     PREVIEW_VIEWS, STUDENT_VIEW, STUDIO_VIEW,
     XModule, XModuleDescriptor, shim_xmodule_js,
 )
@@ -104,7 +105,7 @@ def wrap_xblock(
 
     css_classes = [
         'xblock',
-        f'xblock-{markupsafe.escape(view)}',
+        'xblock-{}'.format(markupsafe.escape(view)),
         'xblock-{}-{}'.format(
             markupsafe.escape(view),
             markupsafe.escape(block.scope_ids.block_type),
@@ -146,7 +147,7 @@ def wrap_xblock(
         'content': block.display_name if display_name_only else frag.content,
         'classes': css_classes,
         'display_name': block.display_name_with_default_escaped,  # xss-lint: disable=python-deprecated-display-name
-        'data_attributes': ' '.join(f'data-{markupsafe.escape(key)}="{markupsafe.escape(value)}"'
+        'data_attributes': ' '.join('data-{}="{}"'.format(markupsafe.escape(key), markupsafe.escape(value))
                                     for key, value in data.items()),
     }
 
@@ -197,7 +198,7 @@ def wrap_xblock_aside(
     data.update(extra_data)
 
     css_classes = [
-        f'xblock-{markupsafe.escape(view)}',
+        'xblock-{}'.format(markupsafe.escape(view)),
         'xblock-{}-{}'.format(
             markupsafe.escape(view),
             markupsafe.escape(aside.scope_ids.block_type),
@@ -219,7 +220,7 @@ def wrap_xblock_aside(
     template_context = {
         'content': frag.content,
         'classes': css_classes,
-        'data_attributes': ' '.join(f'data-{markupsafe.escape(key)}="{markupsafe.escape(value)}"'
+        'data_attributes': ' '.join('data-{}="{}"'.format(markupsafe.escape(key), markupsafe.escape(value))
                                     for key, value in data.items()),
     }
 
@@ -308,6 +309,7 @@ def sanitize_html_id(html_id):
     return sanitized_html_id
 
 
+@contract(user=User, block=XBlock, view=(str,)[0], frag=Fragment, context="dict|None")
 def add_staff_markup(user, disable_staff_debug_info, block, view, frag, context):  # pylint: disable=unused-argument
     """
     Updates the supplied module with a new get_html function that wraps
@@ -558,6 +560,6 @@ def get_icon(block):
     """
     A function that returns the CSS class representing an icon to use for this particular
     XBlock (in the courseware navigation bar). Mostly used for Vertical/Unit XBlocks.
-    It can be overridden by setting `OVERRIDE_GET_UNIT_ICON` to an alternative implementation.
+    It can be overridden by setting `GET_UNIT_ICON_IMPL` to an alternative implementation.
     """
     return block.get_icon_class()

@@ -19,6 +19,7 @@ from celery.states import FAILURE, SUCCESS
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.test.utils import override_settings
 from django.urls import reverse
+from mock import patch
 
 from capa.responsetypes import StudentInputError
 from capa.tests.response_xml_factory import CodeResponseXMLFactory, CustomResponseXMLFactory
@@ -40,8 +41,8 @@ from lms.djangoapps.instructor_task.tests.test_base import (
 )
 from openedx.core.djangoapps.util.testing import TestConditionalContent
 from openedx.core.lib.url_utils import quote_slashes
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.tests.factories import ItemFactory
 
 log = logging.getLogger(__name__)
 
@@ -219,7 +220,7 @@ class TestRescoringTask(TestIntegrationTask):
         )
 
     @ddt.data(
-        RescoreTestData(edit={}, new_expected_scores=(2, 1, 1, 0), new_expected_max=2),
+        RescoreTestData(edit=dict(), new_expected_scores=(2, 1, 1, 0), new_expected_max=2),
         RescoreTestData(edit=dict(correct_answer=OPTION_2), new_expected_scores=(2, 1, 1, 2), new_expected_max=2),
     )
     @ddt.unpack
@@ -634,7 +635,7 @@ class TestGradeReportConditionalContent(TestReportMixin, TestConditionalContent,
         self.submit_student_answer(self.student_b.username, problem_b_url, [OPTION_1, OPTION_2])
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.verify_csv_task_success(result)
             self.verify_grades_in_csv(
                 [
@@ -667,7 +668,7 @@ class TestGradeReportConditionalContent(TestReportMixin, TestConditionalContent,
         self.submit_student_answer(self.student_a.username, problem_a_url, [OPTION_1, OPTION_1])
 
         with patch('lms.djangoapps.instructor_task.tasks_helper.runner._get_current_task'):
-            result = CourseGradeReport.generate(None, None, self.course.id, {}, 'graded')
+            result = CourseGradeReport.generate(None, None, self.course.id, None, 'graded')
             self.verify_csv_task_success(result)
             self.verify_grades_in_csv(
                 [

@@ -10,12 +10,12 @@ from django.conf import settings
 from django.urls import reverse
 from edx_proctoring.api import create_exam
 from edx_proctoring.backends.tests.test_backend import TestBackendProvider
-from edx_toggles.toggles.testutils import override_waffle_flag  # lint-amnesty, pylint: disable=unused-import
+from edx_toggles.toggles.testutils import override_waffle_flag
 
 from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
 from common.djangoapps.student.tests.factories import AdminFactory
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 @patch.dict(settings.FEATURES, {'ENABLE_SPECIAL_EXAMS': True})

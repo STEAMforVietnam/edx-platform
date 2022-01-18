@@ -10,7 +10,7 @@ import ddt
 import pytest
 from django.conf import settings
 from django.urls import reverse
-from openedx_events.tests.utils import OpenEdxEventsTestMixin
+from edx_toggles.toggles.testutils import override_waffle_flag
 
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.course_modes.tests.factories import CourseModeFactory
@@ -23,20 +23,20 @@ from common.djangoapps.student.models import (
 from common.djangoapps.student.roles import CourseInstructorRole, CourseStaffRole
 from common.djangoapps.student.tests.factories import CourseEnrollmentAllowedFactory, UserFactory
 from common.djangoapps.util.testing import UrlResetMixin
+from lms.djangoapps.courseware.toggles import COURSEWARE_PROCTORING_IMPROVEMENTS
 from openedx.core.djangoapps.embargo.test_utils import restrict_course
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 @ddt.ddt
+@override_waffle_flag(COURSEWARE_PROCTORING_IMPROVEMENTS, active=True)
 @patch.dict('django.conf.settings.FEATURES', {'ENABLE_SPECIAL_EXAMS': True})
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
-class EnrollmentTest(UrlResetMixin, SharedModuleStoreTestCase, OpenEdxEventsTestMixin):
+class EnrollmentTest(UrlResetMixin, SharedModuleStoreTestCase):
     """
     Test student enrollment, especially with different course modes.
     """
-
-    ENABLED_OPENEDX_EVENTS = []
 
     USERNAME = "Bob"
     EMAIL = "bob@example.com"
@@ -45,14 +45,7 @@ class EnrollmentTest(UrlResetMixin, SharedModuleStoreTestCase, OpenEdxEventsTest
 
     @classmethod
     def setUpClass(cls):
-        """
-        Set up class method for the Test class.
-
-        This method starts manually events isolation. Explanation here:
-        openedx/core/djangoapps/user_authn/views/tests/test_events.py#L44
-        """
         super().setUpClass()
-        cls.start_events_isolation()
         cls.course = CourseFactory.create()
         cls.course_limited = CourseFactory.create()
         cls.proctored_course = CourseFactory(

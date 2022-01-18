@@ -10,10 +10,7 @@ from django.forms import CharField, Form
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 
-from openedx.core.djangoapps.util.forms import (
-    ExtendedNullBooleanField,
-    MultiValueField
-)
+from openedx.core.djangoapps.util.forms import ExtendedNullBooleanField
 
 
 class UsernameValidatorMixin:
@@ -45,7 +42,7 @@ class CourseDetailGetForm(UsernameValidatorMixin, Form):
         try:
             return CourseKey.from_string(course_key_string)
         except InvalidKeyError:
-            raise ValidationError(f"'{str(course_key_string)}' is not a valid course key.")  # lint-amnesty, pylint: disable=raise-missing-from
+            raise ValidationError("'{}' is not a valid course key.".format(str(course_key_string)))  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 class CourseListGetForm(UsernameValidatorMixin, Form):
@@ -62,7 +59,6 @@ class CourseListGetForm(UsernameValidatorMixin, Form):
         filter_type(param_name='mobile', field_name='mobile_available'),
     ]
     mobile = ExtendedNullBooleanField(required=False)
-    permissions = MultiValueField(required=False)
 
     def clean(self):
         """
@@ -71,7 +67,7 @@ class CourseListGetForm(UsernameValidatorMixin, Form):
         cleaned_data = super().clean()
 
         # create a filter for all supported filter fields
-        filter_ = {}
+        filter_ = dict()
         for supported_filter in self.supported_filters:
             if cleaned_data.get(supported_filter.param_name) is not None:
                 filter_[supported_filter.field_name] = cleaned_data[supported_filter.param_name]

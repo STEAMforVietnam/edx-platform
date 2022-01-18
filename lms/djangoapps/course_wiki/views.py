@@ -8,15 +8,15 @@ import re
 
 from django.conf import settings
 from django.shortcuts import redirect
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from opaque_keys.edx.keys import CourseKey
 from wiki.core.exceptions import NoRootURL
 from wiki.models import Article, URLPath
 
 from lms.djangoapps.course_wiki.utils import course_wiki_slug
+from lms.djangoapps.courseware.courses import get_course_by_id
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.djangolib.markup import Text
-from openedx.core.lib.courses import get_course_by_id
 from openedx.features.enterprise_support.api import data_sharing_consent_required
 
 log = logging.getLogger(__name__)

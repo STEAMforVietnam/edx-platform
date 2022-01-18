@@ -8,27 +8,27 @@ import logging
 from datetime import datetime, timedelta
 from unittest import mock
 
+import pytest
 import ddt
 import httpretty
-import pytest
 import pytz
 from celery.exceptions import MaxRetriesExceededError
 from django.conf import settings
 from django.test import TestCase, override_settings
 from edx_rest_api_client import exceptions
 from edx_rest_api_client.client import EdxRestApiClient
+from waffle.testutils import override_switch
 
-from common.djangoapps.course_modes.tests.factories import CourseModeFactory
-from common.djangoapps.student.tests.factories import UserFactory
-from lms.djangoapps.certificates.tests.factories import CertificateDateOverrideFactory, GeneratedCertificateFactory
+from lms.djangoapps.certificates.tests.factories import GeneratedCertificateFactory
 from openedx.core.djangoapps.catalog.tests.mixins import CatalogIntegrationMixin
+from openedx.core.djangoapps.certificates.config import waffle
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 from openedx.core.djangoapps.credentials.tests.mixins import CredentialsApiConfigMixin
 from openedx.core.djangoapps.oauth_dispatch.tests.factories import ApplicationFactory
 from openedx.core.djangoapps.programs import tasks
 from openedx.core.djangoapps.site_configuration.tests.factories import SiteConfigurationFactory, SiteFactory
 from openedx.core.djangolib.testing.utils import skip_unless_lms
-from xmodule.data import CertificatesDisplayBehaviors  # lint-amnesty, pylint: disable=wrong-import-order
+from common.djangoapps.student.tests.factories import UserFactory
 
 log = logging.getLogger(__name__)
 
@@ -87,8 +87,7 @@ class AwardProgramCertificateTestCase(TestCase):
         """
         Ensure the correct API call gets made
         """
-        student = UserFactory(username='test-username', email='test-email@email.com')
-
+        test_username = 'test-username'
         test_client = EdxRestApiClient('http://test-server', jwt='test-token')
 
         httpretty.register_uri(
@@ -96,11 +95,10 @@ class AwardProgramCertificateTestCase(TestCase):
             'http://test-server/credentials/',
         )
 
-        tasks.award_program_certificate(test_client, student, 123, datetime(2010, 5, 30))
+        tasks.award_program_certificate(test_client, test_username, 123, datetime(2010, 5, 30))
 
         expected_body = {
-            'username': student.username,
-            'lms_user_id': student.id,
+            'username': test_username,
             'credential': {
                 'program_uuid': 123,
                 'type': tasks.PROGRAM_CERTIFICATE,
@@ -495,7 +493,6 @@ class PostCourseCertificateTestCase(TestCase):
                 'mode': self.certificate.mode,
                 'type': tasks.COURSE_CERTIFICATE,
             },
-            'date_override': None,
             'attributes': [{
                 'name': 'visible_date',
                 'value': visible_date.strftime('%Y-%m-%dT%H:%M:%SZ')  # text representation of date
@@ -507,9 +504,9 @@ class PostCourseCertificateTestCase(TestCase):
 
 @skip_unless_lms
 @ddt.ddt
-@mock.patch("lms.djangoapps.certificates.api.auto_certificate_generation_enabled", mock.Mock(return_value=True))
 @mock.patch(TASKS_MODULE + '.post_course_certificate')
 @override_settings(CREDENTIALS_SERVICE_USERNAME='test-service-username')
+@override_switch(waffle.WAFFLE_NAMESPACE + '.' + waffle.AUTO_CERTIFICATE_GENERATION, True)
 class AwardCourseCertificatesTestCase(CredentialsApiConfigMixin, TestCase):
     """
     Test the award_course_certificate celery task
@@ -522,7 +519,6 @@ class AwardCourseCertificatesTestCase(CredentialsApiConfigMixin, TestCase):
         self.course = CourseOverviewFactory.create(
             self_paced=True,  # Any option to allow the certificate to be viewable for the course
             certificate_available_date=self.available_date,
-            certificates_display_behavior=CertificatesDisplayBehaviors.END_WITH_DATE
         )
         self.student = UserFactory.create(username='test-student')
         # Instantiate the Certificate first so that the config doesn't execute issuance
@@ -538,15 +534,6 @@ class AwardCourseCertificatesTestCase(CredentialsApiConfigMixin, TestCase):
 
         ApplicationFactory.create(name='credentials')
         UserFactory.create(username=settings.CREDENTIALS_SERVICE_USERNAME)
-
-    def _add_certificate_date_override(self):
-        """
-        Creates a mock CertificateDateOverride and adds it to the certificate
-        """
-        self.certificate.date_override = CertificateDateOverrideFactory.create(
-            generated_certificate=self.certificate,
-            overridden_by=UserFactory.create(username='test-admin'),
-        )
 
     @ddt.data(
         'verified',
@@ -575,18 +562,6 @@ class AwardCourseCertificatesTestCase(CredentialsApiConfigMixin, TestCase):
         assert call_args[1] == self.student.username
         assert call_args[2] == self.certificate
         assert call_args[3] == self.available_date
-
-    def test_award_course_certificates_override_date(self, mock_post_course_certificate):
-        """
-        Tests the API POST method is called with date override when present
-        """
-        self._add_certificate_date_override()
-        tasks.award_course_certificate.delay(self.student.username, str(self.course.id)).get()
-        call_args, _ = mock_post_course_certificate.call_args
-        assert call_args[1] == self.student.username
-        assert call_args[2] == self.certificate
-        assert call_args[3] == self.certificate.modified_date
-        assert call_args[4] == self.certificate.date_override.date
 
     def test_award_course_cert_not_called_if_disabled(self, mock_post_course_certificate):
         """
@@ -701,27 +676,6 @@ class RevokeProgramCertificatesTestCase(CatalogIntegrationMixin, CredentialsApiC
 
         self.inverted_programs = {self.course_key: [{'uuid': 1}, {'uuid': 2}]}
 
-    def _make_side_effect(self, side_effects):
-        """
-        DRY helper.  Returns a side effect function for use with mocks that
-        will be called multiple times, permitting Exceptions to be raised
-        (or not) in a specified order.
-
-        See Also:
-            http://www.voidspace.org.uk/python/mock/examples.html#multiple-calls-with-different-effects
-            http://www.voidspace.org.uk/python/mock/mock.html#mock.Mock.side_effect
-
-        """
-
-        def side_effect(*_a):
-            if side_effects:
-                exc = side_effects.pop(0)
-                if exc:
-                    raise exc
-            return mock.DEFAULT
-
-        return side_effect
-
     def test_inverted_programs(
         self,
         mock_get_inverted_programs,
@@ -735,7 +689,7 @@ class RevokeProgramCertificatesTestCase(CatalogIntegrationMixin, CredentialsApiC
         tasks.revoke_program_certificates.delay(self.student.username, self.course_key).get()
         mock_get_inverted_programs.assert_any_call(self.student)
 
-    def test_revoke_program_certificate(
+    def test_revokinging_certificate(
         self,
         mock_get_inverted_programs,
         mock_get_certified_programs,
@@ -805,6 +759,27 @@ class RevokeProgramCertificatesTestCase(CatalogIntegrationMixin, CredentialsApiC
         assert mock_get_inverted_programs.called
         assert not mock_get_certified_programs.called
         assert not mock_revoke_program_certificate.called
+
+    def _make_side_effect(self, side_effects):
+        """
+        DRY helper.  Returns a side effect function for use with mocks that
+        will be called multiple times, permitting Exceptions to be raised
+        (or not) in a specified order.
+
+        See Also:
+            http://www.voidspace.org.uk/python/mock/examples.html#multiple-calls-with-different-effects
+            http://www.voidspace.org.uk/python/mock/mock.html#mock.Mock.side_effect
+
+        """
+
+        def side_effect(*_a):
+            if side_effects:
+                exc = side_effects.pop(0)
+                if exc:
+                    raise exc
+            return mock.DEFAULT
+
+        return side_effect
 
     def test_continue_revoking_certs_if_error(
         self,
@@ -940,80 +915,3 @@ class RevokeProgramCertificatesTestCase(CatalogIntegrationMixin, CredentialsApiC
         assert mock_exception.called
         assert mock_get_api_client.call_count == (tasks.MAX_RETRIES + 1)
         assert not mock_revoke_program_certificate.called
-
-
-@skip_unless_lms
-@override_settings(CREDENTIALS_SERVICE_USERNAME='test-service-username')
-@mock.patch(TASKS_MODULE + '.get_credentials_api_client')
-class UpdateCredentialsCourseCertificateConfigurationAvailableDateTestCase(TestCase):
-    """
-    Tests for the update_credentials_course_certificate_configuration_available_date
-    function
-    """
-    def setUp(self):
-        super().setUp()
-        self.course = CourseOverviewFactory.create(
-            certificate_available_date=datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-        )
-        CourseModeFactory.create(course_id=self.course.id, mode_slug='verified')
-        CourseModeFactory.create(course_id=self.course.id, mode_slug='audit')
-        self.available_date = self.course.certificate_available_date
-        self.course_id = self.course.id
-        self.credentials_worker = UserFactory(username='test-service-username')
-
-    # pylint: disable=W0613
-    def test_update_course_cert_available_date(self, mock_client):
-        with mock.patch(TASKS_MODULE + '.post_course_certificate_configuration') as update_posted:
-            tasks.update_credentials_course_certificate_configuration_available_date(
-                self.course_id,
-                self.available_date
-            )
-            update_posted.assert_called_once()
-
-    # pylint: disable=W0613
-    def test_course_with_two_paid_modes(self, mock_client):
-        CourseModeFactory.create(course_id=self.course.id, mode_slug='professional')
-        with mock.patch(TASKS_MODULE + '.post_course_certificate_configuration') as update_posted:
-            tasks.update_credentials_course_certificate_configuration_available_date(
-                self.course_id,
-                self.available_date
-            )
-            update_posted.assert_not_called()
-
-
-@skip_unless_lms
-class PostCourseCertificateConfigurationTestCase(TestCase):
-    """
-    Test the post_course_certificate_configuration function
-    """
-
-    def setUp(self):  # lint-amnesty, pylint: disable=super-method-not-called
-        self.certificate = {
-            'mode': 'verified',
-            'course_id': 'testCourse',
-        }
-
-    @httpretty.activate
-    def test_post_course_certificate_configuration(self):
-        """
-        Ensure the correct API call gets made
-        """
-        test_client = EdxRestApiClient('http://test-server', jwt='test-token')
-
-        httpretty.register_uri(
-            httpretty.POST,
-            'http://test-server/course_certificates/',
-        )
-
-        available_date = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-
-        tasks.post_course_certificate_configuration(test_client, self.certificate, available_date)
-
-        expected_body = {
-            "course_id": 'testCourse',
-            "certificate_type": 'verified',
-            "certificate_available_date": available_date,
-            "is_active": True
-        }
-        last_request_body = httpretty.last_request().body.decode('utf-8')
-        assert json.loads(last_request_body) == expected_body

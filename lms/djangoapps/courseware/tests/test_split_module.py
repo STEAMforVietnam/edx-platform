@@ -10,9 +10,9 @@ from lms.djangoapps.courseware.model_data import FieldDataCache
 from lms.djangoapps.courseware.module_render import get_module_for_descriptor
 from openedx.core.djangoapps.user_api.tests.factories import UserCourseTagFactory
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.partitions.partitions import Group, UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.partitions.partitions import Group, UserPartition
 
 
 class SplitTestBase(SharedModuleStoreTestCase):
@@ -125,7 +125,7 @@ class SplitTestBase(SharedModuleStoreTestCase):
         unicode_content = resp.content.decode(resp.charset)
 
         # Assert we see the proper icon in the top display
-        assert f'<button class="{self.ICON_CLASSES[user_tag]} inactive nav-item tab"' in unicode_content
+        assert '<button class="{} inactive nav-item tab"'.format(self.ICON_CLASSES[user_tag]) in unicode_content
 
         # And proper tooltips
         for tooltip in self.TOOLTIPS[user_tag]:

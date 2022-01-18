@@ -15,14 +15,15 @@ from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
 from common.djangoapps.util.milestones_helpers import milestones_achieved_by_user, set_prerequisite_courses
 from lms.djangoapps.badges.tests.factories import CourseCompleteImageConfigurationFactory
-from lms.djangoapps.certificates.api import certificate_info_for_user, certificate_status_for_student
 from lms.djangoapps.certificates.models import (
     CertificateStatuses,
     GeneratedCertificate,
+    certificate_info_for_user,
+    certificate_status_for_student
 )
 from lms.djangoapps.certificates.tests.factories import GeneratedCertificateFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 @ddt
@@ -57,13 +58,13 @@ class CertificatesModelTest(ModuleStoreTestCase, MilestonesTestCaseMixin):
 
     @unpack
     @data(
-        {'allowlisted': False, 'grade': None, 'output': ['N', 'N', 'N/A']},
-        {'allowlisted': True, 'grade': None, 'output': ['Y', 'N', 'N/A']},
-        {'allowlisted': False, 'grade': 0.9, 'output': ['N', 'N', 'N/A']},
-        {'allowlisted': True, 'grade': 0.8, 'output': ['Y', 'N', 'N/A']},
-        {'allowlisted': None, 'grade': 0.8, 'output': ['N', 'N', 'N/A']}
+        {'whitelisted': False, 'grade': None, 'output': ['N', 'N', 'N/A']},
+        {'whitelisted': True, 'grade': None, 'output': ['Y', 'N', 'N/A']},
+        {'whitelisted': False, 'grade': 0.9, 'output': ['N', 'N', 'N/A']},
+        {'whitelisted': True, 'grade': 0.8, 'output': ['Y', 'N', 'N/A']},
+        {'whitelisted': None, 'grade': 0.8, 'output': ['N', 'N', 'N/A']}
     )
-    def test_certificate_info_for_user(self, allowlisted, grade, output):
+    def test_certificate_info_for_user(self, whitelisted, grade, output):
         """
         Verify that certificate_info_for_user works.
         """
@@ -72,28 +73,28 @@ class CertificatesModelTest(ModuleStoreTestCase, MilestonesTestCaseMixin):
         # for instructor paced course
         certificate_info = certificate_info_for_user(
             student, self.instructor_paced_course.id, grade,
-            allowlisted, user_certificate=None
+            whitelisted, user_certificate=None
         )
         assert certificate_info == output
 
         # for self paced course
         certificate_info = certificate_info_for_user(
             student, self.self_paced_course.id, grade,
-            allowlisted, user_certificate=None
+            whitelisted, user_certificate=None
         )
         assert certificate_info == output
 
     @unpack
     @data(
-        {'allowlisted': False, 'grade': None, 'output': ['Y', 'Y', 'honor']},
-        {'allowlisted': True, 'grade': None, 'output': ['Y', 'Y', 'honor']},
-        {'allowlisted': False, 'grade': 0.9, 'output': ['Y', 'Y', 'honor']},
-        {'allowlisted': True, 'grade': 0.8, 'output': ['Y', 'Y', 'honor']},
-        {'allowlisted': None, 'grade': 0.8, 'output': ['Y', 'Y', 'honor']},
-        {'allowlisted': None, 'grade': None, 'output': ['Y', 'Y', 'honor']},
-        {'allowlisted': True, 'grade': None, 'output': ['Y', 'Y', 'honor']}
+        {'whitelisted': False, 'grade': None, 'output': ['Y', 'Y', 'honor']},
+        {'whitelisted': True, 'grade': None, 'output': ['Y', 'Y', 'honor']},
+        {'whitelisted': False, 'grade': 0.9, 'output': ['Y', 'Y', 'honor']},
+        {'whitelisted': True, 'grade': 0.8, 'output': ['Y', 'Y', 'honor']},
+        {'whitelisted': None, 'grade': 0.8, 'output': ['Y', 'Y', 'honor']},
+        {'whitelisted': None, 'grade': None, 'output': ['Y', 'Y', 'honor']},
+        {'whitelisted': True, 'grade': None, 'output': ['Y', 'Y', 'honor']}
     )
-    def test_certificate_info_for_user_when_grade_changes(self, allowlisted, grade, output):
+    def test_certificate_info_for_user_when_grade_changes(self, whitelisted, grade, output):
         """
         Verify that certificate_info_for_user works as expect in scenario when grading of problems
         changes after certificates already generated. In such scenario `Certificate delivered` should not depend
@@ -119,24 +120,24 @@ class CertificatesModelTest(ModuleStoreTestCase, MilestonesTestCaseMixin):
         # for instructor paced course
         certificate_info = certificate_info_for_user(
             student, self.instructor_paced_course.id, grade,
-            allowlisted, certificate1
+            whitelisted, certificate1
         )
         assert certificate_info == output
 
         # for self paced course
         certificate_info = certificate_info_for_user(
             student, self.self_paced_course.id, grade,
-            allowlisted, certificate2
+            whitelisted, certificate2
         )
         assert certificate_info == output
 
     @unpack
     @data(
-        {'allowlisted': False, 'grade': 0.8, 'mode': 'audit', 'output': ['N', 'N', 'N/A']},
-        {'allowlisted': True, 'grade': 0.8, 'mode': 'audit', 'output': ['Y', 'N', 'N/A']},
-        {'allowlisted': False, 'grade': 0.8, 'mode': 'verified', 'output': ['Y', 'N', 'N/A']}
+        {'whitelisted': False, 'grade': 0.8, 'mode': 'audit', 'output': ['N', 'N', 'N/A']},
+        {'whitelisted': True, 'grade': 0.8, 'mode': 'audit', 'output': ['Y', 'N', 'N/A']},
+        {'whitelisted': False, 'grade': 0.8, 'mode': 'verified', 'output': ['Y', 'N', 'N/A']}
     )
-    def test_certificate_info_for_user_with_course_modes(self, allowlisted, grade, mode, output):
+    def test_certificate_info_for_user_with_course_modes(self, whitelisted, grade, mode, output):
         """
         Verify that certificate_info_for_user works with course modes.
         """
@@ -145,7 +146,7 @@ class CertificatesModelTest(ModuleStoreTestCase, MilestonesTestCaseMixin):
         _ = CourseEnrollment.enroll(user, self.instructor_paced_course.id, mode)
         certificate_info = certificate_info_for_user(
             user, self.instructor_paced_course.id, grade,
-            allowlisted, user_certificate=None
+            whitelisted, user_certificate=None
         )
         assert certificate_info == output
 

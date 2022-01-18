@@ -2,7 +2,7 @@
 
 
 from django.conf import settings
-from django.urls import path, re_path
+from django.conf.urls import url
 
 from openedx.core.constants import COURSE_ID_PATTERN
 
@@ -20,22 +20,22 @@ from .views import (
 app_name = 'v1'
 
 urlpatterns = [
-    path(
-        'programs/enrollments/',
+    url(
+        r'^programs/enrollments/$',
         UserProgramReadOnlyAccessView.as_view(),
         name='learner_program_enrollments'
     ),
-    path(
-        'programs/readonly_access/',
+    url(
+        r'^programs/readonly_access/$',
         UserProgramReadOnlyAccessView.as_view(),
         name='user_program_readonly_access'
     ),
-    re_path(
+    url(
         fr'^programs/{PROGRAM_UUID_PATTERN}/enrollments/$',
         ProgramEnrollmentsView.as_view(),
         name='program_enrollments'
     ),
-    re_path(
+    url(
         r'^programs/{program_uuid}/courses/{course_id}/enrollments/'.format(
             program_uuid=PROGRAM_UUID_PATTERN,
             course_id=COURSE_ID_PATTERN
@@ -43,7 +43,7 @@ urlpatterns = [
         ProgramCourseEnrollmentsView.as_view(),
         name="program_course_enrollments"
     ),
-    re_path(
+    url(
         r'^programs/{program_uuid}/courses/{course_id}/grades/'.format(
             program_uuid=PROGRAM_UUID_PATTERN,
             course_id=COURSE_ID_PATTERN
@@ -51,14 +51,14 @@ urlpatterns = [
         ProgramCourseGradesView.as_view(),
         name="program_course_grades"
     ),
-    re_path(
+    url(
         r'^programs/{program_uuid}/overview/'.format(
             program_uuid=PROGRAM_UUID_PATTERN,
         ),
         ProgramCourseEnrollmentOverviewView.as_view(),
         name="program_course_enrollments_overview"
     ),
-    re_path(
+    url(
         r'^users/{username}/programs/{program_uuid}/courses'.format(
             username=settings.USERNAME_PATTERN,
             program_uuid=PROGRAM_UUID_PATTERN,
@@ -66,8 +66,8 @@ urlpatterns = [
         UserProgramCourseEnrollmentView.as_view(),
         name="user_program_course_enrollments"
     ),
-    path(
-        'integration-reset',
+    url(
+        r'^integration-reset',
         EnrollmentDataResetView.as_view(),
         name="reset_enrollment_data",
     )

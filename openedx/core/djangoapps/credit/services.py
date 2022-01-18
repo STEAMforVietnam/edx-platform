@@ -1,6 +1,8 @@
 """
 Implementation of "credit" XBlock service
 """
+
+
 import logging
 
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
@@ -8,8 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from opaque_keys.edx.keys import CourseKey
 
 from common.djangoapps.student.models import CourseEnrollment
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)
 
@@ -100,10 +101,10 @@ class CreditService:
         }
 
         if return_course_info:
-            course_overview = CourseOverview.get_from_id(course_key)
+            course = modulestore().get_course(course_key, depth=0)
             result.update({
-                'course_name': course_overview.display_name,
-                'course_end_date': course_overview.end,
+                'course_name': course.display_name,
+                'course_end_date': course.end,
             })
         return result
 

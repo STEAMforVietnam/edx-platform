@@ -19,7 +19,6 @@ from eventtracking import tracker
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from organizations import api as organizations_api
-from edx_django_utils.plugins import pluggable_override
 
 from common.djangoapps.edxmako.shortcuts import render_to_response
 from common.djangoapps.edxmako.template import Template
@@ -29,8 +28,6 @@ from common.djangoapps.util.views import handle_500
 from lms.djangoapps.badges.events.course_complete import get_completion_badge
 from lms.djangoapps.badges.utils import badges_enabled
 from lms.djangoapps.certificates.api import (
-    certificates_viewable_for_course,
-    display_date_for_certificate,
     get_active_web_certificate,
     get_certificate_footer_context,
     get_certificate_header_context,
@@ -44,28 +41,22 @@ from lms.djangoapps.certificates.models import (
     GeneratedCertificate
 )
 from lms.djangoapps.certificates.permissions import PREVIEW_CERTIFICATES
-from lms.djangoapps.certificates.utils import (
-    emit_certificate_event,
-    get_certificate_url,
-    get_preferred_certificate_name
-)
-from openedx.core.djangoapps.agreements.toggles import is_integrity_signature_enabled
-from openedx.core.djangoapps.catalog.api import get_course_run_details
-from openedx.core.djangoapps.content.course_overviews.api import get_course_overview_or_none
+from lms.djangoapps.certificates.utils import emit_certificate_event, get_certificate_url
+from lms.djangoapps.courseware.courses import get_course_by_id
+from openedx.core.djangoapps.catalog.utils import get_course_run_details
+from openedx.core.djangoapps.certificates.api import certificates_viewable_for_course, display_date_for_certificate
 from openedx.core.djangoapps.lang_pref.api import get_closest_released_language
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.lib.courses import course_image_url
-from openedx.core.lib.courses import get_course_by_id
-from xmodule.data import CertificatesDisplayBehaviors  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger(__name__)
-_ = translation.gettext
+_ = translation.ugettext
 
 
 INVALID_CERTIFICATE_TEMPLATE_PATH = 'certificates/invalid.html'
 
 
-def get_certificate_description(mode, certificate_type, platform_name, course_key):
+def get_certificate_description(mode, certificate_type, platform_name):
     """
     :return certificate_type_description on the basis of current mode
     """
@@ -83,13 +74,10 @@ def get_certificate_description(mode, certificate_type, platform_name, course_ke
         certificate_type_description = _("A {cert_type} certificate signifies that a "
                                          "learner has agreed to abide by the honor code established by "
                                          "{platform_name} and has completed all of the required tasks for this course "
-                                         "under its guidelines. ").format(cert_type=certificate_type,
-                                                                          platform_name=platform_name)
-        if not is_integrity_signature_enabled(course_key):
-            certificate_type_description += _("A {cert_type} certificate also indicates that the "
-                                              "identity of the learner has been checked and "
-                                              "is valid.").format(cert_type=certificate_type)
-
+                                         "under its guidelines. A {cert_type} certificate also indicates that the "
+                                         "identity of the learner has been checked and "
+                                         "is valid.").format(cert_type=certificate_type,
+                                                             platform_name=platform_name)
     elif mode == 'xseries':
         # Translators:  This text describes the 'XSeries' course certificate type.  An XSeries is a collection of
         # courses related to each other in a meaningful way, such as a specific topic or theme, or even an organization
@@ -99,7 +87,7 @@ def get_certificate_description(mode, certificate_type, platform_name, course_ke
     return certificate_type_description
 
 
-def _update_certificate_context(context, course, course_overview, user_certificate, platform_name):
+def _update_certificate_context(context, course, user_certificate, platform_name):
     """
     Build up the certificate web view context using the provided values
     (Helper method to keep the view clean)
@@ -115,15 +103,8 @@ def _update_certificate_context(context, course, course_overview, user_certifica
         suffix=context.get('certificate_verify_url_suffix')
     )
 
-    # We prefer a CourseOverview for this function because it validates and corrects certificate_available_date
-    # and certificates_display_behavior values. However, not all certificates are guaranteed to have a CourseOverview
-    # associated with them, so we fall back on the course in that case. This shouldn't cause a problem because courses
-    # that are missing CourseOverviews are generally old courses, and thus their display values are no longer relevant
-    if course_overview:
-        date = display_date_for_certificate(course_overview, user_certificate)
-    else:
-        date = display_date_for_certificate(course, user_certificate)
     # Translators:  The format of the date includes the full name of the month
+    date = display_date_for_certificate(course, user_certificate)
     context['certificate_date_issued'] = strftime_localized(date, settings.CERTIFICATE_DATE_FORMAT)
 
     # Translators:  This text represents the verification of the certificate
@@ -150,9 +131,7 @@ def _update_certificate_context(context, course, course_overview, user_certifica
         platform_name=platform_name,
         certificate_type=context.get("certificate_type"))
 
-    certificate_type_description = get_certificate_description(
-        user_certificate.mode, certificate_type, platform_name, course.location.course_key
-    )
+    certificate_type_description = get_certificate_description(user_certificate.mode, certificate_type, platform_name)
     if certificate_type_description:
         context['certificate_type_description'] = certificate_type_description
 
@@ -253,7 +232,6 @@ def _update_course_context(request, context, course, platform_name):
     context['accomplishment_copy_course_name'] = accomplishment_copy_course_name
     course_number = course.display_coursenumber if course.display_coursenumber else course.number
     context['course_number'] = course_number
-    context['is_integrity_signature_enabled_for_course'] = is_integrity_signature_enabled(course.location.course_key)
     if context['organization_long_name']:
         # Translators:  This text represents the description of course
         context['accomplishment_copy_course_description'] = _('a course of study offered by {partner_short_name}, '
@@ -316,8 +294,7 @@ def _update_context_with_user_info(context, user, user_certificate):
     """
     Updates context dictionary with user related info.
     """
-    user_fullname = get_preferred_certificate_name(user)
-
+    user_fullname = user.profile.name
     context['username'] = user.username
     context['course_mode'] = user_certificate.mode
     context['accomplishment_user_id'] = user.id
@@ -343,42 +320,27 @@ def _update_context_with_user_info(context, user, user_certificate):
     )
 
 
-def _get_user_certificate(request, user, course_key, course_overview, preview_mode=None):
+def _get_user_certificate(request, user, course_key, course, preview_mode=None):
     """
     Retrieves user's certificate from db. Creates one in case of preview mode.
     Returns None if there is no certificate generated for given user
     otherwise returns `GeneratedCertificate` instance.
-
-    We use the course_overview instead of the course descriptor here, so we get the certificate_available_date and
-    certificates_display_behavior validation logic, rather than the raw data from the course descriptor.
     """
     user_certificate = None
     if preview_mode:
         # certificate is being previewed from studio
-        if request.user.has_perm(PREVIEW_CERTIFICATES, course_overview):
-            if not settings.FEATURES.get("ENABLE_V2_CERT_DISPLAY_SETTINGS"):
-                if course_overview.certificate_available_date and not course_overview.self_paced:
-                    modified_date = course_overview.certificate_available_date
-                else:
-                    modified_date = datetime.now().date()
+        if request.user.has_perm(PREVIEW_CERTIFICATES, course):
+            if course.certificate_available_date and not course.self_paced:
+                modified_date = course.certificate_available_date
             else:
-                if (
-                    course_overview.certificates_display_behavior == CertificatesDisplayBehaviors.END_WITH_DATE
-                    and course_overview.certificate_available_date
-                    and not course_overview.self_paced
-                ):
-                    modified_date = course_overview.certificate_available_date
-                elif course_overview.certificates_display_behavior == CertificatesDisplayBehaviors.END:
-                    modified_date = course_overview.end
-                else:
-                    modified_date = datetime.now().date()
+                modified_date = datetime.now().date()
             user_certificate = GeneratedCertificate(
                 mode=preview_mode,
                 verify_uuid=str(uuid4().hex),
                 modified_date=modified_date,
                 created_date=datetime.now().date(),
             )
-    elif certificates_viewable_for_course(course_overview):
+    elif certificates_viewable_for_course(course):
         # certificate is being viewed by learner or public
         try:
             user_certificate = GeneratedCertificate.eligible_certificates.get(
@@ -434,7 +396,7 @@ def _track_certificate_events(request, course, user, user_certificate):
 
     # track certificate evidence_visited event for analytics when certificate_user and accessing_user are different
     if request.user and request.user.id != user.id:
-        emit_certificate_event('evidence_visited', user, str(course.id), event_data={
+        emit_certificate_event('evidence_visited', user, str(course.id), course, {
             'certificate_id': user_certificate.verify_uuid,
             'enrollment_mode': user_certificate.mode,
             'social_network': CertificateSocialNetworks.linkedin
@@ -511,12 +473,10 @@ def render_cert_by_uuid(request, certificate_uuid):
     template_path="certificates/server-error.html",
     test_func=lambda request: request.GET.get('preview', None)
 )
-@pluggable_override('OVERRIDE_RENDER_CERTIFICATE_VIEW')
 def render_html_view(request, course_id, certificate=None):
     """
     This public view generates an HTML representation of the specified user and course
     If a certificate is not available, we display a "Sorry!" screen instead
-    It can be overridden by setting `OVERRIDE_RENDER_CERTIFICATE_VIEW` to an alternative implementation.
     """
     user = certificate.user if certificate else request.user
     user_id = user.id
@@ -542,8 +502,6 @@ def render_html_view(request, course_id, certificate=None):
         log.info(error_str, course_id, str(exception))
         return _render_invalid_certificate(request, course_id, platform_name, configuration)
 
-    course_overview = get_course_overview_or_none(course_key)
-
     # Kick the user back to the "Invalid" screen if the feature is disabled for the course
     if not course.cert_html_view_enabled:
         log.info(
@@ -554,7 +512,7 @@ def render_html_view(request, course_id, certificate=None):
         return _render_invalid_certificate(request, course_id, platform_name, configuration)
 
     # Load user's certificate
-    user_certificate = _get_user_certificate(request, user, course_key, course_overview, preview_mode)
+    user_certificate = _get_user_certificate(request, user, course_key, course, preview_mode)
     if not user_certificate:
         log.info(
             "Invalid cert: User %d does not have eligible cert for %s.",
@@ -628,7 +586,7 @@ def render_html_view(request, course_id, certificate=None):
         _update_social_context(request, context, course, user_certificate, platform_name)
 
         # Append/Override the existing view context values with certificate specific values
-        _update_certificate_context(context, course, course_overview, user_certificate, platform_name)
+        _update_certificate_context(context, course, user_certificate, platform_name)
 
         # Append badge info
         _update_badge_context(context, course, user)

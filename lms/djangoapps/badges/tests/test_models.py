@@ -23,16 +23,16 @@ from lms.djangoapps.badges.models import (
     validate_badge_image
 )
 from lms.djangoapps.badges.tests.factories import BadgeAssertionFactory, BadgeClassFactory, RandomBadgeClassFactory
-from lms.djangoapps.certificates.tests.test_models import TEST_DATA_ROOT, TEST_DATA_DIR
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from lms.djangoapps.certificates.tests.test_models import TEST_DATA_ROOT
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 def get_image(name):
     """
     Get one of the test images from the test data directory.
     """
-    return ImageFile(open(f'{TEST_DATA_DIR}/badges/{name}.png', mode='rb'))  # lint-amnesty, pylint: disable=bad-option-value, open-builtin
+    return ImageFile(open(TEST_DATA_ROOT / 'badges' / name + '.png', mode='rb'))  # lint-amnesty, pylint: disable=bad-option-value, open-builtin
 
 
 @override_settings(MEDIA_ROOT=TEST_DATA_ROOT)
@@ -196,8 +196,8 @@ class BadgeClassTest(ModuleStoreTestCase):
         Verify handing incomplete data for required fields when making a badge class raises an Integrity error.
         """
         image = get_image('good')
-        with pytest.raises(IntegrityError), self.allow_transaction_exception():
-            BadgeClass.get_badge_class(slug='new_slug', issuing_component='new_component', image_file_handle=image)
+        pytest.raises(IntegrityError, BadgeClass.get_badge_class, slug='new_slug', issuing_component='new_component',
+                      image_file_handle=image)
 
     def test_get_for_user(self):
         """
@@ -209,11 +209,7 @@ class BadgeClassTest(ModuleStoreTestCase):
         assertion = BadgeAssertionFactory.create(badge_class=badge_class, user=user)
         assert list(badge_class.get_for_user(user)) == [assertion]
 
-    @override_settings(
-        BADGING_BACKEND='lms.djangoapps.badges.backends.badgr.BadgrBackend',
-        BADGR_USERNAME='example@example.com',
-        BADGR_PASSWORD='password',
-        BADGR_TOKENS_CACHE_KEY='badgr-test-cache-key')
+    @override_settings(BADGING_BACKEND='lms.djangoapps.badges.backends.badgr.BadgrBackend', BADGR_API_TOKEN='test')
     @patch('lms.djangoapps.badges.backends.badgr.BadgrBackend.award')
     def test_award(self, mock_award):
         """

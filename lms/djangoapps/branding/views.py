@@ -1,8 +1,8 @@
 """Views for the branding app. """
 
 import logging
-import urllib.parse
 
+import six
 from django.conf import settings
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.core.cache import cache
@@ -56,7 +56,7 @@ def index(request):
         )
         return redirect(marketing_urls.get('ROOT'))
 
-    domain = request.headers.get('Host')
+    domain = request.META.get('HTTP_HOST')
 
     # keep specialized logic for Edge until we can migrate over Edge to fully use
     # configuration.
@@ -257,7 +257,7 @@ def footer(request):
         raise Http404
 
     # Use the content type to decide what representation to serve
-    accepts = request.headers.get('Accept', '*/*')
+    accepts = request.META.get('HTTP_ACCEPT', '*/*')
 
     # Show the OpenEdX logo in the footer
     show_openedx_logo = bool(request.GET.get('show-openedx-logo', False))
@@ -285,7 +285,7 @@ def footer(request):
         }
         if include_language_selector:
             cache_params['language_selector_options'] = ','.join(sorted([lang.code for lang in released_languages()]))
-        cache_key = f"branding.footer.{urllib.parse.urlencode(cache_params)}.html"
+        cache_key = "branding.footer.{params}.html".format(params=six.moves.urllib.parse.urlencode(cache_params))
 
         content = cache.get(cache_key)
         if content is None:
@@ -298,7 +298,7 @@ def footer(request):
 
     elif 'application/json' in accepts:
         cache_key = "branding.footer.{params}.json".format(
-            params=urllib.parse.urlencode({
+            params=six.moves.urllib.parse.urlencode({
                 'language': language,
                 'is_secure': request.is_secure(),
             })

@@ -67,12 +67,12 @@ class EdxClearExpiredTokensTests(TestCase):  # lint-amnesty, pylint: disable=mis
                 (
                     LOGGER_NAME,
                     'INFO',
-                    f'Cleaning {0} rows from {RefreshToken.__name__} table'
+                    'Cleaning {} rows from {} table'.format(0, RefreshToken.__name__)
                 ),
                 (
                     LOGGER_NAME,
                     'INFO',
-                    f'Cleaning {0} rows from {AccessToken.__name__} table',
+                    'Cleaning {} rows from {} table'.format(0, AccessToken.__name__),
                 ),
                 (
                     LOGGER_NAME,

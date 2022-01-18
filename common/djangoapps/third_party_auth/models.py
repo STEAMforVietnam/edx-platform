@@ -14,7 +14,7 @@ from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ugettext_lazy as _
 from organizations.models import Organization
 from social_core.backends.base import BaseAuth
 from social_core.backends.oauth import OAuthAuth
@@ -68,7 +68,7 @@ def clean_json(value, of_type):
 
 def clean_username(username=''):
     """ Simple helper method to ensure a username is compatible with our system requirements. """
-    return ('_').join(re.findall(r'[a-zA-Z0-9\-]+', username))[:USERNAME_MAX_LENGTH]
+    return re.sub(r'[^-\w]+', '_', username)[:USERNAME_MAX_LENGTH]
 
 
 class AuthNotConfigured(SocialAuthBaseException):
@@ -212,16 +212,6 @@ class ProviderConfig(ConfigurationModel):
         default=False,
         help_text="Use the presence of a profile from a trusted third party as proof of identity verification.",
     )
-
-    disable_for_enterprise_sso = models.BooleanField(
-        default=False,
-        verbose_name='Disabled for Enterprise TPA',
-        help_text=_(
-            "IDPs with this set to True will be excluded from the dropdown IDP selection "
-            "in the EnterpriseCustomer Django Admin form."
-        )
-    )
-
     prefix = None  # used for provider_id. Set to a string value in subclass
     backend_name = None  # Set to a field or fixed value in subclass
     accepts_logins = True  # Whether to display a sign-in button when the provider is enabled

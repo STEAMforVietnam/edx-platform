@@ -12,8 +12,6 @@ from django.test import TestCase
 from enterprise.models import EnterpriseCustomer, EnterpriseCustomerUser
 from pytest import mark
 
-from common.djangoapps.student.tests.factories import UserFactory
-
 
 @mark.django_db
 class ChangeEnterpriseUserUsernameCommandTests(TestCase):
@@ -27,7 +25,7 @@ class ChangeEnterpriseUserUsernameCommandTests(TestCase):
         """
         Test that the command does not update a user's username if it is not linked to an Enterprise.
         """
-        user = UserFactory.create(is_active=True, username='old_username', email='test@example.com')
+        user = User.objects.create(is_active=True, username='old_username', email='test@example.com')
         new_username = 'new_username'
 
         post_save_handler = mock.MagicMock()
@@ -43,7 +41,7 @@ class ChangeEnterpriseUserUsernameCommandTests(TestCase):
         """
         Test that the command updates the user's username when the user is linked to an Enterprise.
         """
-        user = UserFactory.create(is_active=True, username='old_username', email='test@example.com')
+        user = User.objects.create(is_active=True, username='old_username', email='test@example.com')
         site, _ = Site.objects.get_or_create(domain='example.com')
         enterprise_customer = EnterpriseCustomer.objects.create(
             name='Test EnterpriseCustomer',

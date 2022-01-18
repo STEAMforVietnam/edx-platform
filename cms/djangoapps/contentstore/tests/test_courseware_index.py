@@ -1,11 +1,14 @@
 """
 Testing indexing of the courseware as it is changed
 """
+
+
 import json
 import time
 from datetime import datetime
 from unittest import skip
 from unittest.mock import patch
+from uuid import uuid4
 
 import ddt
 import pytest
@@ -27,17 +30,28 @@ from cms.djangoapps.contentstore.utils import reverse_course_url, reverse_usage_
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.course_modes.tests.factories import CourseModeFactory
 from openedx.core.djangoapps.models.course_details import CourseDetails
-from xmodule.library_tools import normalize_key_for_search  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import SignalHandler, modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import (  # lint-amnesty, pylint: disable=wrong-import-order
-    ModuleStoreTestCase,
+from xmodule.library_tools import normalize_key_for_search
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import SignalHandler, modulestore
+from xmodule.modulestore.edit_info import EditInfoMixin
+from xmodule.modulestore.inheritance import InheritanceMixin
+from xmodule.modulestore.mixed import MixedModuleStore
+from xmodule.modulestore.tests.django_utils import (
     TEST_DATA_MONGO_MODULESTORE,
     TEST_DATA_SPLIT_MODULESTORE,
-    SharedModuleStoreTestCase,
+    SharedModuleStoreTestCase
 )
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, LibraryFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.partitions.partitions import UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, LibraryFactory
+from xmodule.modulestore.tests.mongo_connection import MONGO_HOST, MONGO_PORT_NUM
+from xmodule.modulestore.tests.utils import (
+    LocationMixin,
+    MixedSplitTestCase,
+    MongoContentstoreBuilder,
+    create_modulestore_instance
+)
+from xmodule.partitions.partitions import UserPartition
+from xmodule.tests import DATA_DIR
+from xmodule.x_module import XModuleMixin
 
 COURSE_CHILD_STRUCTURE = {
     "course": "chapter",
@@ -79,9 +93,46 @@ def create_large_course(store, load_factor):
     return course, child_count
 
 
-class MixedWithOptionsTestCase(ModuleStoreTestCase):
+class MixedWithOptionsTestCase(MixedSplitTestCase):
     """ Base class for test cases within this file """
-    CREATE_USER = False
+    HOST = MONGO_HOST
+    PORT = MONGO_PORT_NUM
+    DATABASE = 'test_mongo_%s' % uuid4().hex[:5]
+    COLLECTION = 'modulestore'
+    ASSET_COLLECTION = 'assetstore'
+    DEFAULT_CLASS = 'xmodule.hidden_module.HiddenDescriptor'
+    RENDER_TEMPLATE = lambda t_n, d, ctx=None, nsp='main': ''
+    modulestore_options = {
+        'default_class': DEFAULT_CLASS,
+        'fs_root': DATA_DIR,
+        'render_template': RENDER_TEMPLATE,
+        'xblock_mixins': (EditInfoMixin, InheritanceMixin, LocationMixin, XModuleMixin),
+    }
+    DOC_STORE_CONFIG = {
+        'host': HOST,
+        'port': PORT,
+        'db': DATABASE,
+        'collection': COLLECTION,
+        'asset_collection': ASSET_COLLECTION,
+    }
+    OPTIONS = {
+        'stores': [
+            {
+                'NAME': 'draft',
+                'ENGINE': 'xmodule.modulestore.mongo.draft.DraftModuleStore',
+                'DOC_STORE_CONFIG': DOC_STORE_CONFIG,
+                'OPTIONS': modulestore_options
+            },
+            {
+                'NAME': 'split',
+                'ENGINE': 'xmodule.modulestore.split_mongo.split_draft.DraftVersioningModuleStore',
+                'DOC_STORE_CONFIG': DOC_STORE_CONFIG,
+                'OPTIONS': modulestore_options
+            },
+        ],
+        'xblock_mixins': modulestore_options['xblock_mixins'],
+    }
+
     INDEX_NAME = None
 
     def setup_course_base(self, store):
@@ -104,10 +155,18 @@ class MixedWithOptionsTestCase(ModuleStoreTestCase):
 
     def _perform_test_using_store(self, store_type, test_to_perform):
         """ Helper method to run a test function that uses a specific store """
-        store = modulestore()
-        with store.default_store(store_type):
-            self.setup_course_base(store)
-            test_to_perform(store)
+        with MongoContentstoreBuilder().build() as contentstore:
+            store = MixedModuleStore(
+                contentstore=contentstore,
+                create_modulestore_instance=create_modulestore_instance,
+                mappings={},
+                **self.OPTIONS
+            )
+            self.addCleanup(store.close_all_connections)
+
+            with store.default_store(store_type):
+                self.setup_course_base(store)
+                test_to_perform(store)
 
     def publish_item(self, store, item_location):
         """ publish the item at the given location """
@@ -131,7 +190,6 @@ class TestCoursewareSearchIndexer(MixedWithOptionsTestCase):
     """ Tests the operation of the CoursewareSearchIndexer """
 
     WORKS_WITH_STORES = (ModuleStoreEnum.Type.mongo, ModuleStoreEnum.Type.split)
-    ENABLED_SIGNALS = ['course_deleted']
 
     def setUp(self):
         super().setUp()
@@ -206,8 +264,11 @@ class TestCoursewareSearchIndexer(MixedWithOptionsTestCase):
 
     def _test_indexing_course(self, store):
         """ indexing course tests """
+        response = self.search()
+        self.assertEqual(response["total"], 0)
+
         # Only published modules should be in the index
-        added_to_index = self.reindex_course(store)  # This reindex may not be necessary (it may already be indexed)
+        added_to_index = self.reindex_course(store)
         self.assertEqual(added_to_index, 3)
         response = self.search()
         self.assertEqual(response["total"], 3)
@@ -250,15 +311,17 @@ class TestCoursewareSearchIndexer(MixedWithOptionsTestCase):
         Test that course will also be delete from search_index after course deletion.
         """
         self.searcher = SearchEngine.get_search_engine(CourseAboutSearchIndexer.INDEX_NAME)
-        # index the course in search_index (it may already be indexed)
+        response = self.search()
+        self.assertEqual(response["total"], 0)
+
+        # index the course in search_index
         self.reindex_course(store)
         response = self.search()
         self.assertEqual(response["total"], 1)
 
         # delete the course and look course in search_index
-        store.delete_course(self.course.id, ModuleStoreEnum.UserID.test)
-        self.assertIsNone(store.get_course(self.course.id))
-        # Now, because of contentstore.signals.handlers.listen_for_course_delete, the index should already be updated:
+        modulestore().delete_course(self.course.id, self.user_id)
+        self.assertIsNone(modulestore().get_course(self.course.id))
         response = self.search()
         self.assertEqual(response["total"], 0)
 
@@ -713,7 +776,6 @@ class TestTaskExecution(SharedModuleStoreTestCase):
             self.assertFalse(mock_index.called)
 
 
-@pytest.mark.django_db
 @ddt.ddt
 class TestLibrarySearchIndexer(MixedWithOptionsTestCase):
     """ Tests the operation of the CoursewareSearchIndexer """
@@ -867,7 +929,7 @@ class GroupConfigurationSearchMongo(CourseTestCase, MixedWithOptionsTestCase):
     """
     Tests indexing of content groups on course modules using mongo modulestore.
     """
-    CREATE_USER = True
+
     MODULESTORE = TEST_DATA_MONGO_MODULESTORE
     INDEX_NAME = CoursewareSearchIndexer.INDEX_NAME
 

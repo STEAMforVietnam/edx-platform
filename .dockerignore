@@ -149,5 +149,3 @@ openedx/core/djangoapps/django_comment_common/comment_client/python
 
 # Locally generated PII reports
 **/pii_report
-
-/Dockerfile

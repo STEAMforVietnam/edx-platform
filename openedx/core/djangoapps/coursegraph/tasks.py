@@ -11,16 +11,8 @@ from django.utils import timezone
 from edx_django_utils.cache import RequestCache
 from edx_django_utils.monitoring import set_code_owner_attribute
 from opaque_keys.edx.keys import CourseKey
-
-import py2neo  # pylint: disable=unused-import
-from py2neo import Graph, Node, Relationship
-
-try:
-    from py2neo.matching import NodeMatcher
-except ImportError:
-    from py2neo import NodeMatcher
-else:
-    pass
+from py2neo import Graph, Node, Relationship, authenticate, NodeSelector
+from py2neo.compat import integer, string
 
 
 log = logging.getLogger(__name__)
@@ -31,7 +23,7 @@ celery_log = logging.getLogger('edx.celery.task')
 bolt_log = logging.getLogger('neo4j.bolt')  # pylint: disable=invalid-name
 bolt_log.setLevel(logging.ERROR)
 
-PRIMITIVE_NEO4J_TYPES = (int, bytes, str, float, bool)
+PRIMITIVE_NEO4J_TYPES = (integer, string, str, float, bool)
 
 
 def serialize_item(item):
@@ -118,8 +110,8 @@ def get_command_last_run(course_key, graph):
     Returns: The datetime that the command was last run, converted into
         text, or None, if there's no record of this command last being run.
     """
-    matcher = NodeMatcher(graph)
-    course_node = matcher.match(
+    selector = NodeSelector(graph)
+    course_node = selector.select(
         "course",
         course_key=str(course_key)
     ).first()
@@ -289,7 +281,7 @@ def dump_course_to_neo4j(course_key_string, credentials):
         # now, re-add it
         add_to_transaction(nodes, transaction)
         add_to_transaction(relationships, transaction)
-        graph.commit(transaction)
+        transaction.commit()
         celery_log.info("Completed dumping %s to neo4j", course_key)
 
     except Exception:  # pylint: disable=broad-except
@@ -297,7 +289,7 @@ def dump_course_to_neo4j(course_key_string, credentials):
             "Error trying to dump course %s to neo4j, rolling back",
             course_string
         )
-        graph.rollback(transaction)
+        transaction.rollback()
 
 
 class ModuleStoreSerializer:
@@ -390,17 +382,27 @@ def authenticate_and_create_graph(credentials):
     """
 
     host = credentials['host']
-    port = credentials['port']
+    https_port = credentials['https_port']
+    http_port = credentials['http_port']
     secure = credentials['secure']
     neo4j_user = credentials['user']
     neo4j_password = credentials['password']
 
+    authenticate(
+        "{host}:{port}".format(
+            host=host, port=https_port if secure else http_port
+        ),
+        neo4j_user,
+        neo4j_password,
+    )
+
     graph = Graph(
-        protocol='bolt',
+        bolt=True,
         password=neo4j_password,
         user=neo4j_user,
-        address=host,
-        port=port,
+        https_port=https_port,
+        http_port=http_port,
+        host=host,
         secure=secure,
     )
 

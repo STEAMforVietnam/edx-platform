@@ -7,7 +7,7 @@ import logging
 from urllib.parse import urlencode
 
 from django.conf import settings
-from opaque_keys.edx.keys import CourseKey, UsageKey
+from django.utils.timezone import now
 
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 
@@ -73,10 +73,15 @@ def has_certificates_enabled(course):
     return course.cert_html_view_enabled
 
 
-def course_location_from_key(course_key: CourseKey) -> UsageKey:
-    """Creates a usage key for the toplevel course item, handling differences between mongo and newer keys"""
-    if getattr(course_key, 'deprecated', False):
-        block_id = course_key.run
-    else:
-        block_id = 'course'
-    return course_key.make_usage_key('course', block_id)
+def should_display_grade(course_overview):
+    """
+    Returns True or False depending upon either certificate available date
+    or course-end-date
+    """
+    course_end_date = course_overview.end_date
+    cert_available_date = course_overview.certificate_available_date
+    current_date = now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if cert_available_date:
+        return cert_available_date < current_date
+
+    return course_end_date and course_end_date < current_date

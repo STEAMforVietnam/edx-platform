@@ -6,7 +6,6 @@ Unit tests for getting the list of courses and the course outline.
 import datetime
 import json
 from unittest import mock
-from unittest.mock import patch
 
 import ddt
 import lxml
@@ -14,27 +13,22 @@ import pytz
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.test.utils import override_settings
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from opaque_keys.edx.locator import CourseLocator
 from search.api import perform_search
 
 from cms.djangoapps.contentstore.courseware_index import CoursewareSearchIndexer, SearchIndexingError
 from cms.djangoapps.contentstore.tests.utils import CourseTestCase
-from cms.djangoapps.contentstore.utils import (
-    add_instructor,
-    get_proctored_exam_settings_url,
-    reverse_course_url,
-    reverse_usage_url
-)
+from cms.djangoapps.contentstore.utils import add_instructor, reverse_course_url, reverse_usage_url
 from common.djangoapps.course_action_state.managers import CourseRerunUIStateManager
 from common.djangoapps.course_action_state.models import CourseRerunState
 from common.djangoapps.student.auth import has_course_author_access
 from common.djangoapps.student.roles import CourseStaffRole, GlobalStaff, LibraryUserRole
 from common.djangoapps.student.tests.factories import UserFactory
 from openedx.core.djangoapps.waffle_utils.testutils import WAFFLE_TABLES
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, LibraryFactory, check_mongo_calls  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, LibraryFactory, check_mongo_calls
 
 from ..course import _deprecated_blocks_info, course_outline_initial_state, reindex_course_and_check_access
 from ..item import VisibilityState, create_xblock_info
@@ -594,28 +588,6 @@ class TestCourseOutline(CourseTestCase):
             info,
             expected_block_types
         )
-
-    @override_settings(FEATURES={'ENABLE_EXAM_SETTINGS_HTML_VIEW': True})
-    @patch('cms.djangoapps.models.settings.course_metadata.CourseMetadata.validate_proctoring_settings')
-    def test_proctoring_link_is_visible(self, mock_validate_proctoring_settings):
-        """
-        Test to check proctored exam settings mfe url is rendering properly
-        """
-        mock_validate_proctoring_settings.return_value = [
-            {
-                'key': 'proctoring_provider',
-                'message': 'error message',
-                'model': {'display_name': 'proctoring_provider'}
-            },
-            {
-                'key': 'proctoring_provider',
-                'message': 'error message',
-                'model': {'display_name': 'proctoring_provider'}
-            }
-        ]
-        response = self.client.get_html(reverse_course_url('course_handler', self.course.id))
-        proctored_exam_settings_url = get_proctored_exam_settings_url(self.course.id)
-        self.assertContains(response, proctored_exam_settings_url, 2)
 
 
 class TestCourseReIndex(CourseTestCase):

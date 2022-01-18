@@ -20,7 +20,7 @@ def is_skip_dir(skip_dirs, directory):
     """
     for skip_dir in skip_dirs:
         skip_dir_regex = re.compile(
-            f"(.*/)*{re.escape(skip_dir)}(/.*)*")
+            "(.*/)*{}(/.*)*".format(re.escape(skip_dir)))
         if skip_dir_regex.match(directory) is not None:
             return True
     return False

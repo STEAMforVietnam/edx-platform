@@ -3,18 +3,16 @@ Certificates factories
 """
 
 
-import datetime
 from uuid import uuid4
 
 from factory.django import DjangoModelFactory
 
 from common.djangoapps.student.models import LinkedInAddToProfileConfiguration
 from lms.djangoapps.certificates.models import (
-    CertificateAllowlist,
-    CertificateDateOverride,
     CertificateHtmlViewConfiguration,
     CertificateInvalidation,
     CertificateStatuses,
+    CertificateWhitelist,
     GeneratedCertificate
 )
 
@@ -34,16 +32,16 @@ class GeneratedCertificateFactory(DjangoModelFactory):
     grade = ''
 
 
-class CertificateAllowlistFactory(DjangoModelFactory):
+class CertificateWhitelistFactory(DjangoModelFactory):
     """
-    Certificate allowlist factory
+    CertificateWhitelist factory
     """
 
     class Meta:
-        model = CertificateAllowlist
+        model = CertificateWhitelist
 
     course_id = None
-    allowlist = True
+    whitelist = True
     notes = 'Test Notes'
 
 
@@ -72,18 +70,18 @@ class CertificateHtmlViewConfigurationFactory(DjangoModelFactory):
             "default": {
                 "accomplishment_class_append": "accomplishment-certificate",
                 "platform_name": "edX",
-                "company_about_url": "https://www.edx.org/about-us",
-                "company_privacy_url": "https://www.edx.org/edx-privacy-policy",
-                "company_tos_url": "https://www.edx.org/edx-terms-service",
-                "company_verified_certificate_url": "https://www.edx.org/verified-certificate",
+                "company_about_url": "http://www.edx.org/about-us",
+                "company_privacy_url": "http://www.edx.org/edx-privacy-policy",
+                "company_tos_url": "http://www.edx.org/edx-terms-service",
+                "company_verified_certificate_url": "http://www.edx.org/verified-certificate",
                 "document_stylesheet_url_application": "/static/certificates/sass/main-ltr.css",
                 "logo_src": "/static/certificates/images/logo-edx.png",
-                "logo_url": "https://www.edx.org"
+                "logo_url": "http://www.edx.org"
             },
             "honor": {
                 "certificate_type": "Honor Code",
                 "certificate_title": "Certificate of Achievement",
-                "logo_url": "https://www.edx.org/honor_logo.png"
+                "logo_url": "http://www.edx.org/honor_logo.png"
             },
             "verified": {
                 "certificate_type": "Verified",
@@ -106,14 +104,3 @@ class LinkedInAddToProfileConfigurationFactory(DjangoModelFactory):
 
     enabled = True
     company_identifier = "1337"
-
-
-class CertificateDateOverrideFactory(DjangoModelFactory):
-    """
-    CertificateDateOverride factory
-    """
-    class Meta:
-        model = CertificateDateOverride
-
-    date = datetime.datetime(2021, 5, 11, 0, 0, tzinfo=datetime.timezone.utc)
-    reason = "Learner really wanted this on their birthday"

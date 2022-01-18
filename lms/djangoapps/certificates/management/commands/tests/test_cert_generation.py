@@ -6,11 +6,12 @@ from unittest import mock
 
 import pytest
 from django.core.management import CommandError, call_command
+from waffle.testutils import override_switch
 
 from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
 from lms.djangoapps.certificates.tests.test_generation_handler import ID_VERIFIED_METHOD
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 @mock.patch(ID_VERIFIED_METHOD, mock.Mock(return_value=True))

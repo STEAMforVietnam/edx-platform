@@ -28,8 +28,8 @@ from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_
 
 log = logging.getLogger(__name__)
 
-# providing_args=['user', 'response']
-CREATE_LOGON_COOKIE = Signal()
+
+CREATE_LOGON_COOKIE = Signal(providing_args=['user', 'response'])
 
 
 JWT_COOKIE_NAMES = (
@@ -78,7 +78,7 @@ def delete_logged_in_cookies(response):
         response.delete_cookie(
             cookie_name,
             path='/',
-            domain=settings.SHARED_COOKIE_DOMAIN
+            domain=settings.SESSION_COOKIE_DOMAIN
         )
 
     return response
@@ -88,7 +88,7 @@ def standard_cookie_settings(request):
     """ Returns the common cookie settings (e.g. expiration time). """
 
     cookie_settings = {
-        'domain': settings.SHARED_COOKIE_DOMAIN,
+        'domain': settings.SESSION_COOKIE_DOMAIN,
         'path': '/',
         'httponly': None,
     }
@@ -170,7 +170,6 @@ def get_response_with_refreshed_jwt_cookies(request, user):
     response.content = json.dumps(
         {
             'success': True,
-            'user_id': user.id,
             'response_epoch_seconds': current_time,
             'response_http_date': http_date(current_time),
             'expires': expires_date if expires_date else 'not-found',

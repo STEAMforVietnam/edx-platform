@@ -1,24 +1,25 @@
 """
 Test status utilities
 """
-from unittest import TestCase
 from unittest import mock
 
 from django.conf import settings
-from opaque_keys.edx.keys import CourseKey
 from pytest import mark
+from unittest import TestCase  # lint-amnesty, pylint: disable=wrong-import-order
 
 from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.course_modes.tests.factories import CourseModeFactory
+from opaque_keys.edx.keys import CourseKey  # lint-amnesty, pylint: disable=wrong-import-order
 from common.djangoapps.student.tests.factories import UserFactory
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase, TEST_DATA_SPLIT_MODULESTORE
+from xmodule.modulestore.tests.factories import CourseFactory
+
 from openedx.core.djangoapps.catalog.tests.factories import (
     ProgramFactory,
 )
-from openedx.core.djangolib.testing.utils import skip_unless_lms
 from openedx.features.enterprise_support.tests.factories import EnterpriseCustomerUserFactory
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase, TEST_DATA_SPLIT_MODULESTORE  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from openedx.core.djangolib.testing.utils import skip_unless_lms
 
 if settings.ROOT_URLCONF == 'lms.urls':
     from openedx.core.djangoapps.demographics.api.status import show_user_demographics, show_call_to_action_for_user
@@ -29,10 +30,7 @@ MICROBACHELORS = 'microbachelors'
 
 @skip_unless_lms
 @mock.patch('openedx.core.djangoapps.programs.utils.get_programs_by_type')
-class TestShowDemographics(SharedModuleStoreTestCase):
-    """
-    Tests for whether the demographics collection fields should be shown
-    """
+class TestShowDemographics(SharedModuleStoreTestCase):  # lint-amnesty, pylint: disable=missing-class-docstring
     MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     @classmethod
@@ -59,10 +57,7 @@ class TestShowDemographics(SharedModuleStoreTestCase):
 
 @skip_unless_lms
 @mark.django_db
-class TestShowCallToAction(TestCase):
-    """
-    Tests for whether the demographics call to action should be shown
-    """
+class TestShowCallToAction(TestCase):  # lint-amnesty, pylint: disable=missing-class-docstring
     def setUp(self):
         super().setUp()
         self.user = UserFactory()

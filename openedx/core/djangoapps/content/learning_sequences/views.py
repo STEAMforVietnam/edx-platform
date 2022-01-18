@@ -7,22 +7,17 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
+from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import serializers
-from rest_framework.exceptions import NotAuthenticated, NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from lms.djangoapps.courseware.access import has_access
-from lms.djangoapps.courseware.masquerade import setup_masquerade
-from openedx.core import types
-from openedx.core.lib.api.view_utils import validate_course_key
-
+from openedx.core.lib.api.permissions import IsStaff
 from .api import get_user_course_outline_details
-from .api.permissions import can_call_public_api
 from .data import CourseOutlineData
 
 User = get_user_model()
@@ -35,6 +30,9 @@ class CourseOutlineView(APIView):
     """
     # We want to eventually allow unauthenticated users to use this as well...
     authentication_classes = (JwtAuthentication, SessionAuthenticationAllowInactiveUser)
+
+    # For early testing, restrict this to only global staff...
+    permission_classes = (IsStaff,)
 
     class UserCourseOutlineDataSerializer(serializers.BaseSerializer):  # lint-amnesty, pylint: disable=abstract-method
         """
@@ -156,104 +154,46 @@ class CourseOutlineView(APIView):
         """
         The CourseOutline, customized for a given user.
 
+        Currently restricted to global staff.
+
         TODO: Swagger docs of API. For an exemplar to imitate, see:
         https://github.com/edx/edx-platform/blob/master/lms/djangoapps/program_enrollments/rest_api/v1/views.py#L792-L820
         """
-        # Translate input params and do course key validation (will cause HTTP
-        # 400 error if an invalid CourseKey was entered, instead of 404).
-        course_key = validate_course_key(course_key_str)
+        # Translate input params and do any substitutions...
+        course_key = self._validate_course_key(course_key_str)
         at_time = datetime.now(timezone.utc)
+        user = self._determine_user(request)
 
-        # Get target user (and override request user for the benefit of any waffle checks)
-        request.user = self._determine_user(request, course_key)
-
-        # We use can_call_public_api to slowly roll this feature out, and be
-        # able to turn it off for a course. But it's not really a permissions
-        # thing in that it doesn't give them elevated access. If I had it to do
-        # over again, I'd call it something else, but all this code is supposed
-        # to go away when rollout is completed anyway.
-        #
-        # The force_on param just means, "Yeah, never mind whether you're turned
-        # on by default for the purposes of the MFE. I want to see production
-        # data using this API." The MFE should _never_ pass this parameter. It's
-        # just a way to peek at the API while it's techincally dark for rollout
-        # purposes. TODO: REMOVE THIS PARAM AFTER FULL ROLLOUT OF THIS FEATURE.
-        force_on = request.GET.get("force_on")
-        if (not force_on) and (not can_call_public_api(course_key)):
-            raise PermissionDenied()
-
+        # Grab the user's outline and send our response...
         try:
-            # Grab the user's outline and send our response...
-            user_course_outline_details = get_user_course_outline_details(course_key, request.user, at_time)
+            user_course_outline_details = get_user_course_outline_details(course_key, user, at_time)
         except CourseOutlineData.DoesNotExist as does_not_exist_err:
-            if not request.user.id:
-                # Outline is private or doesn't exist. But don't leak whether a course exists or not to anonymous
-                # users with a 404 - give a 401 instead. This mostly prevents drive-by crawlers from creating a bunch
-                # of 404 errors in your error report dashboard.
-                raise NotAuthenticated() from does_not_exist_err
             raise NotFound() from does_not_exist_err
 
         serializer = self.UserCourseOutlineDataSerializer(user_course_outline_details)
         return Response(serializer.data)
 
-    def _determine_user(self, request, course_key: CourseKey) -> types.User:
-        """
-        For which user should we get an outline?
-
-        Uses a combination of the user on the request object, session masquerading
-        data, and a manually passed in "user" parameter. Ensures that the requesting
-        user has permission to view course outline of target user. Raise request-level
-        exceptions otherwise.
-
-        The "user" querystring param is expected to be a username, with a blank
-        value being interpreted as the anonymous user. It will take priority over
-        session masquerading, if provided.
-        """
-        has_staff_access = has_access(request.user, 'staff', course_key).has_access
-
-        target_username = request.GET.get("user")
-        if target_username is not None:
-            return self._get_target_user(request, course_key, has_staff_access, target_username)
-
-        _course_masquerade, user = setup_masquerade(request, course_key, has_staff_access)
-        return user
-
-    @staticmethod
-    def _get_target_user(request, course_key: CourseKey, has_staff_access: bool, target_username: str) -> types.User:
-        """
-        Load and return the requested user with permission checking.
-
-        A blank username will return an anonymous user.
-
-        This was designed for manual API testing and kept in, as it may be useful for future development.
-        """
-        # Users can always see the outline as themselves.
-        if target_username == request.user.username:
-            return request.user
-
-        # Otherwise, do a permission check to see if they're allowed to view as
-        # other users.
-        if not has_staff_access:
-            display_username = "the anonymous user" if target_username == "" else target_username
-            raise PermissionDenied(
-                f"User {request.user.username} does not have permission to "
-                f"view course outline for {course_key} as {display_username}."
-            )
-
-        # If we've gotten this far, their permissions are fine. Now we handle
-        # the different-user use case...
-
-        # Having a "user" querystring that is a blank string is interpreted as
-        # "show me this outline as an anonymous user".
-        if target_username == "":
-            return AnonymousUser()
-
-        # Finally, the actual work of looking up a user to target.
+    def _validate_course_key(self, course_key_str):  # lint-amnesty, pylint: disable=missing-function-docstring
         try:
-            target_user = User.objects.get(username=target_username)
-        except User.DoesNotExist as err:
-            # We throw this only after we've passed the permission check, to
-            # make it harder for crawlers to get a list of our usernames.
-            raise NotFound(f"User {target_username} does not exist.") from err
+            course_key = CourseKey.from_string(course_key_str)
+        except InvalidKeyError:
+            raise serializers.ValidationError(  # lint-amnesty, pylint: disable=raise-missing-from
+                f"{course_key_str} is not a valid CourseKey"
+            )
+        if course_key.deprecated:
+            raise serializers.ValidationError(
+                "Deprecated CourseKeys (Org/Course/Run) are not supported."
+            )
+        return course_key
 
-        return target_user
+    def _determine_user(self, request):
+        """
+        Requesting for a different user (easiest way to test for students)
+        while restricting access to only global staff. This is a placeholder
+        until we have more full fledged permissions/masquerading.
+        """
+        requested_username = request.GET.get("user")
+        if request.user.is_staff and requested_username:
+            return User.objects.get(username=requested_username)
+
+        return request.user

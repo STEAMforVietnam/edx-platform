@@ -9,11 +9,12 @@ from config_models.models import ConfigurationModel
 from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-
-from django.utils.translation import gettext_lazy
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext_lazy
 from edx_django_utils.cache import RequestCache
 from opaque_keys.edx.django.models import CourseKeyField
 
+from lms.djangoapps.courseware.courses import get_course_by_id
 from openedx.core.djangoapps.course_groups.cohorts import (
     CourseCohort,
     get_course_cohorts,
@@ -22,7 +23,6 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 )
 from openedx.core.djangoapps.verified_track_content.tasks import sync_cohort_with_mode
 from openedx.core.lib.cache_utils import request_cached
-from openedx.core.lib.courses import get_course_by_id
 from common.djangoapps.student.models import CourseEnrollment
 
 log = logging.getLogger(__name__)
@@ -92,6 +92,7 @@ def pre_save_callback(sender, instance, **kwargs):  # pylint: disable=unused-arg
         instance._old_mode = None  # pylint: disable=protected-access
 
 
+@python_2_unicode_compatible
 class VerifiedTrackCohortedCourse(models.Model):
     """
     Tracks which courses have verified track auto-cohorting enabled.
@@ -100,7 +101,7 @@ class VerifiedTrackCohortedCourse(models.Model):
     """
     course_key = CourseKeyField(
         max_length=255, db_index=True, unique=True,
-        help_text=gettext_lazy("The course key for the course we would like to be auto-cohorted.")
+        help_text=ugettext_lazy("The course key for the course we would like to be auto-cohorted.")
     )
 
     verified_cohort_name = models.CharField(max_length=100, default=DEFAULT_VERIFIED_COHORT_NAME)
@@ -110,7 +111,7 @@ class VerifiedTrackCohortedCourse(models.Model):
     CACHE_NAMESPACE = "verified_track_content.VerifiedTrackCohortedCourse.cache."
 
     def __str__(self):
-        return f"Course: {str(self.course_key)}, enabled: {self.enabled}"
+        return "Course: {}, enabled: {}".format(str(self.course_key), self.enabled)
 
     @classmethod
     def verified_cohort_name_for_course(cls, course_key):

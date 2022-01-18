@@ -20,7 +20,7 @@ class HttpMethod(Enum):
     PUT = 'PUT'
 
 
-class CourseTool:
+class CourseTool(object):
     """
     This is an optional base class for Course Tool plugins.
 

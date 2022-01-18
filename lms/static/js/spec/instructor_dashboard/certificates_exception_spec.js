@@ -4,12 +4,12 @@ define([
     'sinon',
     'edx-ui-toolkit/js/utils/spec-helpers/ajax-helpers',
     'js/certificates/models/certificate_exception',
-    'js/certificates/views/certificate_allowlist',
-    'js/certificates/views/certificate_allowlist_editor',
-    'js/certificates/collections/certificate_allowlist'
+    'js/certificates/views/certificate_whitelist',
+    'js/certificates/views/certificate_whitelist_editor',
+    'js/certificates/collections/certificate_whitelist'
 ],
-    function($, sinon, AjaxHelpers, CertificateExceptionModel, CertificateAllowlistView, CertificateAllowlistEditorView,
-             CertificateAllowlistCollection) {
+    function($, sinon, AjaxHelpers, CertificateExceptionModel, CertificateWhiteListView, CertificateWhiteListEditorView,
+             CertificateWhiteListCollection) {
         'use strict';
 
         describe('edx.certificates.models.certificates_exception.CertificateExceptionModel', function() {
@@ -52,8 +52,8 @@ define([
             });
         });
 
-        describe('edx.certificates.collections.certificate_allowlist.CertificateAllowlist', function() {
-            var certificateAllowlist = null,
+        describe('edx.certificates.collections.certificate_whitelist.CertificateWhiteList', function() {
+            var certificateWhiteList = null,
                 certificateExceptionUrl = 'test/url/';
             var certificatesExceptionsJson = [
                 {
@@ -77,7 +77,7 @@ define([
             ];
 
             beforeEach(function() {
-                certificateAllowlist = new CertificateAllowlistCollection(certificatesExceptionsJson, {
+                certificateWhiteList = new CertificateWhiteListCollection(certificatesExceptionsJson, {
                     parse: true,
                     canBeEmpty: true,
                     url: certificateExceptionUrl,
@@ -86,17 +86,17 @@ define([
             });
 
             it('has 2 models in the collection after initialization', function() {
-                expect(certificateAllowlist.models.length).toEqual(2);
+                expect(certificateWhiteList.models.length).toEqual(2);
             });
 
             it("returns correct model on getModel call and 'undefined' if queried model is not present", function() {
-                expect(certificateAllowlist.getModel({user_name: 'test1'})).not.toBe(undefined);
-                expect(certificateAllowlist.getModel({user_name: 'test_invalid_user'})).toBe(undefined);
+                expect(certificateWhiteList.getModel({user_name: 'test1'})).not.toBe(undefined);
+                expect(certificateWhiteList.getModel({user_name: 'test_invalid_user'})).toBe(undefined);
 
-                expect(certificateAllowlist.getModel({user_email: 'test1@test.com'})).not.toBe(undefined);
-                expect(certificateAllowlist.getModel({user_email: 'test_invalid_user@test.com'})).toBe(undefined);
+                expect(certificateWhiteList.getModel({user_email: 'test1@test.com'})).not.toBe(undefined);
+                expect(certificateWhiteList.getModel({user_email: 'test_invalid_user@test.com'})).toBe(undefined);
 
-                expect(certificateAllowlist.getModel({user_name: 'test1'}).attributes).toEqual(
+                expect(certificateWhiteList.getModel({user_name: 'test1'}).attributes).toEqual(
                     {
                         id: 1,
                         user_id: 1,
@@ -109,7 +109,7 @@ define([
                     }
                 );
 
-                expect(certificateAllowlist.getModel({user_email: 'test2@test.com'}).attributes).toEqual(
+                expect(certificateWhiteList.getModel({user_email: 'test2@test.com'}).attributes).toEqual(
                     {
                         id: 2,
                         user_id: 2,
@@ -133,7 +133,7 @@ define([
                     postData: []
                 };
 
-                certificateAllowlist.sync({success: successCallback, error: errorCallback}, addStudents);
+                certificateWhiteList.sync({success: successCallback, error: errorCallback}, addStudents);
                 AjaxHelpers.expectJsonRequest(requests, 'POST', expected.url, expected.postData);
             });
 
@@ -144,8 +144,8 @@ define([
                     addStudents = 'new',
                     expected;
 
-                certificateAllowlist.add({user_name: 'test3', notes: 'test3 notes', new: true});
-                certificateAllowlist.sync({success: successCallback, error: errorCallback}, addStudents);
+                certificateWhiteList.add({user_name: 'test3', notes: 'test3 notes', new: true});
+                certificateWhiteList.sync({success: successCallback, error: errorCallback}, addStudents);
 
                 expected = {
                     url: certificateExceptionUrl + addStudents,
@@ -163,7 +163,7 @@ define([
             });
         });
 
-        describe('edx.certificates.views.certificate_allowlist.CertificateAllowlistView', function() {
+        describe('edx.certificates.views.certificate_whitelist.CertificateWhiteListView', function() {
             var view = null,
                 certificateExceptionUrl = 'test/url/';
 
@@ -191,11 +191,11 @@ define([
             beforeEach(function() {
                 var fixture;
                 setFixtures();
-                fixture = readFixtures('templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore');
-                setFixtures("<script type='text/template' id='certificate-allowlist-tpl'>" + fixture + '</script>' +
-                    "<div class='allowlisted-students' id='allowlisted-students'></div>");
+                fixture = readFixtures('templates/instructor/instructor_dashboard_2/certificate-white-list.underscore');
+                setFixtures("<script type='text/template' id='certificate-white-list-tpl'>" + fixture + '</script>' +
+                    "<div class='white-listed-students' id='white-listed-students'></div>");
 
-                this.certificate_allowlist = new CertificateAllowlistCollection(certificatesExceptionsJson, {
+                this.certificate_white_list = new CertificateWhiteListCollection(certificatesExceptionsJson, {
                     parse: true,
                     canBeEmpty: true,
                     url: certificateExceptionUrl,
@@ -203,8 +203,8 @@ define([
 
                 });
 
-                view = new CertificateAllowlistView({
-                    collection: this.certificate_allowlist,
+                view = new CertificateWhiteListView({
+                    collection: this.certificate_white_list,
                     active_certificate: true
                 });
                 view.render();
@@ -220,8 +220,8 @@ define([
                 expect(view.$el.find('#generate-exception-certificates').first()).not.toHaveAttr('disabled');
 
                 // Render the view with active_certificate set to false.
-                view = new CertificateAllowlistView({
-                    collection: this.certificate_allowlist,
+                view = new CertificateWhiteListView({
+                    collection: this.certificate_white_list,
                     active_certificate: false
                 });
                 view.render();
@@ -288,7 +288,7 @@ define([
             });
         });
 
-        describe('edx.certificates.views.certificate_allowlist_editor.CertificateAllowlistEditorView', function() {
+        describe('edx.certificates.views.certificate_whitelist_editor.CertificateWhiteListEditorView', function() {
             var view = null,
                 listView = null,
                 certificateExceptionUrl = 'test/url/';
@@ -317,40 +317,40 @@ define([
             ];
 
             beforeEach(function() {
-                var fixture, fixture2, certificateAllowlist;
+                var fixture, fixture2, certificateWhiteList;
                 setFixtures();
 
                 fixture = readFixtures(
-                    'templates/instructor/instructor_dashboard_2/certificate-allowlist-editor.underscore'
+                    'templates/instructor/instructor_dashboard_2/certificate-white-list-editor.underscore'
                 );
 
                 fixture2 = readFixtures(
-                    'templates/instructor/instructor_dashboard_2/certificate-allowlist.underscore'
+                    'templates/instructor/instructor_dashboard_2/certificate-white-list.underscore'
                 );
 
                 setFixtures(
-                    "<script type='text/template' id='certificate-allowlist-editor-tpl'>" + fixture + '</script>' +
-                    "<script type='text/template' id='certificate-allowlist-tpl'>" + fixture2 + '</script>' +
-                    "<div id='certificate-allowlist-editor'></div>" +
-                    "<div class='allowlisted-students' id='allowlisted-students'></div>"
+                    "<script type='text/template' id='certificate-white-list-editor-tpl'>" + fixture + '</script>' +
+                    "<script type='text/template' id='certificate-white-list-tpl'>" + fixture2 + '</script>' +
+                    "<div id='certificate-white-list-editor'></div>" +
+                    "<div class='white-listed-students' id='white-listed-students'></div>"
                 );
 
-                certificateAllowlist = new CertificateAllowlistCollection(certificatesExceptionsJson, {
+                certificateWhiteList = new CertificateWhiteListCollection(certificatesExceptionsJson, {
                     parse: true,
                     canBeEmpty: true,
                     url: certificateExceptionUrl,
                     generate_certificates_url: certificateExceptionUrl
                 });
 
-                view = new CertificateAllowlistEditorView({
-                    collection: certificateAllowlist,
+                view = new CertificateWhiteListEditorView({
+                    collection: certificateWhiteList,
                     url: certificateExceptionUrl
                 });
                 view.render();
 
-                listView = new CertificateAllowlistView({
-                    collection: certificateAllowlist,
-                    certificateAllowlistEditorView: view
+                listView = new CertificateWhiteListView({
+                    collection: certificateWhiteList,
+                    certificateWhiteListEditorView: view
                 });
                 listView.render();
             });
@@ -414,7 +414,7 @@ define([
 
             it('verifies certificate exception can be deleted by clicking "delete" ', function() {
                 var username = 'test1',
-                    certificateExceptionSelector = "div.allowlisted-students table tr:contains('" + username + "')",
+                    certificateExceptionSelector = "div.white-listed-students table tr:contains('" + username + "')",
                     deleteBtnSelector =
                         certificateExceptionSelector + ' td .delete-exception',
                     requests = AjaxHelpers.requests(this);

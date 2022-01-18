@@ -5,17 +5,17 @@ perform some LMS-specific tab display gymnastics for the Entrance Exams feature
 
 
 from django.conf import settings
-from django.utils.translation import gettext as _
-from django.utils.translation import gettext_noop
+from django.utils.translation import ugettext as _
+from django.utils.translation import ugettext_noop
 
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.entrance_exams import user_can_skip_entrance_exam
-from lms.djangoapps.course_home_api.toggles import course_home_legacy_is_active, course_home_mfe_progress_tab_is_active
+from lms.djangoapps.course_home_api.toggles import course_home_mfe_dates_tab_is_active, course_home_mfe_outline_tab_is_active, course_home_mfe_progress_tab_is_active  # lint-amnesty, pylint: disable=line-too-long
 from openedx.core.lib.course_tabs import CourseTabPluginManager
 from openedx.features.course_experience import DISABLE_UNIFIED_COURSE_TAB_FLAG, default_course_url_name
 from openedx.features.course_experience.url_helpers import get_learning_mfe_home_url
 from common.djangoapps.student.models import CourseEnrollment
-from xmodule.tabs import CourseTab, CourseTabList, course_reverse_func_from_name_func, key_checker  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.tabs import CourseTab, CourseTabList, course_reverse_func_from_name_func, key_checker
 
 
 class EnrolledTab(CourseTab):
@@ -33,8 +33,8 @@ class CoursewareTab(EnrolledTab):
     The main courseware view.
     """
     type = 'courseware'
-    title = gettext_noop('Course')
-    priority = 11
+    title = ugettext_noop('Course')
+    priority = 10
     view_name = 'courseware'
     is_movable = False
     is_default = False
@@ -42,12 +42,12 @@ class CoursewareTab(EnrolledTab):
 
     def __init__(self, tab_dict):
         def link_func(course, reverse_func):
-            if course_home_legacy_is_active(course.id):
+            if course_home_mfe_outline_tab_is_active(course.id):
+                return get_learning_mfe_home_url(course_key=course.id, view_name='home')
+            else:
                 reverse_name_func = lambda course: default_course_url_name(course.id)
                 url_func = course_reverse_func_from_name_func(reverse_name_func)
                 return url_func(course, reverse_func)
-            else:
-                return get_learning_mfe_home_url(course_key=course.id, url_fragment='home')
 
         tab_dict['link_func'] = link_func
         super().__init__(tab_dict)
@@ -68,8 +68,8 @@ class CourseInfoTab(CourseTab):
     The course info view.
     """
     type = 'course_info'
-    title = gettext_noop('Home')
-    priority = 10
+    title = ugettext_noop('Home')
+    priority = 20
     view_name = 'info'
     tab_id = 'info'
     is_movable = False
@@ -85,8 +85,8 @@ class SyllabusTab(EnrolledTab):
     A tab for the course syllabus.
     """
     type = 'syllabus'
-    title = gettext_noop('Syllabus')
-    priority = 80
+    title = ugettext_noop('Syllabus')
+    priority = 30
     view_name = 'syllabus'
     allow_multiple = True
     is_default = False
@@ -103,8 +103,8 @@ class ProgressTab(EnrolledTab):
     The course progress view.
     """
     type = 'progress'
-    title = gettext_noop('Progress')
-    priority = 20
+    title = ugettext_noop('Progress')
+    priority = 40
     view_name = 'progress'
     is_hideable = True
     is_default = False
@@ -112,12 +112,12 @@ class ProgressTab(EnrolledTab):
     def __init__(self, tab_dict):
         def link_func(course, reverse_func):
             if course_home_mfe_progress_tab_is_active(course.id):
-                return get_learning_mfe_home_url(course_key=course.id, url_fragment=self.view_name)
+                return get_learning_mfe_home_url(course_key=course.id, view_name=self.view_name)
             else:
                 return reverse_func(self.view_name, args=[str(course.id)])
 
         tab_dict['link_func'] = link_func
-        super().__init__(tab_dict)  # pylint: disable=super-with-arguments
+        super(ProgressTab, self).__init__(tab_dict)  # pylint: disable=super-with-arguments
 
     @classmethod
     def is_enabled(cls, course, user=None):
@@ -131,7 +131,7 @@ class TextbookTabsBase(CourseTab):
     Abstract class for textbook collection tabs classes.
     """
     # Translators: 'Textbooks' refers to the tab in the course that leads to the course' textbooks
-    title = gettext_noop("Textbooks")
+    title = ugettext_noop("Textbooks")
     is_collection = True
     is_default = False
 
@@ -153,7 +153,7 @@ class TextbookTabs(TextbookTabsBase):
     A tab representing the collection of all textbook tabs.
     """
     type = 'textbooks'
-    priority = 200
+    priority = None
     view_name = 'book'
 
     @classmethod
@@ -177,7 +177,7 @@ class PDFTextbookTabs(TextbookTabsBase):
     A tab representing the collection of all PDF textbook tabs.
     """
     type = 'pdf_textbooks'
-    priority = 201
+    priority = None
     view_name = 'pdf_book'
 
     @classmethod
@@ -196,7 +196,7 @@ class HtmlTextbookTabs(TextbookTabsBase):
     A tab representing the collection of all Html textbook tabs.
     """
     type = 'html_textbooks'
-    priority = 202
+    priority = None
     view_name = 'html_book'
 
     @classmethod
@@ -263,7 +263,7 @@ class ExternalDiscussionCourseTab(LinkTab):
 
     type = 'external_discussion'
     # Translators: 'Discussion' refers to the tab in the courseware that leads to the discussion forums
-    title = gettext_noop('Discussion')
+    title = ugettext_noop('Discussion')
     priority = None
     is_default = False
 
@@ -285,7 +285,7 @@ class ExternalLinkCourseTab(LinkTab):
     A course tab containing an external link.
     """
     type = 'external_link'
-    priority = 110
+    priority = None
     is_default = False    # An external link tab is not added to a course by default
     allow_multiple = True
 
@@ -311,7 +311,7 @@ class SingleTextbookTab(CourseTab):
             """ Constructs a link for textbooks from a view name, a course, and an index. """
             return reverse_func(view_name, args=[str(course.id), index])
 
-        tab_dict = {}
+        tab_dict = dict()
         tab_dict['name'] = name
         tab_dict['tab_id'] = tab_id
         tab_dict['link_func'] = link_func
@@ -326,18 +326,18 @@ class DatesTab(EnrolledTab):
     A tab representing the relevant dates for a course.
     """
     type = "dates"
-    # We don't have the user in this context, so we don't want to translate it at this level.
-    title = gettext_noop("Dates")
-    priority = 30
+    title = ugettext_noop(
+        "Dates")  # We don't have the user in this context, so we don't want to translate it at this level.
+    priority = 50
     view_name = "dates"
     is_dynamic = True
 
     def __init__(self, tab_dict):
         def link_func(course, reverse_func):
-            if course_home_legacy_is_active(course.id):
-                return reverse_func(self.view_name, args=[str(course.id)])
+            if course_home_mfe_dates_tab_is_active(course.id):
+                return get_learning_mfe_home_url(course_key=course.id, view_name=self.view_name)
             else:
-                return get_learning_mfe_home_url(course_key=course.id, url_fragment=self.view_name)
+                return reverse_func(self.view_name, args=[str(course.id)])
 
         tab_dict['link_func'] = link_func
         super().__init__(tab_dict)
@@ -393,10 +393,10 @@ def _get_dynamic_tabs(course, user):
     Note: dynamic tabs are those that are not persisted in the course, but are
     instead added dynamically based upon the user's role.
     """
-    dynamic_tabs = []
+    dynamic_tabs = list()
     for tab_type in CourseTabPluginManager.get_tab_types():
         if getattr(tab_type, "is_dynamic", False):
-            tab = tab_type({})
+            tab = tab_type(dict())
             if tab.is_enabled(course, user=user):
                 dynamic_tabs.append(tab)
     dynamic_tabs.sort(key=lambda dynamic_tab: dynamic_tab.name)

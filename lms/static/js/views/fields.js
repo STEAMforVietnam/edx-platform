@@ -1,5 +1,4 @@
-/* eslint no-underscore-dangle: ["error", { "allow": ["_super"] }] */
-(function(define, undef) {
+(function(define, undefined) {
     'use strict';
     define([
         'gettext', 'jquery', 'underscore', 'backbone',
@@ -26,7 +25,7 @@
             fieldType: 'generic',
 
             className: function() {
-                return 'u-field u-field-' + this.fieldType + ' u-field-' + this.options.valueAttribute;
+                return 'u-field' + ' u-field-' + this.fieldType + ' u-field-' + this.options.valueAttribute;
             },
 
             tagName: 'div',
@@ -101,22 +100,21 @@
                 return HtmlUtils.setHtml(this.$('.u-field-title'), title);
             },
 
-            getMessage: function(messageStatus) {
-                if ((messageStatus + 'Message') in this) {
-                    return this[messageStatus + 'Message'].call(this);
+            getMessage: function(message_status) {
+                if ((message_status + 'Message') in this) {
+                    return this[message_status + 'Message'].call(this);
                 } else if (this.showMessages) {
-                    return HtmlUtils.joinHtml(this.indicators[messageStatus], this.messages[messageStatus]);
+                    return HtmlUtils.joinHtml(this.indicators[message_status], this.messages[message_status]);
                 }
-                return this.indicators[messageStatus];
+                return this.indicators[message_status];
             },
 
             showHelpMessage: function(message) {
-                var msg = message;
                 if (_.isUndefined(message) || _.isNull(message)) {
-                    msg = this.helpMessage;
+                    message = this.helpMessage;
                 }
                 this.$('.u-field-message-notification').html('');
-                HtmlUtils.setHtml(this.$('.u-field-message-help'), msg);
+                HtmlUtils.setHtml(this.$('.u-field-message-help'), message);
             },
 
             getNotificationMessage: function() {
@@ -141,19 +139,19 @@
             },
 
             showSuccessMessage: function() {
-                var context = Date.now(),
-                    successMessage = this.getMessage('success'),
-                    view = this;
-
+                var successMessage = this.getMessage('success');
                 this.showNotificationMessage(successMessage);
 
                 if (this.options.refreshPageOnSave) {
-                    if ('focusNextID' in this.options) {
-                        $.cookie('focus_id', this.options.focusNextID);
+                    if ("focusNextID" in this.options) {
+                        $.cookie('focus_id', this.options.focusNextID );
                     }
                     location.reload(true);
                 }
 
+                var view = this;
+
+                var context = Date.now();
                 this.lastSuccessMessageContext = context;
 
                 setTimeout(function() {
@@ -169,14 +167,11 @@
             },
 
             showErrorMessage: function(xhr) {
-                var errors,
-                    validationErrorMessage,
-                    message;
                 if (xhr.status === 400) {
                     try {
-                        errors = JSON.parse(xhr.responseText);
-                        validationErrorMessage = errors.field_errors[this.options.valueAttribute].user_message;
-                        message = HtmlUtils.joinHtml(this.indicators.validationError, validationErrorMessage);
+                        var errors = JSON.parse(xhr.responseText),
+                            validationErrorMessage = errors.field_errors[this.options.valueAttribute].user_message,
+                            message = HtmlUtils.joinHtml(this.indicators.validationError, validationErrorMessage);
                         this.showNotificationMessage(message);
                     } catch (error) {
                         this.showNotificationMessage(this.getMessage('error'));
@@ -207,19 +202,19 @@
             },
 
             saveAttributes: function(attributes, options) {
-                var view = this;
-                var defaultOptions = {
-                    contentType: 'application/merge-patch+json',
-                    patch: true,
-                    wait: true,
-                    success: function() {
-                        view.saveSucceeded();
-                    },
-                    error: function(model, xhr) {
-                        view.showErrorMessage(xhr);
-                    }
-                };
                 if (this.persistChanges === true) {
+                    var view = this;
+                    var defaultOptions = {
+                        contentType: 'application/merge-patch+json',
+                        patch: true,
+                        wait: true,
+                        success: function() {
+                            view.saveSucceeded();
+                        },
+                        error: function(model, xhr) {
+                            view.showErrorMessage(xhr);
+                        }
+                    };
                     this.showInProgressMessage();
                     this.model.save(attributes, _.extend(defaultOptions, options));
                 }
@@ -388,12 +383,7 @@
 
             updateValueInField: function() {
                 var value = (_.isUndefined(this.modelValue()) || _.isNull(this.modelValue())) ? '' : this.modelValue();
-
-                var fieldHasFocus = (document.activeElement === this.$('.u-field-value input')[0]);
-                var fieldChanged = this.fieldValue() !== value;
-                if (!fieldHasFocus || !fieldChanged) {
-                    this.$('.u-field-value input').val(value);
-                }
+                this.$('.u-field-value input').val(value);
             },
 
             saveValue: function() {
@@ -429,7 +419,7 @@
                     editable: this.editable,
                     title: this.options.title,
                     screenReaderTitle: this.options.screenReaderTitle || this.options.title,
-                    titleVisible: this.options.titleVisible !== undef ? this.options.titleVisible : true,
+                    titleVisible: this.options.titleVisible !== undefined ? this.options.titleVisible : true,
                     iconName: this.options.iconName,
                     showBlankOption: (!this.options.required || !this.modelValueIsSet()),
                     groupOptions: this.createGroupOptions(),
@@ -478,9 +468,8 @@
             },
 
             displayValue: function(value) {
-                var option;
                 if (value) {
-                    option = this.optionForValue(value);
+                    var option = this.optionForValue(value);
                     return (option ? option[1] : '');
                 } else {
                     return '';
@@ -488,19 +477,11 @@
             },
 
             updateValueInField: function() {
-                var value;  // str
-                var fieldHasFocus;  // bool
-                var fieldChanged;  // bool
                 if (this.editable !== 'never') {
-                    value = this.modelValue() || '';
-                    fieldHasFocus = (document.activeElement === this.$('.u-field-value select')[0]);
-                    fieldChanged = this.fieldValue() !== value;
-                    if (!fieldHasFocus || !fieldChanged) {
-                        this.$('.u-field-value select').val(value);
-                    }
+                    this.$('.u-field-value select').val(this.modelValue() || '');
                 }
 
-                value = this.displayValue(this.modelValue() || '');
+                var value = this.displayValue(this.modelValue() || '');
                 if (this.modelValueIsSet() === false) {
                     value = this.options.placeholderValue || '';
                 }
@@ -632,21 +613,24 @@
                             'aria-live': 'assertive',
                             'aria-atomic': true
                         });
-                    } else if (remainingCharCount < 60) {
+                    }
+                    else if (remainingCharCount < 60) {
                         $charCount.attr('aria-atomic', 'false');
-                    } else if (remainingCharCount < 70) {
+                    }
+                    else if (remainingCharCount < 70) {
                         $charCount.attr({
                             'aria-live': 'polite',
                             'aria-atomic': true
                         });
                     }
                     $charCount.text(curCharCount);
+
                 }
             },
 
             adjustTextareaHeight: function() {
-                var textarea = this.$('textarea');
                 if (this.persistChanges === false) { return; }
+                var textarea = this.$('textarea');
                 textarea.css('height', 'auto').css('height', textarea.prop('scrollHeight') + 10);
             },
 

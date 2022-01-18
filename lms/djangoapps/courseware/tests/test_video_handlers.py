@@ -17,19 +17,19 @@ from webob import Request, Response
 
 from common.test.utils import normalize_repr
 from openedx.core.djangoapps.contentserver.caching import del_cached_content
-from xmodule.contentstore.content import StaticContent  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.contentstore.django import contentstore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.exceptions import NotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.video_module import VideoBlock  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.video_module.transcripts_utils import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.contentstore.content import StaticContent
+from xmodule.contentstore.django import contentstore
+from xmodule.exceptions import NotFoundError
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.video_module import VideoBlock
+from xmodule.video_module.transcripts_utils import (
     Transcript,
     edxval_api,
     get_transcript,
     subs_filename,
 )
-from xmodule.x_module import STUDENT_VIEW  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.x_module import STUDENT_VIEW
 
 from .helpers import BaseTestXmodule
 from .test_video_xml import SOURCE_XML
@@ -49,7 +49,7 @@ def _create_srt_file(content=None):
     """
     content = content or SRT_content
 
-    srt_file = tempfile.NamedTemporaryFile(suffix=".srt")  # lint-amnesty, pylint: disable=consider-using-with
+    srt_file = tempfile.NamedTemporaryFile(suffix=".srt")
     srt_file.content_type = 'application/x-subrip; charset=utf-8'
     srt_file.write(content.encode('utf-8'))
     srt_file.seek(0)
@@ -93,7 +93,7 @@ def _create_file(content=''):
     """
     Create temporary subs_somevalue.srt.sjson file.
     """
-    sjson_file = tempfile.NamedTemporaryFile(prefix="subs_", suffix=".srt.sjson")  # lint-amnesty, pylint: disable=consider-using-with
+    sjson_file = tempfile.NamedTemporaryFile(prefix="subs_", suffix=".srt.sjson")
     sjson_file.content_type = 'application/json'
     sjson_file.write(textwrap.dedent(content).encode('utf-8'))
     sjson_file.seek(0)
@@ -1296,16 +1296,15 @@ class TestGetTranscript(TestVideo):  # lint-amnesty, pylint: disable=test-inheri
         assert filename == 'zh_塞.srt'
         assert mime_type == 'application/x-subrip; charset=utf-8'
 
-    def test_value_error_handled(self):
+    def test_value_error(self):
         good_sjson = _create_file(content='bad content')
 
         _upload_sjson_file(good_sjson, self.item.location)
         self.item.sub = _get_subs_id(good_sjson.name)
 
         transcripts = self.item.get_transcripts_info()  # lint-amnesty, pylint: disable=unused-variable
-        error_transcript = {"start": [], "end": [], "text": ["An error occured obtaining the transcript."]}
-        content, _, _ = get_transcript(self.item)
-        assert error_transcript["text"][0] in content
+        with pytest.raises(ValueError):
+            get_transcript(self.item)
 
     def test_key_error(self):
         good_sjson = _create_file(content="""

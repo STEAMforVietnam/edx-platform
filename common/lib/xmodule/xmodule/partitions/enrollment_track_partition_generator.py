@@ -5,7 +5,7 @@ openedx.dynamic_partition plugin.
 import logging
 
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ugettext_lazy as _
 
 from xmodule.partitions.partitions import (
     get_partition_from_id,
@@ -19,9 +19,9 @@ log = logging.getLogger(__name__)
 FEATURES = getattr(settings, 'FEATURES', {})
 
 
-def create_enrollment_track_partition_with_course_id(course_id):
+def create_enrollment_track_partition(course):
     """
-    Create and return the dynamic enrollment track user partition based only on course_id.
+    Create and return the dynamic enrollment track user partition.
     If it cannot be created, None is returned.
     """
     if not FEATURES.get('ENABLE_ENROLLMENT_TRACK_USER_PARTITION'):
@@ -32,21 +32,6 @@ def create_enrollment_track_partition_with_course_id(course_id):
     except UserPartitionError:
         log.warning("No 'enrollment_track' scheme registered, EnrollmentTrackUserPartition will not be created.")
         return None
-
-    partition = enrollment_track_scheme.create_user_partition(
-        id=ENROLLMENT_TRACK_PARTITION_ID,
-        name=_("Enrollment Track Groups"),
-        description=_("Partition for segmenting users by enrollment track"),
-        parameters={"course_id": str(course_id)}
-    )
-    return partition
-
-
-def create_enrollment_track_partition(course):
-    """
-    Create and return the dynamic enrollment track user partition.
-    If it cannot be created, None is returned.
-    """
 
     used_ids = {p.id for p in course.user_partitions}
     if ENROLLMENT_TRACK_PARTITION_ID in used_ids:
@@ -59,4 +44,10 @@ def create_enrollment_track_partition(course):
         )
         return None
 
-    return create_enrollment_track_partition_with_course_id(course.id)
+    partition = enrollment_track_scheme.create_user_partition(
+        id=ENROLLMENT_TRACK_PARTITION_ID,
+        name=_("Enrollment Track Groups"),
+        description=_("Partition for segmenting users by enrollment track"),
+        parameters={"course_id": str(course.id)}
+    )
+    return partition

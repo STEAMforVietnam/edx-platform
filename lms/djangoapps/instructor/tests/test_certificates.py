@@ -4,10 +4,12 @@
 import contextlib
 import io
 import json
+from datetime import datetime, timedelta
 from unittest import mock
 
 import ddt
 import pytest
+import pytz
 from config_models.models import cache
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -15,24 +17,28 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.utils import override_settings
 from django.urls import reverse
 
+from capa.xqueue_interface import XQueueInterface
+from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.student.models import CourseEnrollment
-from common.djangoapps.student.tests.factories import GlobalStaffFactory
-from common.djangoapps.student.tests.factories import InstructorFactory
-from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.certificates import api as certs_api
-from lms.djangoapps.certificates.data import CertificateStatuses
 from lms.djangoapps.certificates.models import (
     CertificateGenerationConfiguration,
     CertificateInvalidation,
+    CertificateStatuses,
+    CertificateWhitelist,
     GeneratedCertificate
 )
 from lms.djangoapps.certificates.tests.factories import (
-    CertificateAllowlistFactory,
     CertificateInvalidationFactory,
+    CertificateWhitelistFactory,
     GeneratedCertificateFactory
 )
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from lms.djangoapps.courseware.tests.factories import GlobalStaffFactory, InstructorFactory, UserFactory
+from lms.djangoapps.grades.tests.utils import mock_passing_grade
+from lms.djangoapps.verify_student.services import IDVerificationService
+from lms.djangoapps.verify_student.tests.factories import SoftwareSecurePhotoVerificationFactory
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 @ddt.ddt
@@ -40,7 +46,7 @@ class CertificatesInstructorDashTest(SharedModuleStoreTestCase):
     """Tests for the certificate panel of the instructor dash. """
 
     ERROR_REASON = "An error occurred!"
-    DOWNLOAD_URL = "https://www.example.com/abcd123/cert.pdf"
+    DOWNLOAD_URL = "http://www.example.com/abcd123/cert.pdf"
 
     @classmethod
     def setUpClass(cls):
@@ -228,7 +234,7 @@ class CertificatesInstructorApiTest(SharedModuleStoreTestCase):
         cache.clear()
         CertificateGenerationConfiguration.objects.create(enabled=True)
 
-    @ddt.data('enable_certificate_generation')
+    @ddt.data('generate_example_certificates', 'enable_certificate_generation')
     def test_allow_only_global_staff(self, url_name):
         url = reverse(url_name, kwargs={'course_id': self.course.id})
 
@@ -241,6 +247,23 @@ class CertificatesInstructorApiTest(SharedModuleStoreTestCase):
         self.client.login(username=self.global_staff.username, password='test')
         response = self.client.post(url)
         assert response.status_code == 302
+
+    def test_generate_example_certificates(self):
+        self.client.login(username=self.global_staff.username, password='test')
+        url = reverse(
+            'generate_example_certificates',
+            kwargs={'course_id': str(self.course.id)}
+        )
+        response = self.client.post(url)
+
+        # Expect a redirect back to the instructor dashboard
+        self._assert_redirects_to_instructor_dash(response)
+
+        # Expect that certificate generation started
+        # Cert generation will fail here because XQueue isn't configured,
+        # but the status should at least not be None.
+        status = certs_api.example_certificates_status(self.course.id)
+        assert status is not None
 
     @ddt.data(True, False)
     def test_enable_certificate_generation(self, is_enabled):
@@ -256,7 +279,7 @@ class CertificatesInstructorApiTest(SharedModuleStoreTestCase):
         self._assert_redirects_to_instructor_dash(response)
 
         # Expect that certificate generation is now enabled for the course
-        actual_enabled = certs_api.has_self_generated_certificates_enabled(self.course.id)
+        actual_enabled = certs_api.cert_generation_enabled(self.course.id)
         assert is_enabled == actual_enabled
 
     def _assert_redirects_to_instructor_dash(self, response):
@@ -335,6 +358,81 @@ class CertificatesInstructorApiTest(SharedModuleStoreTestCase):
                'Certificate regeneration task has been started.' \
                ' You can view the status of the generation task in the "Pending Tasks" section.'
 
+    @override_settings(AUDIT_CERT_CUTOFF_DATE=datetime.now(pytz.UTC) - timedelta(days=1))
+    @ddt.data(
+        (CertificateStatuses.generating, 'ID Verified', 'approved'),
+        (CertificateStatuses.unverified, 'Not ID Verified', 'denied'),
+    )
+    @ddt.unpack
+    def test_verified_users_with_audit_certs(self, expected_cert_status, verification_output, id_verification_status):
+        """
+        Test certificate regeneration for verified users with audit certificates.
+
+        Scenario:
+            Enroll user in a course in audit mode,
+            User passed the course and now he has `audit_passing` certificate status,
+            User switched to verified mode and is ID verified,
+            Regenerate certificate for it,
+            Modified certificate status is `generating` if user is ID verified otherwise `unverified`.
+        """
+        # Check that user is enrolled in audit mode.
+        enrollment = CourseEnrollment.get_enrollment(self.user, self.course.id)
+        assert enrollment.mode == CourseMode.AUDIT
+
+        with mock_passing_grade():
+            # Generate certificate for user and check that user has a audit passing certificate.
+            cert_status = certs_api.generate_user_certificates(
+                student=self.user,
+                course_key=self.course.id,
+                course=self.course,
+            )
+
+            # Check that certificate status is 'audit_passing'.
+            assert cert_status == CertificateStatuses.audit_passing
+
+            # Update user enrollment mode to verified mode.
+            enrollment.update_enrollment(mode=CourseMode.VERIFIED)
+            assert enrollment.mode == CourseMode.VERIFIED
+
+            # Create and assert user's ID verification record.
+            SoftwareSecurePhotoVerificationFactory.create(user=self.user, status=id_verification_status)
+            actual_verification_status = IDVerificationService.verification_status_for_user(
+                self.user,
+                enrollment.mode
+            )
+            assert actual_verification_status == verification_output
+
+            # Login the client and access the url with 'audit_passing' status.
+            self.client.login(username=self.global_staff.username, password='test')
+            url = reverse(
+                'start_certificate_regeneration',
+                kwargs={'course_id': str(self.course.id)}
+            )
+
+            with mock.patch.object(XQueueInterface, 'send_to_queue') as mock_send:
+                mock_send.return_value = (0, None)
+                response = self.client.post(
+                    url,
+                    {'certificate_statuses': [CertificateStatuses.audit_passing]}
+                )
+
+                # Assert 200 status code in response
+                assert response.status_code == 200
+                res_json = json.loads(response.content.decode('utf-8'))
+
+                # Assert request is successful
+                assert res_json['success']
+
+                # Assert success message
+                assert res_json['message'] ==\
+                       'Certificate regeneration task has been started.' \
+                       ' You can view the status of the generation task in the "Pending Tasks" section.'
+
+            # Now, check whether user has audit certificate.
+            cert = certs_api.get_certificate_for_user(self.user.username, self.course.id)
+            assert cert['status'] != CertificateStatuses.audit_passing
+            assert cert['status'] == expected_cert_status
+
     def test_certificate_regeneration_error(self):
         """
         Test certificate regeneration errors out when accessed with either empty list of 'certificate_statuses' or
@@ -395,7 +493,7 @@ class CertificateExceptionViewInstructorApiTest(SharedModuleStoreTestCase):
         CourseEnrollment.enroll(self.user2, self.course.id)
         self.url = reverse('certificate_exception_view', kwargs={'course_id': str(self.course.id)})
 
-        certificate_allowlist_item = CertificateAllowlistFactory.create(
+        certificate_white_list_item = CertificateWhitelistFactory.create(
             user=self.user2,
             course_id=self.course.id,
         )
@@ -409,11 +507,11 @@ class CertificateExceptionViewInstructorApiTest(SharedModuleStoreTestCase):
         )
 
         self.certificate_exception_in_db = dict(
-            id=certificate_allowlist_item.id,
-            user_name=certificate_allowlist_item.user.username,
-            notes=certificate_allowlist_item.notes,
-            user_email=certificate_allowlist_item.user.email,
-            user_id=certificate_allowlist_item.user.id,
+            id=certificate_white_list_item.id,
+            user_name=certificate_white_list_item.user.username,
+            notes=certificate_white_list_item.notes,
+            user_email=certificate_white_list_item.user.email,
+            user_id=certificate_white_list_item.user.id,
         )
 
         # Enable certificate generation
@@ -489,8 +587,8 @@ class CertificateExceptionViewInstructorApiTest(SharedModuleStoreTestCase):
 
     def test_certificate_exception_duplicate_user_error(self):
         """
-        Ensure the certificates exception endpoint returns failure when called with
-        username/email that already exists on the certificate allowlist.
+        Test certificates exception addition api endpoint returns failure when called with
+        username/email that already exists in 'CertificateWhitelist' table.
         """
         response = self.client.post(
             self.url,
@@ -584,9 +682,6 @@ class CertificateExceptionViewInstructorApiTest(SharedModuleStoreTestCase):
             status=CertificateStatuses.downloadable,
             grade='1.0'
         )
-        # Verify that certificate exception exists
-        assert certs_api.is_on_allowlist(self.user2, self.course.id)
-
         response = self.client.post(
             self.url,
             data=json.dumps(self.certificate_exception_in_db),
@@ -596,8 +691,12 @@ class CertificateExceptionViewInstructorApiTest(SharedModuleStoreTestCase):
         # Assert successful request processing
         assert response.status_code == 204
 
-        # Verify that certificate exception does not exist
-        assert not certs_api.is_on_allowlist(self.user2, self.course.id)
+        # Verify that certificate exception successfully removed from CertificateWhitelist and GeneratedCertificate
+        with pytest.raises(ObjectDoesNotExist):
+            CertificateWhitelist.objects.get(user=self.user2, course_id=self.course.id)
+            GeneratedCertificate.eligible_certificates.get(
+                user=self.user2, course_id=self.course.id, status__not=CertificateStatuses.unavailable
+            )
 
     def test_remove_certificate_exception_invalid_request_error(self):
         """
@@ -696,7 +795,7 @@ class GenerateCertificatesInstructorApiTest(SharedModuleStoreTestCase):
         self.instructor = InstructorFactory(course_key=self.course.id)
         self.user = UserFactory()
         CourseEnrollment.enroll(self.user, self.course.id)
-        certificate_exception = CertificateAllowlistFactory.create(
+        certificate_exception = CertificateWhitelistFactory.create(
             user=self.user,
             course_id=self.course.id,
         )
@@ -736,9 +835,9 @@ class GenerateCertificatesInstructorApiTest(SharedModuleStoreTestCase):
         # Assert Request is successful
         assert res_json['success']
         # Assert Message
-        assert res_json['message'] == 'Certificate generation started for students on the allowlist.'
+        assert res_json['message'] == 'Certificate generation started for white listed students.'
 
-    def test_generate_certificate_exceptions_allowlist_not_generated(self):
+    def test_generate_certificate_exceptions_whitelist_not_generated(self):
         """
         Test generate certificates exceptions api endpoint returns success
         when calling with new certificate exception.
@@ -761,7 +860,7 @@ class GenerateCertificatesInstructorApiTest(SharedModuleStoreTestCase):
         # Assert Request is successful
         assert res_json['success']
         # Assert Message
-        assert res_json['message'] == 'Certificate generation started for students on the allowlist.'
+        assert res_json['message'] == 'Certificate generation started for white listed students.'
 
     def test_generate_certificate_exceptions_generate_for_incorrect_value(self):
         """
@@ -790,9 +889,9 @@ class GenerateCertificatesInstructorApiTest(SharedModuleStoreTestCase):
 
 
 @ddt.ddt
-class TestCertificatesInstructorApiBulkAllowlist(SharedModuleStoreTestCase):
+class TestCertificatesInstructorApiBulkWhiteListExceptions(SharedModuleStoreTestCase):
     """
-    Test bulk certificates allowlist uploads from csv file
+    Test Bulk certificates white list exceptions from csv file
     """
     @classmethod
     def setUpClass(cls):
@@ -804,25 +903,22 @@ class TestCertificatesInstructorApiBulkAllowlist(SharedModuleStoreTestCase):
     def setUp(self):
         super().setUp()
         self.global_staff = GlobalStaffFactory()
-        self.enrolled_user_1_email = 'test_student1@example.com'
         self.enrolled_user_1 = UserFactory(
             username='TestStudent1',
-            email=self.enrolled_user_1_email,
+            email='test_student1@example.com',
             first_name='Enrolled',
             last_name='Student'
         )
-        self.enrolled_user_2_email = 'test_student2@example.com'
         self.enrolled_user_2 = UserFactory(
             username='TestStudent2',
-            email=self.enrolled_user_2_email,
+            email='test_student2@example.com',
             first_name='Enrolled',
             last_name='Student'
         )
 
-        self.not_enrolled_user_email = 'nonenrolled@test.com'
         self.not_enrolled_student = UserFactory(
             username='NotEnrolledStudent',
-            email=self.not_enrolled_user_email,
+            email='nonenrolled@test.com',
             first_name='NotEnrolled',
             last_name='Student'
         )
@@ -832,25 +928,20 @@ class TestCertificatesInstructorApiBulkAllowlist(SharedModuleStoreTestCase):
         # Global staff can see the certificates section
         self.client.login(username=self.global_staff.username, password="test")
 
-    def test_create_allowlist_exception_record(self):
+    def test_create_white_list_exception_record(self):
         """
-        Happy path test to create a single new allowlisted record
+        Happy path test to create a single new white listed record
         """
-        assert not certs_api.is_on_allowlist(self.enrolled_user_1, self.course.id)
-        assert not certs_api.is_on_allowlist(self.enrolled_user_2, self.course.id)
-
         csv_content = b"test_student1@example.com,dummy_notes\n" \
                       b"test_student2@example.com,dummy_notes"
         data = self.upload_file(csv_content=csv_content)
         assert len(data['general_errors']) == 0
         assert len(data['row_errors']['data_format_error']) == 0
         assert len(data['row_errors']['user_not_exist']) == 0
-        assert len(data['row_errors']['user_already_allowlisted']) == 0
+        assert len(data['row_errors']['user_already_white_listed']) == 0
         assert len(data['row_errors']['user_not_enrolled']) == 0
         assert len(data['success']) == 2
-
-        assert certs_api.is_on_allowlist(self.enrolled_user_1, self.course.id)
-        assert certs_api.is_on_allowlist(self.enrolled_user_2, self.course.id)
+        assert len(CertificateWhitelist.objects.all()) == 2
 
     def test_invalid_data_format_in_csv(self):
         """
@@ -863,9 +954,7 @@ class TestCertificatesInstructorApiBulkAllowlist(SharedModuleStoreTestCase):
         assert len(data['row_errors']['data_format_error']) == 2
         assert len(data['general_errors']) == 0
         assert len(data['success']) == 0
-
-        assert not certs_api.is_on_allowlist(self.enrolled_user_1, self.course.id)
-        assert not certs_api.is_on_allowlist(self.enrolled_user_2, self.course.id)
+        assert len(CertificateWhitelist.objects.all()) == 0
 
     def test_file_upload_type_not_csv(self):
         """
@@ -899,6 +988,7 @@ class TestCertificatesInstructorApiBulkAllowlist(SharedModuleStoreTestCase):
         data = self.upload_file(csv_content=csv_content)
         assert len(data['row_errors']['user_not_exist']) == 1
         assert len(data['success']) == 0
+        assert len(CertificateWhitelist.objects.all()) == 0
 
     def test_csv_user_not_enrolled(self):
         """
@@ -909,20 +999,24 @@ class TestCertificatesInstructorApiBulkAllowlist(SharedModuleStoreTestCase):
         data = self.upload_file(csv_content=csv_content)
         assert len(data['row_errors']['user_not_enrolled']) == 1
         assert len(data['general_errors']) == 0
-
-        assert not certs_api.is_on_allowlist(self.not_enrolled_student, self.course.id)
+        assert len(data['success']) == 0
 
     def test_certificate_exception_already_exist(self):
         """
         Test error if existing user is already in certificates exception list.
         """
-        CertificateAllowlistFactory.create(user=self.enrolled_user_1, course_id=self.course.id)
-
+        CertificateWhitelist.objects.create(
+            user=self.enrolled_user_1,
+            course_id=self.course.id,
+            whitelist=True,
+            notes=''
+        )
         csv_content = b"test_student1@example.com,dummy_notes"
         data = self.upload_file(csv_content=csv_content)
-        assert len(data['row_errors']['user_already_allowlisted']) == 1
+        assert len(data['row_errors']['user_already_white_listed']) == 1
         assert len(data['general_errors']) == 0
         assert len(data['success']) == 0
+        assert len(CertificateWhitelist.objects.all()) == 1
 
     def test_csv_file_not_attached(self):
         """
@@ -1122,7 +1216,7 @@ class CertificateInvalidationViewTests(SharedModuleStoreTestCase):
         res_json = json.loads(response.content.decode('utf-8'))
 
         # Assert Error Message
-        assert res_json['message'] == f'The student {self.enrolled_user_2.username} does not have certificate for the course {self.course.number}. Kindly verify student username/email and the selected course are correct and try again.'  # pylint: disable=line-too-long
+        assert res_json['message'] == 'The student {student} does not have certificate for the course {course}. Kindly verify student username/email and the selected course are correct and try again.'.format(student=self.enrolled_user_2.username, course=self.course.number)  # pylint: disable=line-too-long
 
     def test_certificate_already_invalid_error(self):
         """
@@ -1142,7 +1236,7 @@ class CertificateInvalidationViewTests(SharedModuleStoreTestCase):
         res_json = json.loads(response.content.decode('utf-8'))
 
         # Assert Error Message
-        assert res_json['message'] == f'Certificate for student {self.enrolled_user_1.username} is already invalid, kindly verify that certificate was generated for this student and then proceed.'  # pylint: disable=line-too-long
+        assert res_json['message'] == 'Certificate for student {user} is already invalid, kindly verify that certificate was generated for this student and then proceed.'.format(user=self.enrolled_user_1.username)  # pylint: disable=line-too-long
 
     def test_duplicate_certificate_invalidation_error(self):
         """
@@ -1166,7 +1260,7 @@ class CertificateInvalidationViewTests(SharedModuleStoreTestCase):
         res_json = json.loads(response.content.decode('utf-8'))
 
         # Assert Error Message
-        assert res_json['message'] == f'Certificate of {self.enrolled_user_1.username} has already been invalidated. Please check your spelling and retry.'  # pylint: disable=line-too-long
+        assert res_json['message'] == 'Certificate of {user} has already been invalidated. Please check your spelling and retry.'.format(user=self.enrolled_user_1.username)  # pylint: disable=line-too-long
 
     def test_remove_certificate_invalidation(self):
         """
@@ -1225,7 +1319,7 @@ class CertificateInvalidationViewTests(SharedModuleStoreTestCase):
         invalidation lists.
         """
         # add test learner to the allowlist
-        CertificateAllowlistFactory.create(user=self.enrolled_user_1, course_id=self.course.id)
+        CertificateWhitelistFactory.create(user=self.enrolled_user_1, course_id=self.course.id)
 
         # now try and add them to the invalidation list, expect an error
         response = self.client.post(

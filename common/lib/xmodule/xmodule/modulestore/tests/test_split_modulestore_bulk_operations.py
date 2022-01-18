@@ -12,7 +12,7 @@ import ddt
 from bson.objectid import ObjectId
 from opaque_keys.edx.locator import CourseLocator
 
-from xmodule.modulestore.split_mongo.mongo_connection import MongoPersistenceBackend
+from xmodule.modulestore.split_mongo.mongo_connection import MongoConnection
 from xmodule.modulestore.split_mongo.split import SplitBulkWriteMixin
 
 VERSION_GUID_DICT = {
@@ -30,7 +30,7 @@ class TestBulkWriteMixin(unittest.TestCase):  # lint-amnesty, pylint: disable=mi
         self.bulk = SplitBulkWriteMixin()
         self.bulk.SCHEMA_VERSION = 1
         self.clear_cache = self.bulk._clear_cache = Mock(name='_clear_cache')
-        self.conn = self.bulk.db_connection = MagicMock(name='db_connection', spec=MongoPersistenceBackend)
+        self.conn = self.bulk.db_connection = MagicMock(name='db_connection', spec=MongoConnection)
         self.conn.get_course_index.return_value = {'initial': 'index'}
 
         self.course_key = CourseLocator('org', 'course', 'run-a', branch='test')
@@ -476,6 +476,107 @@ class TestBulkWriteMixinFindMethods(TestBulkWriteMixin):
         self.bulk.get_definitions(self.course_key, test_ids)
         self.bulk._end_bulk_operation(self.course_key)
         assert not self.conn.insert_definition.called
+
+    def test_no_bulk_find_structures_derived_from(self):
+        ids = [Mock(name='id')]
+        self.conn.find_structures_derived_from.return_value = [MagicMock(name='result')]
+        result = self.bulk.find_structures_derived_from(ids)
+        self.assertConnCalls(call.find_structures_derived_from(ids))
+        assert result == self.conn.find_structures_derived_from.return_value
+        self.assertCacheNotCleared()
+
+    @ddt.data(
+        # Test values are:
+        #   - previous_versions to search for
+        #   - documents in the cache with $previous_version.$_id
+        #   - documents in the db with $previous_version.$_id
+        ([], [], []),
+        (['1', '2', '3'], ['1.a', '1.b', '2.c'], ['1.a', '2.c']),
+        (['1', '2', '3'], ['1.a'], ['1.a', '2.c']),
+        (['1', '2', '3'], [], ['1.a', '2.c']),
+        (['1', '2', '3'], ['4.d'], ['1.a', '2.c']),
+    )
+    @ddt.unpack
+    def test_find_structures_derived_from(self, search_ids, active_ids, db_ids):
+        def db_structure(_id):
+            previous, _, current = _id.partition('.')
+            return {'db': 'structure', 'previous_version': previous, '_id': current}
+
+        def active_structure(_id):
+            previous, _, current = _id.partition('.')
+            return {'active': 'structure', 'previous_version': previous, '_id': current}
+
+        db_structures = [db_structure(_id) for _id in db_ids]
+        active_structures = []
+        for n, _id in enumerate(active_ids):
+            course_key = CourseLocator('org', 'course', f'run{n}')
+            self.bulk._begin_bulk_operation(course_key)
+            structure = active_structure(_id)
+            self.bulk.update_structure(course_key, structure)
+            active_structures.append(structure)
+
+        self.conn.find_structures_derived_from.return_value = db_structures
+        results = self.bulk.find_structures_derived_from(search_ids)
+        self.conn.find_structures_derived_from.assert_called_once_with(search_ids)
+        for structure in active_structures:
+            if structure['previous_version'] in search_ids:
+                assert structure in results
+            else:
+                assert structure not in results
+        for structure in db_structures:
+            if (
+                structure['previous_version'] in search_ids and  # We're searching for this document
+                not any(active.endswith(structure['_id']) for active in active_ids)  # This document doesn't match any active _ids  # lint-amnesty, pylint: disable=line-too-long
+            ):
+                assert structure in results
+            else:
+                assert structure not in results
+
+    def test_no_bulk_find_ancestor_structures(self):
+        original_version = Mock(name='original_version')
+        block_id = Mock(name='block_id')
+        self.conn.find_ancestor_structures.return_value = [MagicMock(name='result')]
+        result = self.bulk.find_ancestor_structures(original_version, block_id)
+        self.assertConnCalls(call.find_ancestor_structures(original_version, block_id))
+        assert result == self.conn.find_ancestor_structures.return_value
+        self.assertCacheNotCleared()
+
+    @ddt.data(
+        # Test values are:
+        #   - original_version
+        #   - block_id
+        #   - matching documents in the cache
+        #   - non-matching documents in the cache
+        #   - expected documents returned from the db
+        #   - unexpected documents returned from the db
+        ('ov', 'bi', [{'original_version': 'ov', 'blocks': {'bi': {'edit_info': {'update_version': 'foo'}}}}], [], [], []),  # lint-amnesty, pylint: disable=line-too-long
+        ('ov', 'bi', [{'original_version': 'ov', 'blocks': {'bi': {'edit_info': {'update_version': 'foo'}}}, '_id': 'foo'}], [], [], [{'_id': 'foo'}]),  # lint-amnesty, pylint: disable=line-too-long
+        ('ov', 'bi', [], [{'blocks': {'bi': {'edit_info': {'update_version': 'foo'}}}}], [], []),
+        ('ov', 'bi', [], [{'original_version': 'ov'}], [], []),
+        ('ov', 'bi', [], [], [{'original_version': 'ov', 'blocks': {'bi': {'edit_info': {'update_version': 'foo'}}}}], []),  # lint-amnesty, pylint: disable=line-too-long
+        (
+            'ov',
+            'bi',
+            [{'original_version': 'ov', 'blocks': {'bi': {'edit_info': {'update_version': 'foo'}}}}],
+            [],
+            [{'original_version': 'ov', 'blocks': {'bi': {'edit_info': {'update_version': 'bar'}}}}],
+            []
+        ),
+    )
+    @ddt.unpack
+    def test_find_ancestor_structures(self, original_version, block_id, active_match, active_unmatch, db_match, db_unmatch):  # lint-amnesty, pylint: disable=line-too-long
+        for structure in active_match + active_unmatch + db_match + db_unmatch:
+            structure.setdefault('_id', ObjectId())
+
+        for n, structure in enumerate(active_match + active_unmatch):
+            course_key = CourseLocator('org', 'course', f'run{n}')
+            self.bulk._begin_bulk_operation(course_key)
+            self.bulk.update_structure(course_key, structure)
+
+        self.conn.find_ancestor_structures.return_value = db_match + db_unmatch
+        results = self.bulk.find_ancestor_structures(original_version, block_id)
+        self.conn.find_ancestor_structures.assert_called_once_with(original_version, block_id)
+        self.assertCountEqual(active_match + db_match, results)
 
 
 @ddt.ddt

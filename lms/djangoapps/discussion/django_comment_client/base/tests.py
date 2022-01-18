@@ -47,6 +47,7 @@ from openedx.core.djangoapps.django_comment_common.models import (
 from openedx.core.djangoapps.django_comment_common.utils import (
     ThreadContext,
     seed_permissions_roles,
+    set_course_discussion_settings
 )
 from openedx.core.djangoapps.waffle_utils.testutils import WAFFLE_TABLES
 from openedx.core.lib.teams_config import TeamsConfig
@@ -241,7 +242,7 @@ class ViewsTestCaseMixin:
             self.password = 'test'
 
             # Create the user and make them active so we can log them in.
-            self.student = UserFactory.create(username=uname, email=email, password=self.password)
+            self.student = User.objects.create_user(uname, email, self.password)
             self.student.is_active = True
             self.student.save()
 
@@ -402,7 +403,7 @@ class ViewsQueryCountTestCase(
 
     @ddt.data(
         (ModuleStoreEnum.Type.mongo, 3, 4, 39),
-        (ModuleStoreEnum.Type.split, 3, 11, 39),
+        (ModuleStoreEnum.Type.split, 3, 13, 39),
     )
     @ddt.unpack
     @count_queries
@@ -411,7 +412,7 @@ class ViewsQueryCountTestCase(
 
     @ddt.data(
         (ModuleStoreEnum.Type.mongo, 3, 3, 35),
-        (ModuleStoreEnum.Type.split, 3, 9, 35),
+        (ModuleStoreEnum.Type.split, 3, 10, 35),
     )
     @ddt.unpack
     @count_queries
@@ -464,7 +465,7 @@ class ViewsTestCase(
             self.password = 'test'
 
             # Create the user and make them active so we can log them in.
-            self.student = UserFactory.create(username=uname, email=email, password=self.password)
+            self.student = User.objects.create_user(uname, email, self.password)
             self.student.is_active = True
             self.student.save()
 
@@ -1424,13 +1425,13 @@ class TeamsPermissionsTestCase(ForumsEnableMixin, UrlResetMixin, SharedModuleSto
         If dividing by cohorts, create and assign users to a cohort.
         """
         enable_cohorts = True if scheme is CourseDiscussionSettings.COHORT else False
-        discussion_settings = CourseDiscussionSettings.get(self.course.id)
-        discussion_settings.update({
-            'enable_cohorts': enable_cohorts,
-            'divided_discussions': [],
-            'always_divide_inline_discussions': True,
-            'division_scheme': scheme,
-        })
+        set_course_discussion_settings(
+            self.course.id,
+            enable_cohorts=enable_cohorts,
+            divided_discussions=[],
+            always_divide_inline_discussions=True,
+            division_scheme=scheme,
+        )
         set_course_cohorted(self.course.id, enable_cohorts)
 
     @classmethod

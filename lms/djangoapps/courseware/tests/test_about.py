@@ -22,26 +22,25 @@ from lms.djangoapps.ccx.tests.factories import CcxFactory
 from openedx.features.course_experience import COURSE_ENABLE_UNENROLLED_ACCESS_FLAG
 from openedx.features.course_experience.waffle import ENABLE_COURSE_ABOUT_SIDEBAR_HTML
 from openedx.features.course_experience.waffle import WAFFLE_NAMESPACE as COURSE_EXPERIENCE_WAFFLE_NAMESPACE
-from lms.djangoapps.course_home_api.toggles import COURSE_HOME_USE_LEGACY_FRONTEND
 from common.djangoapps.student.tests.factories import AdminFactory, CourseEnrollmentAllowedFactory, UserFactory
 from common.djangoapps.track.tests import EventTrackingTestCase
 from common.djangoapps.util.milestones_helpers import get_prerequisite_courses_display, set_prerequisite_courses
-from xmodule.course_module import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.course_module import (
     CATALOG_VISIBILITY_ABOUT,
     CATALOG_VISIBILITY_NONE,
     COURSE_VISIBILITY_PRIVATE,
     COURSE_VISIBILITY_PUBLIC,
     COURSE_VISIBILITY_PUBLIC_OUTLINE
 )
-from xmodule.modulestore.tests.django_utils import (  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import (
     TEST_DATA_MIXED_MODULESTORE,
     TEST_DATA_SPLIT_MODULESTORE,
     ModuleStoreTestCase,
     SharedModuleStoreTestCase
 )
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.utils import TEST_DATA_DIR  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.xml_importer import import_course_from_xml  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.modulestore.tests.utils import TEST_DATA_DIR
+from xmodule.modulestore.xml_importer import import_course_from_xml
 
 from .helpers import LoginEnrollmentTestCase
 
@@ -476,7 +475,6 @@ class CourseAboutTestCaseCCX(SharedModuleStoreTestCase, LoginEnrollmentTestCase)
         self.coach = coach = AdminFactory.create(password="test")
         self.client.login(username=coach.username, password="test")
 
-    @override_waffle_flag(COURSE_HOME_USE_LEGACY_FRONTEND, active=True)
     def test_redirect_to_dashboard_unenrolled_ccx(self):
         """
         Assert that when unenrolled user tries to access CCX do not allow the user to self-register.

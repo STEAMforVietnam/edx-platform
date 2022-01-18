@@ -4,15 +4,12 @@ Models for bulk email
 
 
 import logging
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 
 import markupsafe
 from config_models.models import ConfigurationModel
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.db import models
-from django.conf import settings
-
+from django.utils.encoding import python_2_unicode_compatible
 from opaque_keys.edx.django.models import CourseKeyField
 
 from common.djangoapps.course_modes.models import CourseMode
@@ -26,7 +23,6 @@ from openedx.core.djangoapps.enrollments.errors import CourseModeNotFoundError
 from openedx.core.lib.html_to_text import html_to_text
 from openedx.core.lib.mail_utils import wrap_message
 
-User = get_user_model()
 log = logging.getLogger(__name__)
 
 
@@ -62,6 +58,7 @@ EMAIL_TARGET_CHOICES = list(zip(
 EMAIL_TARGETS = {target[0] for target in EMAIL_TARGET_CHOICES}
 
 
+@python_2_unicode_compatible
 class Target(models.Model):
     """
     A way to refer to a particular group (within a course) as a "Send to:" target.
@@ -121,13 +118,6 @@ class Target(models.Model):
             courseenrollment__is_active=True
         )
         enrollment_qset = User.objects.filter(enrollment_query)
-
-        # filter out learners from the message who are no longer active in the course-run based on last login
-        last_login_eligibility_period = settings.BULK_COURSE_EMAIL_LAST_LOGIN_ELIGIBILITY_PERIOD
-        if last_login_eligibility_period and isinstance(last_login_eligibility_period, int):
-            cutoff = datetime.now() - relativedelta(months=last_login_eligibility_period)
-            enrollment_qset = enrollment_qset.exclude(last_login__lte=cutoff)
-
         if self.target_type == SEND_TO_MYSELF:
             if user_id is None:
                 raise ValueError("Must define self user to send email to self.")
@@ -152,6 +142,7 @@ class Target(models.Model):
             raise ValueError(f"Unrecognized target type {self.target_type}")
 
 
+@python_2_unicode_compatible
 class CohortTarget(Target):
     """
     Subclass of Target, specifically referring to a cohort.
@@ -197,6 +188,7 @@ class CohortTarget(Target):
         return cohort
 
 
+@python_2_unicode_compatible
 class CourseModeTarget(Target):
     """
     Subclass of Target, specifically for course modes.
@@ -244,6 +236,7 @@ class CourseModeTarget(Target):
             )
 
 
+@python_2_unicode_compatible
 class CourseEmail(Email):
     """
     Stores information for an email to a course.
@@ -438,6 +431,7 @@ class CourseEmailTemplate(models.Model):
         return CourseEmailTemplate._render(self.html_template, htmltext, context)
 
 
+@python_2_unicode_compatible
 class CourseAuthorization(models.Model):
     """
     Enable the course email feature on a course-by-course basis.
@@ -468,31 +462,10 @@ class CourseAuthorization(models.Model):
         not_en = "Not "
         if self.email_enabled:
             not_en = ""
-        return f"Course '{str(self.course_id)}': Instructor Email {not_en}Enabled"
+        return "Course '{}': Instructor Email {}Enabled".format(str(self.course_id), not_en)
 
 
-class DisabledCourse(models.Model):
-    """
-    Disable the bulk email feature for specific courses.
-
-    .. no_pii:
-    """
-    class Meta:
-        app_label = "bulk_email"
-
-    course_id = CourseKeyField(max_length=255, db_index=True, unique=True)
-
-    @classmethod
-    def instructor_email_disabled_for_course(cls, course_id):
-        """
-        Returns whether or not email is disabled for the given course id.
-        """
-        try:
-            return cls.objects.filter(course_id=course_id).exists()
-        except cls.DoesNotExist:
-            return False
-
-
+@python_2_unicode_compatible
 class BulkEmailFlag(ConfigurationModel):
     """
     Enables site-wide configuration for the bulk_email feature.

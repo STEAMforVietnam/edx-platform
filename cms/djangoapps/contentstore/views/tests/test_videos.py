@@ -39,7 +39,7 @@ from openedx.core.djangoapps.video_pipeline.config.waffle import (
     waffle_flags
 )
 from openedx.core.djangoapps.waffle_utils.models import WaffleFlagCourseOverrideModel
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory
 
 from ..videos import (
     ENABLE_VIDEO_UPLOAD_PAGINATION,
@@ -52,7 +52,7 @@ from ..videos import (
     convert_video_status
 )
 
-VIDEO_IMAGE_UPLOAD_ENABLED_SWITCH = LegacyWaffleSwitch(WAFFLE_SWITCHES, VIDEO_IMAGE_UPLOAD_ENABLED)  # lint-amnesty, pylint: disable=toggle-missing-annotation
+VIDEO_IMAGE_UPLOAD_ENABLED_SWITCH = LegacyWaffleSwitch(WAFFLE_SWITCHES, VIDEO_IMAGE_UPLOAD_ENABLED)
 
 
 class VideoUploadTestBase:

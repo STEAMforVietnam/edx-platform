@@ -9,6 +9,7 @@ import datetime
 import unittest
 
 from django.conf import settings
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
@@ -32,7 +33,7 @@ class AuthenticateTestCase(TestCase):
 
     def setUp(self):
         super().setUp()
-        self.user = UserFactory.create(
+        self.user = User.objects.create_user(
             username='darkhelmet',
             password='12345',
             email='darkhelmet@spaceball_one.org',
@@ -57,7 +58,7 @@ class CustomValidationTestCase(TestCase):
     """
     def setUp(self):
         super().setUp()
-        self.user = UserFactory.create(
+        self.user = User.objects.create_user(
             username='darkhelmet',
             password='12345',
             email='darkhelmet@spaceball_one.org',

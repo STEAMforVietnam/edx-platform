@@ -1,7 +1,7 @@
 """
 CMS feature toggles.
 """
-from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace, SettingDictToggle, WaffleFlag
+from edx_toggles.toggles import LegacyWaffleFlag, LegacyWaffleFlagNamespace, SettingDictToggle
 
 # .. toggle_name: FEATURES['ENABLE_EXPORT_GIT']
 # .. toggle_implementation: SettingDictToggle
@@ -35,17 +35,17 @@ SPLIT_LIBRARY_ON_DASHBOARD = LegacyWaffleFlag(
     module_name=__name__
 )
 
-# .. toggle_name: bypass_olx_failure
+# .. toggle_name: course_import_olx_validation
 # .. toggle_implementation: WaffleFlag
 # .. toggle_default: False
-# .. toggle_description: Enables bypassing olx validation failures during course import.
+# .. toggle_description: Enables olx validation during course import.
 # .. toggle_use_cases: open_edx
-# .. toggle_creation_date: 2021-04-15
-# .. toggle_target_removal_date: 2021-05-15
-# .. toggle_tickets: TNL-8214
-BYPASS_OLX_FAILURE = LegacyWaffleFlag(
+# .. toggle_creation_date: 2021-04-01
+# .. toggle_target_removal_date: 2021-05-01
+# .. toggle_tickets: TNL-8151
+COURSE_IMPORT_OLX_VALIDATION = LegacyWaffleFlag(
     waffle_namespace=LegacyWaffleFlagNamespace(name=WAFFLE_NAMESPACE),
-    flag_name='bypass_olx_failure',
+    flag_name='course_import_olx_validation',
     module_name=__name__
 )
 
@@ -57,84 +57,8 @@ def split_library_view_on_dashboard():
     return SPLIT_LIBRARY_ON_DASHBOARD.is_enabled()
 
 
-def bypass_olx_failure_enabled():
+def course_import_olx_validation_is_enabled():
     """
-    Check if bypass is enabled for course olx validation errors.
+    Check if course olx validation is enabled on course import.
     """
-    return BYPASS_OLX_FAILURE.is_enabled()
-
-
-# .. toggle_name: FEATURES['ENABLE_EXAM_SETTINGS_HTML_VIEW']
-# .. toggle_use_cases: open_edx
-# .. toggle_implementation: SettingDictToggle
-# .. toggle_default: False
-# .. toggle_description: When enabled, users can access the new course authoring view for proctoring exams
-# .. toggle_warnings: None
-# .. toggle_creation_date: 2020-07-23
-ENABLE_EXAM_SETTINGS_HTML_VIEW = SettingDictToggle(
-    "FEATURES", "ENABLE_EXAM_SETTINGS_HTML_VIEW", default=False, module_name=__name__
-)
-
-
-def exam_setting_view_enabled():
-    """
-    Returns a boolean if proctoring exam setting mfe view is enabled.
-    """
-    return ENABLE_EXAM_SETTINGS_HTML_VIEW.is_enabled()
-
-
-# .. toggle_name: new_core_editors.use_new_text_editor
-# .. toggle_implementation: WaffleFlag
-# .. toggle_default: False
-# .. toggle_description: This flag enables the use of the new core text xblock editor
-# .. toggle_use_cases: temporary
-# .. toggle_creation_date: 2021-12-1
-# .. toggle_target_removal_date: 2022-1-30
-# .. toggle_tickets: TNL-9306
-# .. toggle_warnings:
-ENABLE_NEW_TEXT_EDITOR_FLAG = WaffleFlag('new_core_editors.use_new_text_editor', __name__)
-
-
-def use_new_text_editor():
-    """
-    Returns a boolean = true if new text editor is enabled
-    """
-    return ENABLE_NEW_TEXT_EDITOR_FLAG.is_enabled()
-
-
-# .. toggle_name: new_core_editors.use_new_video_editor
-# .. toggle_implementation: WaffleFlag
-# .. toggle_default: False
-# .. toggle_description: This flag enables the use of the new core video xblock editor
-# .. toggle_use_cases: temporary
-# .. toggle_creation_date: 2021-12-1
-# .. toggle_target_removal_date: 2022-1-30
-# .. toggle_tickets: TNL-9306
-# .. toggle_warnings:
-ENABLE_NEW_VIDEO_EDITOR_FLAG = WaffleFlag('new_core_editors.use_new_video_editor', __name__)
-
-
-def use_new_video_editor():
-    """
-    Returns a boolean = true if new video editor is enabled
-    """
-    return ENABLE_NEW_VIDEO_EDITOR_FLAG.is_enabled()
-
-
-# .. toggle_name: new_core_editors.use_new_problem_editor
-# .. toggle_implementation: WaffleFlag
-# .. toggle_default: False
-# .. toggle_description: This flag enables the use of the new core problem xblock editor
-# .. toggle_use_cases: temporary
-# .. toggle_creation_date: 2021-12-1
-# .. toggle_target_removal_date: 2022-1-30
-# .. toggle_tickets: TNL-9306
-# .. toggle_warnings:
-ENABLE_NEW_PROBLEM_EDITOR_FLAG = WaffleFlag('new_core_editors.use_new_problem_editor', __name__)
-
-
-def use_new_problem_editor():
-    """
-    Returns a boolean if new problem editor is enabled
-    """
-    return ENABLE_NEW_PROBLEM_EDITOR_FLAG.is_enabled()
+    return COURSE_IMPORT_OLX_VALIDATION.is_enabled()

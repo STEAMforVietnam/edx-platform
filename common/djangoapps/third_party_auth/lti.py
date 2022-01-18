@@ -187,7 +187,7 @@ class LTIAuthBackend(BaseAuth):
             if valid:
                 return data
         except AttributeError as error:
-            log.error(f"'{str(error)}' not found.")
+            log.error("'{}' not found.".format(str(error)))
         return None
 
     @classmethod

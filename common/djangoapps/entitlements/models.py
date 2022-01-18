@@ -8,7 +8,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.db import IntegrityError, models, transaction
-
+from django.utils.encoding import python_2_unicode_compatible
 from django.utils.timezone import now
 from model_utils import Choices
 from model_utils.models import TimeStampedModel
@@ -18,8 +18,7 @@ from common.djangoapps.course_modes.models import CourseMode
 from common.djangoapps.entitlements.utils import is_course_run_entitlement_fulfillable
 from common.djangoapps.student.models import CourseEnrollment, CourseEnrollmentException
 from common.djangoapps.util.date_utils import strftime_localized
-from lms.djangoapps.certificates import api as certificates_api
-from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.certificates.models import GeneratedCertificate
 from lms.djangoapps.commerce.utils import refund_entitlement
 from openedx.core.djangoapps.catalog.utils import get_course_uuid_for_course
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
@@ -27,6 +26,7 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 log = logging.getLogger("common.entitlements.models")
 
 
+@python_2_unicode_compatible
 class CourseEntitlementPolicy(models.Model):
     """
     Represents the Entitlement's policy for expiration, refunds, and regaining a used certificate
@@ -95,11 +95,8 @@ class CourseEntitlementPolicy(models.Model):
             return False
 
         if entitlement.enrollment_course_run:
-            certificate = certificates_api.get_certificate_for_user_id(
-                entitlement.user,
-                entitlement.enrollment_course_run.course_id
-            )
-            if certificate and not CertificateStatuses.is_refundable_status(certificate.status):
+            if GeneratedCertificate.certificate_for_student(
+                    entitlement.user_id, entitlement.enrollment_course_run.course_id) is not None:
                 return False
 
             # This is >= because a days_until_expiration 0 means that the expiration day has not fully passed yet
@@ -463,6 +460,7 @@ class CourseEntitlement(TimeStampedModel):
         super().save(*args, **kwargs)
 
 
+@python_2_unicode_compatible
 class CourseEntitlementSupportDetail(TimeStampedModel):
     """
     Table recording support interactions with an entitlement

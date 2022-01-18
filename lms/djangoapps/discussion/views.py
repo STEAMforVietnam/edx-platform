@@ -4,22 +4,23 @@ Views handling read (GET) requests for the Discussion tab and inline discussions
 
 
 import logging
+from functools import wraps
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import Http404, HttpResponseForbidden, HttpResponseServerError
-from django.shortcuts import render
+from django.shortcuts import render_to_response
 from django.template.context_processors import csrf
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django.utils.translation import get_language_bidi, gettext_lazy as _
+from django.utils.translation import get_language_bidi
+from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.cache import cache_control
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
 from edx_django_utils.monitoring import function_trace
-from functools import wraps  # lint-amnesty, pylint: disable=wrong-import-order
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import status
 from web_fragments.fragment import Fragment
@@ -37,30 +38,27 @@ from lms.djangoapps.discussion.django_comment_client.constants import TYPE_ENTRY
 from lms.djangoapps.discussion.django_comment_client.permissions import has_permission
 from lms.djangoapps.discussion.django_comment_client.utils import (
     add_courseware_context,
+    available_division_schemes,
     course_discussion_division_enabled,
     extract,
     get_group_id_for_comments_service,
     get_group_id_for_user,
+    get_group_names_by_id,
     is_commentable_divided,
-    strip_none,
+    strip_none
 )
 from lms.djangoapps.discussion.exceptions import TeamDiscussionHiddenFromUserException
-from lms.djangoapps.discussion.toggles import ENABLE_DISCUSSIONS_MFE
 from lms.djangoapps.experiments.utils import get_experiment_user_metadata_context
 from lms.djangoapps.teams import api as team_api
-from openedx.core.djangoapps.discussions.url_helpers import get_discussions_mfe_url
-from openedx.core.djangoapps.discussions.utils import (
-    available_division_schemes,
-    get_discussion_categories_ids,
-    get_divided_discussions,
-    get_group_names_by_id,
-)
 from openedx.core.djangoapps.django_comment_common.models import CourseDiscussionSettings
-from openedx.core.djangoapps.django_comment_common.utils import ThreadContext
+from openedx.core.djangoapps.django_comment_common.utils import (
+    ThreadContext,
+    get_course_discussion_settings,
+    set_course_discussion_settings
+)
 from openedx.core.djangoapps.plugin_api.views import EdxFragmentView
-from openedx.core.djangolib.markup import HTML
 from openedx.features.course_duration_limits.access import generate_course_expired_fragment
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger("edx.discussions")
 
@@ -78,7 +76,7 @@ def make_course_settings(course, user, include_category_map=True):
     Generate a JSON-serializable model for course settings, which will be used to initialize a
     DiscussionCourseSettings object on the client.
     """
-    course_discussion_settings = CourseDiscussionSettings.get(course.id)
+    course_discussion_settings = get_course_discussion_settings(course.id)
     group_names_by_id = get_group_names_by_id(course_discussion_settings)
     course_setting = {
         'is_discussion_division_enabled': course_discussion_division_enabled(course_discussion_settings),
@@ -169,7 +167,7 @@ def get_threads(request, course, user_info, discussion_id=None, per_page=THREADS
     # If not provided with a discussion id, filter threads by commentable ids
     # which are accessible to the current user.
     if discussion_id is None:
-        discussion_category_ids = set(get_discussion_categories_ids(course, request.user))
+        discussion_category_ids = set(utils.get_discussion_categories_ids(course, request.user))
         threads = [
             thread for thread in threads
             if thread.get('commentable_id') in discussion_category_ids
@@ -227,7 +225,7 @@ def inline_discussion(request, course_key, discussion_id):
 
     with function_trace('determine_group_permissions'):
         is_staff = has_permission(request.user, 'openclose_thread', course.id)
-        course_discussion_settings = CourseDiscussionSettings.get(course.id)
+        course_discussion_settings = get_course_discussion_settings(course.id)
         group_names_by_id = get_group_names_by_id(course_discussion_settings)
         course_is_divided = course_discussion_settings.division_scheme is not CourseDiscussionSettings.NONE
 
@@ -380,7 +378,7 @@ def _find_thread(request, course, discussion_id, thread_id):
 
     # verify that the thread belongs to the requesting student's group
     is_moderator = has_permission(request.user, "see_all_cohorts", course.id)
-    course_discussion_settings = CourseDiscussionSettings.get(course.id)
+    course_discussion_settings = get_course_discussion_settings(course.id)
     if is_commentable_divided(course.id, discussion_id, course_discussion_settings) and not is_moderator:
         user_group_id = get_group_id_for_user(request.user, course_discussion_settings)
         if getattr(thread, "group_id", None) is not None and user_group_id != thread.group_id:
@@ -491,7 +489,7 @@ def _create_discussion_board_context(request, base_context, thread=None):
         add_courseware_context(threads, course, user)
 
     with function_trace("get_cohort_info"):
-        course_discussion_settings = CourseDiscussionSettings.get(course_key)
+        course_discussion_settings = get_course_discussion_settings(course_key)
         user_group_id = get_group_id_for_user(user, course_discussion_settings)
 
     context.update({
@@ -565,7 +563,7 @@ def create_user_profile_context(request, course_key, user_id):
         ).order_by("name").values_list("name", flat=True).distinct()
 
         with function_trace("get_cohort_info"):
-            course_discussion_settings = CourseDiscussionSettings.get(course_key)
+            course_discussion_settings = get_course_discussion_settings(course_key)
             user_group_id = get_group_id_for_user(request.user, course_discussion_settings)
 
         context = _create_base_discussion_view_context(request, course_key)
@@ -689,7 +687,7 @@ def followed_threads(request, course_key, user_id):
                 #                'content': content,
             }
 
-            return render(request, 'discussion/user_profile.html', context)
+            return render_to_response('discussion/user_profile.html', context)
     except User.DoesNotExist:
         raise Http404  # lint-amnesty, pylint: disable=raise-missing-from
 
@@ -720,25 +718,8 @@ class DiscussionBoardFragmentView(EdxFragmentView):
         Returns:
             Fragment: The fragment representing the discussion board
         """
-        course_key = CourseKey.from_string(course_id)
-        mfe_url = get_discussions_mfe_url(course_key)
-        if ENABLE_DISCUSSIONS_MFE.is_enabled(course_key) and mfe_url:
-            fragment = Fragment(
-                HTML(
-                    "<iframe id='discussions-mfe-tab-embed' src='{src}'></iframe>"
-                ).format(src=mfe_url)
-            )
-            fragment.add_css(
-                """
-                #discussions-mfe-tab-embed {
-                    width: 100%;
-                    min-height: 800px;
-                    border: none;
-                }
-                """
-            )
-            return fragment
         try:
+            course_key = CourseKey.from_string(course_id)
             base_context = _create_base_discussion_view_context(request, course_key)
             # Note:
             #   After the thread is rendered in this fragment, an AJAX
@@ -928,7 +909,7 @@ def course_discussions_settings_handler(request, course_key_string):
     """
     course_key = CourseKey.from_string(course_key_string)
     course = get_course_with_access(request.user, 'staff', course_key)
-    discussion_settings = CourseDiscussionSettings.get(course_key)
+    discussion_settings = get_course_discussion_settings(course_key)
 
     if request.method == 'PATCH':
         divided_course_wide_discussions, divided_inline_discussions = get_divided_discussions(
@@ -960,7 +941,7 @@ def course_discussions_settings_handler(request, course_key_string):
 
         try:
             if settings_to_change:
-                discussion_settings.update(settings_to_change)
+                discussion_settings = set_course_discussion_settings(course_key, **settings_to_change)
 
         except ValueError as err:
             # Note: error message not translated because it is not exposed to the user (UI prevents this state).
@@ -978,6 +959,25 @@ def course_discussions_settings_handler(request, course_key_string):
         'division_scheme': discussion_settings.division_scheme,
         'available_division_schemes': available_division_schemes(course_key)
     })
+
+
+def get_divided_discussions(course, discussion_settings):
+    """
+    Returns the course-wide and inline divided discussion ids separately.
+    """
+    divided_course_wide_discussions = []
+    divided_inline_discussions = []
+
+    course_wide_discussions = [topic['id'] for __, topic in course.discussion_topics.items()]
+    all_discussions = utils.get_discussion_categories_ids(course, None, include_all=True)
+
+    for divided_discussion_id in discussion_settings.divided_discussions:
+        if divided_discussion_id in course_wide_discussions:
+            divided_course_wide_discussions.append(divided_discussion_id)
+        elif divided_discussion_id in all_discussions:
+            divided_inline_discussions.append(divided_discussion_id)
+
+    return divided_course_wide_discussions, divided_inline_discussions
 
 
 def _check_team_discussion_access(request, course, discussion_id):

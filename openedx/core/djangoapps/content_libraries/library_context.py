@@ -44,7 +44,7 @@ class LibraryContextImpl(LearningContext):
         """
         try:
             api.require_permission_for_library_key(usage_key.lib_key, user, permissions.CAN_EDIT_THIS_CONTENT_LIBRARY)
-        except (PermissionDenied, api.ContentLibraryNotFound):
+        except PermissionDenied:
             return False
         def_key = self.definition_for_usage(usage_key)
         if not def_key:
@@ -67,7 +67,7 @@ class LibraryContextImpl(LearningContext):
             api.require_permission_for_library_key(
                 usage_key.lib_key, user, permissions.CAN_LEARN_FROM_THIS_CONTENT_LIBRARY,
             )
-        except (PermissionDenied, api.ContentLibraryNotFound):
+        except PermissionDenied:
             return False
         def_key = self.definition_for_usage(usage_key)
         if not def_key:

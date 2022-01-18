@@ -1,14 +1,13 @@
 
 
-'use strict';
-{
-  const globals = this;
-  const django = globals.django || (globals.django = {});
+(function(globals) {
+
+  var django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    const v = (n > 1);
-    if (typeof v === 'boolean') {
+    var v=(n > 1);
+    if (typeof(v) == 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -20,7 +19,10 @@
 
   django.catalog = django.catalog || {};
   
-  const newcatalog = {
+  var newcatalog = {
+    " learner does not exist in LMS and not added to the exception list": "aluno n\u00e3o existe no LMS e n\u00e3o est\u00e1 adicionado na lista de exce\u00e7\u00e3o",
+    " learner is successfully added to the exception list": "aluno \u00e9 adicionado com sucesso na lista de exce\u00e7\u00e3o",
+    " learners are successfully added to exception list": "alunos s\u00e3o adicionados com sucesso na lista de exce\u00e7\u00e3o",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
     "%(field)s can only contain up to %(count)d characters.": "%(field)s pode conter somente at\u00e9 %(count)d caracteres.",
     "%(field)s must have at least %(count)d characters.": "%(field)s deve ter no m\u00ednimo %(count)d caracteres.",
@@ -211,6 +213,7 @@
     "Could not retrieve upload url.": "N\u00e3o foi poss\u00edvel recuperar o url de upload.",
     "Could not submit order": "N\u00e3o foi poss\u00edvel enviar seu pedido.",
     "Could not submit photos": "N\u00e3o foi poss\u00edvel enviar fotos",
+    "Couldn't Save This Assignment": "N\u00e3o Foi Poss\u00edvel Salvar Esta Tarefa",
     "Country": "Pa\u00eds",
     "Country of residence": "Pa\u00eds de resid\u00eancia",
     "Course Credit Requirements": "Exig\u00eancias de cr\u00e9ditos do curso.",
@@ -338,6 +341,7 @@
     "Error listing task history for this student and problem.": "Houve um erro ao listar o hist\u00f3rico de tarefas para este aluno e problema.",
     "Error removing user": "Erro ao remover usu\u00e1rio",
     "Error resetting entrance exam attempts for student '{student_id}'. Make sure student identifier is correct.": "Erro ao zerar o n\u00famero de tentativas do Exame de Admiss\u00e3o para o aluno '{student_id}'. Tenha certeza que a identifica\u00e7\u00e3o do aluno est\u00e1 correta.",
+    "Error resetting problem attempts for problem '<%= problem_id %>' and student '<%- student_id %>'. Make sure that the problem and student identifiers are complete and correct.": "Houve um erro ao zerar as tentativas do problema '<%= problem_id %>' para o aluno  '<%- student_id %>'. Certifique-se que o identificador do problema e do aluno estejam corretos.",
     "Error retrieving grading configuration.": "Erro ao recuperar a configura\u00e7\u00e3o para a avalia\u00e7\u00e3o.",
     "Error sending email.": "Erro ao enviar o e-mail.",
     "Error starting a task to override score for problem '<%- problem_id %>' for student '<%- student_id %>'. Make sure that the the score and the problem and student identifiers are complete and correct.": "Erro ao iniciar uma tarefa para substituir a pontua\u00e7\u00e3o do problema '<%- problem_id %>' para aluno '<%- student_id %>'. Certifique-se de que a pontua\u00e7\u00e3o e o problema e os identificadores dos alunos estejam completos e corretos.",
@@ -507,6 +511,7 @@
     "No content-specific discussion topics exist.": "N\u00e3o h\u00e1 t\u00f3picos de discuss\u00e3o de conte\u00fado espec\u00edficos",
     "No description available": "Sem descri\u00e7\u00e3o dispon\u00edvel",
     "No results": "Sem resultados",
+    "No results found for \"%(query_string)s\". Please try searching again.": "Nenhum resultado foi encontrado para \"%(query_string)s\". Tente novamente.",
     "No tasks currently running.": "N\u00e3o h\u00e1 nenhuma tarefa em andamento",
     "None": "Nenhum",
     "Noon": "Meio-dia",
@@ -561,6 +566,7 @@
     "Placeholder": "Espa\u00e7o reservado",
     "Please address the errors on this page first, and then save your progress.": "Por favor, primeiro corrija os erros nesta p\u00e1gina e somente depois salve o seu progresso. ",
     "Please check the following validation feedbacks and reflect them in your course settings:": "Por favor confira os seguintes feedbacks de valida\u00e7\u00e3o e use-os para alterar as configura\u00e7\u00f5es do curso:",
+    "Please correct the outlined fields.": "Por favor, corrija os campos destacados.",
     "Please do not use any spaces in this field.": "Por favor, n\u00e3o utilize espa\u00e7os neste campo.",
     "Please do not use any spaces or special characters in this field.": "Por favor, n\u00e3o utilize espa\u00e7o ou caracteres especiais neste campo. ",
     "Please enter a problem location.": "Por favor, informe o local do problema.",
@@ -591,6 +597,7 @@
     "Processing Re-run Request": "Processando Requisi\u00e7\u00e3o de Reprise",
     "Proctored": "Supervisionado",
     "Proctored Exam": "Exame supervisionado",
+    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "Exames supervisionados s\u00e3o cronometrados e eles gravam um v\u00eddeo de cada aluno fazendo a prova. Os v\u00eddeos s\u00e3o ent\u00e3o revisados para garantir que os alunos sigam as regras do exame.",
     "Professional Education": "Educa\u00e7\u00e3o Profissional",
     "Professional Education Verified Certificate": "Certificado verificado de profissional de educa\u00e7\u00e3o",
     "Promote another member to Admin to remove your admin rights": "Promova outro membro a Administrador para remover seus direitos de administrador",
@@ -809,6 +816,7 @@
     "This is the list of chosen %s. You may remove some by selecting them in the box below and then clicking the \"Remove\" arrow between the two boxes.": "Esta \u00e9 a lista de %s dispon\u00edveis. Voc\u00ea pode remov\u00ea-los(as) selecionando-os(as) abaixo e clicando na seta \"Remover\" entre as duas caixas.",
     "This is the name of the group": "Esse \u00e9 o nome do grupo",
     "This problem could not be saved.": "Este problema n\u00e3o p\u00f4de ser salvo.",
+    "This problem has already been released. Any changes will apply only to future assessments.": "A solu\u00e7\u00e3o deste problema j\u00e1 foi colocada no software. Quaisquer altera\u00e7\u00f5es ser\u00e3o aplicadas apenas em avalia\u00e7\u00f5es futuras.",
     "This response could not be saved.": "Esta resposta n\u00e3o p\u00f4de ser salva.",
     "This response could not be submitted.": "Esta resposta n\u00e3o p\u00f4de ser enviada",
     "This response has been saved but not submitted.": "Esta resposta foi salva mas n\u00e3o foi enviada.",
@@ -944,6 +952,7 @@
     "You did not select a content group": "Voc\u00ea n\u00e3o selecionou nenhum grupo de conte\u00fado.",
     "You don't seem to have Flash installed. Get Flash to continue your verification.": "Parece que voc\u00ea n\u00e3o tem Flash instalado. Instale o Flash para continuar sua verifica\u00e7\u00e3o.",
     "You don't seem to have a webcam connected.": "Parece que sua webcam n\u00e3o est\u00e1 conectada.",
+    "You have added a criterion. You will need to select an option for the criterion in the Learner Training step. To do this, click the Settings tab.": "Voc\u00ea adicionou um crit\u00e9rio. Voc\u00ea precisa selecionar uma op\u00e7\u00e3o para o crit\u00e9rio na etapa de Treinamento do Estudante. Para fazer isso, clique na guia Configura\u00e7\u00f5es.",
     "You have already verified your ID!": "Voc\u00ea j\u00e1 verificou a sua identifica\u00e7\u00e3o",
     "You have deleted a criterion. The criterion has been removed from the example responses in the Learner Training step.": "Voc\u00ea excluiu um crit\u00e9rio. O crit\u00e9rio foi removido do exemplo de respostas na etapa de Treinamento do Estudante.",
     "You have deleted all the options for this criterion. The criterion has been removed from the sample responses in the Learner Training step.": "Voc\u00ea excluiu todas as op\u00e7\u00f5es para este crit\u00e9rio. O crit\u00e9rio foi removido a partir das respostas de amostra na etapa de Treinamento do Estudante.",
@@ -952,10 +961,8 @@
     "You have not created any certificates yet.": "Voc\u00ea ainda n\u00e3o criou um certificado.",
     "You have not created any content groups yet.": "Voc\u00ea n\u00e3o criou nenhum grupo de conte\u00fado ainda.",
     "You have not created any group configurations yet.": "Voc\u00ea ainda n\u00e3o criou uma configura\u00e7\u00e3o de grupo.",
-    "You have selected an action, and you haven't made any changes on individual fields. You're probably looking for the Go button rather than the Save button.": "Selecionou uma a\u00e7\u00e3o mas ainda n\u00e3o guardou as mudan\u00e7as dos campos individuais. Provavelmente querer\u00e1 o bot\u00e3o Ir ao inv\u00e9s do bot\u00e3o Guardar.",
-    "You have selected an action, and you haven\u2019t made any changes on individual fields. You\u2019re probably looking for the Go button rather than the Save button.": "Voc\u00ea selecionou uma a\u00e7\u00e3o sem fazer mudan\u00e7as nos campos individuais. Voc\u00ea provavelmente est\u00e1 procurando pelo bot\u00e3o Go ao inv\u00e9s do bot\u00e3o Save.",
-    "You have selected an action, but you haven't saved your changes to individual fields yet. Please click OK to save. You'll need to re-run the action.": "Selecionou uma a\u00e7\u00e3o mas ainda n\u00e3o guardou as mudan\u00e7as dos campos individuais. Carregue em OK para gravar. Precisar\u00e1 de correr de novo a a\u00e7\u00e3o.",
-    "You have selected an action, but you haven\u2019t saved your changes to individual fields yet. Please click OK to save. You\u2019ll need to re-run the action.": "Voc\u00ea selecionou uma a\u00e7\u00e3o, mas voc\u00ea ainda n\u00e3o salvou suas altera\u00e7\u00f5es nos campos individuais. Por favor clique OK para salvar. voc\u00ea precisar\u00e1 de rodar novamente a a\u00e7\u00e3o.",
+    "You have selected an action, and you haven't made any changes on individual fields. You're probably looking for the Go button rather than the Save button.": "Voc\u00ea selecionou uma a\u00e7\u00e3o, e voc\u00ea n\u00e3o fez altera\u00e7\u00f5es em campos individuais. Voc\u00ea provavelmente est\u00e1 procurando o bot\u00e3o Ir ao inv\u00e9s do bot\u00e3o Salvar.",
+    "You have selected an action, but you haven't saved your changes to individual fields yet. Please click OK to save. You'll need to re-run the action.": "Voc\u00ea selecionou uma a\u00e7\u00e3o, mas voc\u00ea n\u00e3o salvou as altera\u00e7\u00f5es de cada campo ainda. Clique em OK para salvar. Voc\u00ea vai precisar executar novamente a a\u00e7\u00e3o.",
     "You have set your language to {beta_language}, which is currently not fully translated. You can help us translate this language fully by joining the Transifex community and adding translations from English for learners that speak {beta_language}.": "Voc\u00ea configurou seu idioma para {beta_language}, que atualmente n\u00e3o est\u00e1 todo traduzido. Voc\u00ea pode nos ajudar a traduzir este idioma integralmente se juntando \u00e0 comunidade Transifex e adicionar tradu\u00e7\u00f5es do ingl\u00eas para alunos que falam {beta_language}",
     "You have unsaved changes on individual editable fields. If you run an action, your unsaved changes will be lost.": "Voc\u00ea tem altera\u00e7\u00f5es n\u00e3o salvas em campos edit\u00e1veis individuais. Se voc\u00ea executar uma a\u00e7\u00e3o suas altera\u00e7\u00f5es n\u00e3o salvas ser\u00e3o perdidas.",
     "You haven't added any assets to this course yet.": "Voc\u00ea n\u00e3o adicionou nenhum ativo a este curso ainda",
@@ -995,18 +1002,6 @@
     "Zoom In": "Aumentar a tela",
     "Zoom Out": "Diminuir a tela",
     "[no tags]": "[no tags]",
-    "abbrev. month April\u0004Apr": "Abr",
-    "abbrev. month August\u0004Aug": "Ago",
-    "abbrev. month December\u0004Dec": "Dez",
-    "abbrev. month February\u0004Feb": "Fev",
-    "abbrev. month January\u0004Jan": "Jan",
-    "abbrev. month July\u0004Jul": "Jul",
-    "abbrev. month June\u0004Jun": "Jun",
-    "abbrev. month March\u0004Mar": "Mar",
-    "abbrev. month May\u0004May": "Mai",
-    "abbrev. month November\u0004Nov": "Nov",
-    "abbrev. month October\u0004Oct": "Out",
-    "abbrev. month September\u0004Sep": "Set",
     "and others": "e outros",
     "anonymous": "an\u00f4nimo",
     "bytes": "bytes",
@@ -1054,24 +1049,24 @@
     "{email} is already on the {container} team. Recheck the email address if you want to add a new member.": "{email} j\u00e1 est\u00e1 no grupo {container}. Verifique novamente o endere\u00e7o de email se voc\u00ea quiser adicionar um novo membro.",
     "\u2026": "\u2026"
   };
-  for (const key in newcatalog) {
+  for (var key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      const value = django.catalog[msgid];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[msgid];
+      if (typeof(value) == 'undefined') {
         return msgid;
       } else {
-        return (typeof value === 'string') ? value : value[0];
+        return (typeof(value) == 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      const value = django.catalog[singular];
-      if (typeof value === 'undefined') {
+      var value = django.catalog[singular];
+      if (typeof(value) == 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1081,16 +1076,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      let value = django.gettext(context + '\x04' + msgid);
-      if (value.includes('\x04')) {
+      var value = django.gettext(context + '\x04' + msgid);
+      if (value.indexOf('\x04') != -1) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.includes('\x04')) {
+      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.indexOf('\x04') != -1) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1113,9 +1108,11 @@
       "%d/%m/%Y %H:%M:%S",
       "%d/%m/%Y %H:%M:%S.%f",
       "%d/%m/%Y %H:%M",
+      "%d/%m/%Y",
       "%d/%m/%y %H:%M:%S",
       "%d/%m/%y %H:%M:%S.%f",
       "%d/%m/%y %H:%M",
+      "%d/%m/%y",
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
@@ -1144,8 +1141,8 @@
   };
 
     django.get_format = function(format_type) {
-      const value = django.formats[format_type];
-      if (typeof value === 'undefined') {
+      var value = django.formats[format_type];
+      if (typeof(value) == 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1164,5 +1161,6 @@
 
     django.jsi18n_initialized = true;
   }
-};
+
+}(this));
 

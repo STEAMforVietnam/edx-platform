@@ -29,7 +29,6 @@ from xblock.core import XBlock
 from xblock.fields import ScopeIds
 from xblock.runtime import KvsFieldData
 
-from common.djangoapps.xblock_django.constants import ATTR_KEY_REQUEST_COUNTRY_CODE
 from openedx.core.djangoapps.video_config.models import HLSPlaybackEnabledFlag, CourseYoutubeBlockedFlag
 from openedx.core.djangoapps.video_pipeline.config.waffle import DEPRECATE_YOUTUBE, waffle_flags
 from openedx.core.lib.cache_utils import request_cached
@@ -109,7 +108,6 @@ EXPORT_IMPORT_STATIC_DIR = 'static'
 
 
 @XBlock.wants('settings', 'completion', 'i18n', 'request_cache')
-@XBlock.needs('mako', 'user')
 class VideoBlock(
         VideoFields, VideoTranscriptsMixin, VideoStudioViewHandlers, VideoStudentViewHandlers,
         TabsEditingMixin, EmptyDataRawMixin, XmlMixin, EditingMixin,
@@ -220,7 +218,7 @@ class VideoBlock(
         If only either youtube or hls is present then play whichever is present
         """
         yt_present = bool(youtube_streams.strip()) if youtube_streams else False
-        hls_present = any(source for source in html5_sources)
+        hls_present = any(source for source in html5_sources if source.strip().endswith('.m3u8'))
 
         if yt_present and hls_present:
             return self.youtube_deprecated
@@ -247,7 +245,7 @@ class VideoBlock(
         Return the studio view.
         """
         fragment = Fragment(
-            self.runtime.service(self, 'mako').render_template(self.mako_template, self.get_context())
+            self.system.render_template(self.mako_template, self.get_context())
         )
         add_webpack_to_fragment(fragment, 'VideoBlockStudio')
         shim_xmodule_js(fragment, 'TabsEditingDescriptor')
@@ -282,8 +280,7 @@ class VideoBlock(
         # based on user locale.  This exists to support cases where
         # we leverage a geography specific CDN, like China.
         default_cdn_url = getattr(settings, 'VIDEO_CDN_URL', {}).get('default')
-        user_location = self.runtime.service(self, 'user').get_current_user().opt_attrs[ATTR_KEY_REQUEST_COUNTRY_CODE]
-        cdn_url = getattr(settings, 'VIDEO_CDN_URL', {}).get(user_location, default_cdn_url)
+        cdn_url = getattr(settings, 'VIDEO_CDN_URL', {}).get(self.system.user_location, default_cdn_url)
 
         # If we have an edx_video_id, we prefer its values over what we store
         # internally for download links (source, html5_sources) and the youtube
@@ -337,7 +334,7 @@ class VideoBlock(
         # Video caching is disabled for Studio. User_location is always None in Studio.
         # CountryMiddleware disabled for Studio.
         if getattr(self, 'video_speed_optimizations', True) and cdn_url:
-            branding_info = BrandingInfoConfig.get_config().get(user_location)
+            branding_info = BrandingInfoConfig.get_config().get(self.system.user_location)
 
             if self.edx_video_id and edxval_api and video_status != 'external':
                 for index, source_url in enumerate(sources):
@@ -471,7 +468,7 @@ class VideoBlock(
             'transcript_download_formats_list': self.fields['transcript_download_format'].values,  # lint-amnesty, pylint: disable=unsubscriptable-object
             'license': getattr(self, "license", None),
         }
-        return self.runtime.service(self, 'mako').render_template('video.html', context)
+        return self.system.render_template('video.html', context)
 
     def validate(self):
         """
@@ -1026,7 +1023,7 @@ class VideoBlock(
             """ Find video transcript - if not found, don't update index """
             try:
                 transcript = get_transcript(self, lang=language, output_format=Transcript.TXT)[0].replace("\n", " ")
-                transcript_index_name = f"transcript_{language if language else self.transcript_language}"
+                transcript_index_name = "transcript_{}".format(language if language else self.transcript_language)
                 video_body.update({transcript_index_name: transcript})
             except NotFoundError:
                 pass

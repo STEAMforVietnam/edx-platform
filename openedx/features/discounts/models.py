@@ -6,12 +6,13 @@ DiscountRestrictionConfig Models
 
 
 from django.db import models
-
-from django.utils.translation import gettext_lazy as _
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext_lazy as _
 
 from openedx.core.djangoapps.config_model_utils.models import StackedConfigurationModel
 
 
+@python_2_unicode_compatible
 class DiscountRestrictionConfig(StackedConfigurationModel):
     """
     A ConfigurationModel used to manage restrictons for lms-controlled discounts
@@ -20,7 +21,7 @@ class DiscountRestrictionConfig(StackedConfigurationModel):
     STACKABLE_FIELDS = ('disabled',)
     # Since this config disables a feature, it seemed it would be clearer to use a disabled flag instead of enabled.
     # The enabled field still exists but is not used or shown in the admin.
-    disabled = models.BooleanField(default=None, verbose_name=_("Disabled"), null=True)
+    disabled = models.NullBooleanField(default=None, verbose_name=_("Disabled"))
 
     @classmethod
     def disabled_for_course_stacked_config(cls, course):
@@ -40,6 +41,7 @@ class DiscountRestrictionConfig(StackedConfigurationModel):
         )
 
 
+@python_2_unicode_compatible
 class DiscountPercentageConfig(StackedConfigurationModel):
     """
     A ConfigurationModel to configure the discount percentage for the first purchase discount

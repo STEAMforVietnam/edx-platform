@@ -41,8 +41,8 @@ from openedx.core.djangolib.testing.utils import skip_unless_lms
 from common.djangoapps.student.models import CourseEnrollment
 from common.djangoapps.student.tests.factories import UserFactory
 from common.djangoapps.util.date_utils import from_timestamp
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 TEST_CREDIT_PROVIDER_SECRET_KEY = "931433d583c84ca7ba41784bad3232e6"
 TEST_CREDIT_PROVIDER_SECRET_KEY_TWO = "abcf433d583c8baebae1784bad3232e6"
@@ -198,7 +198,7 @@ class CreditApiTestBase(ModuleStoreTestCase):
         """ Mock GET requests to the ecommerce course API endpoint. """
         httpretty.reset()
         httpretty.register_uri(
-            httpretty.GET, f'{TEST_API_URL}/courses/{str(course_key)}/?include_products=1',
+            httpretty.GET, '{}/courses/{}/?include_products=1'.format(TEST_API_URL, str(course_key)),
             status=status,
             body=json.dumps(body), content_type='application/json',
         )
@@ -747,7 +747,7 @@ class CreditRequirementApiTests(CreditApiTestBase):
         # Since the requirement hasn't been published yet, it won't show
         # up in the list of requirements.
         req_status = api.get_credit_requirement_status(self.course_key, username, namespace="grade", name="grade")
-        assert not req_status
+        assert req_status == []
 
         # Now add the requirements, simulating what happens when a course is published.
         requirements = [

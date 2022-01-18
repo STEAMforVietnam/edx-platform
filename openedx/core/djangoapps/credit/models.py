@@ -17,8 +17,9 @@ from django.core.cache import cache
 from django.core.validators import RegexValidator
 from django.db import IntegrityError, models, transaction
 from django.dispatch import receiver
-from django.utils.translation import gettext as _  # lint-amnesty, pylint: disable=unused-import
-from django.utils.translation import gettext_lazy
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import ugettext as _  # lint-amnesty, pylint: disable=unused-import
+from django.utils.translation import ugettext_lazy
 from edx_django_utils.cache import RequestCache
 from jsonfield.fields import JSONField
 from model_utils.models import TimeStampedModel
@@ -30,6 +31,7 @@ CREDIT_PROVIDER_ID_REGEX = "[a-z,A-Z,0-9,\\-]+"
 log = logging.getLogger(__name__)
 
 
+@python_2_unicode_compatible
 class CreditProvider(TimeStampedModel):
     """
     This model represents an institution that can grant credit for a course.
@@ -51,7 +53,7 @@ class CreditProvider(TimeStampedModel):
                 code="invalid_provider_id",
             )
         ],
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Unique identifier for this credit provider. "
             "Only alphanumeric characters and hyphens (-) are allowed. "
             "The identifier is case-sensitive."
@@ -60,17 +62,17 @@ class CreditProvider(TimeStampedModel):
 
     active = models.BooleanField(
         default=True,
-        help_text=gettext_lazy("Whether the credit provider is currently enabled.")
+        help_text=ugettext_lazy("Whether the credit provider is currently enabled.")
     )
 
     display_name = models.CharField(
         max_length=255,
-        help_text=gettext_lazy("Name of the credit provider displayed to users")
+        help_text=ugettext_lazy("Name of the credit provider displayed to users")
     )
 
     enable_integration = models.BooleanField(
         default=False,
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "When true, automatically notify the credit provider "
             "when a user requests credit. "
             "In order for this to work, a shared secret key MUST be configured "
@@ -80,7 +82,7 @@ class CreditProvider(TimeStampedModel):
 
     provider_url = models.URLField(
         default="",
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "URL of the credit provider.  If automatic integration is "
             "enabled, this will the the end-point that we POST to "
             "to notify the provider of a credit request.  Otherwise, the "
@@ -91,7 +93,7 @@ class CreditProvider(TimeStampedModel):
 
     provider_status_url = models.URLField(
         default="",
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "URL from the credit provider where the user can check the status "
             "of his or her request for credit.  This is displayed to students "
             "*after* they have requested credit."
@@ -100,7 +102,7 @@ class CreditProvider(TimeStampedModel):
 
     provider_description = models.TextField(
         default="",
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Description for the credit provider displayed to users."
         )
     )
@@ -108,7 +110,7 @@ class CreditProvider(TimeStampedModel):
     fulfillment_instructions = models.TextField(
         null=True,
         blank=True,
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Plain text or html content for displaying further steps on "
             "receipt page *after* paying for the credit to get credit for a "
             "credit course against a credit provider."
@@ -117,7 +119,7 @@ class CreditProvider(TimeStampedModel):
 
     eligibility_email_message = models.TextField(
         default="",
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Plain text or html content for displaying custom message inside "
             "credit eligibility email content which is sent when user has met "
             "all credit eligibility requirements."
@@ -126,7 +128,7 @@ class CreditProvider(TimeStampedModel):
 
     receipt_email_message = models.TextField(
         default="",
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Plain text or html content for displaying custom message inside "
             "credit receipt email content which is sent *after* paying to get "
             "credit for a credit course."
@@ -136,7 +138,7 @@ class CreditProvider(TimeStampedModel):
     thumbnail_url = models.URLField(
         default="",
         max_length=255,
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Thumbnail image url of the credit provider."
         )
     )
@@ -212,6 +214,7 @@ def invalidate_provider_cache(sender, **kwargs):  # pylint: disable=unused-argum
     cache.delete(CreditProvider.CREDIT_PROVIDERS_CACHE_KEY)
 
 
+@python_2_unicode_compatible
 class CreditCourse(models.Model):
     """
     Model for tracking a credit course.
@@ -274,6 +277,7 @@ def invalidate_credit_courses_cache(sender, **kwargs):   # pylint: disable=unuse
     cache.delete(CreditCourse.CREDIT_COURSES_CACHE_KEY)
 
 
+@python_2_unicode_compatible
 class CreditRequirement(TimeStampedModel):
     """
     This model represents a credit requirement.
@@ -446,7 +450,7 @@ class CreditRequirementStatus(TimeStampedModel):
 
     class Meta:
         unique_together = ('username', 'requirement')
-        verbose_name_plural = gettext_lazy('Credit requirement statuses')
+        verbose_name_plural = ugettext_lazy('Credit requirement statuses')
 
     @classmethod
     def get_statuses(cls, requirements, username):
@@ -542,6 +546,7 @@ def default_deadline_for_credit_eligibility():
     )
 
 
+@python_2_unicode_compatible
 class CreditEligibility(TimeStampedModel):
     """
     A record of a user's eligibility for credit for a specific course.
@@ -558,7 +563,7 @@ class CreditEligibility(TimeStampedModel):
     # we need to override the deadline for particular students.
     deadline = models.DateTimeField(
         default=default_deadline_for_credit_eligibility,
-        help_text=gettext_lazy("Deadline for purchasing and requesting credit.")
+        help_text=ugettext_lazy("Deadline for purchasing and requesting credit.")
     )
 
     class Meta:
@@ -648,6 +653,7 @@ class CreditEligibility(TimeStampedModel):
         )
 
 
+@python_2_unicode_compatible
 class CreditRequest(TimeStampedModel):
     """
     A request for credit from a particular credit provider.
@@ -774,6 +780,7 @@ class CreditRequest(TimeStampedModel):
         )
 
 
+@python_2_unicode_compatible
 class CreditConfig(ConfigurationModel):
     """
     Manage credit configuration
@@ -783,9 +790,9 @@ class CreditConfig(ConfigurationModel):
     CACHE_KEY = 'credit.providers.api.data'
 
     cache_ttl = models.PositiveIntegerField(
-        verbose_name=gettext_lazy("Cache Time To Live"),
+        verbose_name=ugettext_lazy("Cache Time To Live"),
         default=0,
-        help_text=gettext_lazy(
+        help_text=ugettext_lazy(
             "Specified in seconds. Enable caching by setting this to a value greater than 0."
         )
     )

@@ -56,16 +56,8 @@
             },
 
             isAboveMinimumAge: function() {
-                var yearOfBirth = this.get('year_of_birth'),
-                    isBirthDefined = !(_.isUndefined(yearOfBirth) || _.isNull(yearOfBirth)),
-                    minimumAllowedAge = this.get('parental_consent_age_limit'),
-                    enableCoppaCompliance = this.get('enable_coppa_compliance');
-
-                if(enableCoppaCompliance){
-                    var currentYear = new Date().getFullYear(),
-                    isOlderThanMinimum = (currentYear - yearOfBirth) >= minimumAllowedAge;
-                    return isBirthDefined && isOlderThanMinimum && !(this.get('requires_parental_consent'));
-                }
+                var yearOfBirth = this.get('year_of_birth');
+                var isBirthDefined = !(_.isUndefined(yearOfBirth) || _.isNull(yearOfBirth));
                 return isBirthDefined && !(this.get('requires_parental_consent'));
             }
         });

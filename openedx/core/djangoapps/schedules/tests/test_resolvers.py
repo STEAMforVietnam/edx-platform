@@ -30,8 +30,8 @@ from openedx.core.djangoapps.schedules.resolvers import (
 from openedx.core.djangoapps.schedules.tests.factories import ScheduleConfigFactory
 from openedx.core.djangoapps.site_configuration.tests.factories import SiteConfigurationFactory, SiteFactory
 from openedx.core.djangolib.testing.utils import CacheIsolationMixin, skip_unless_lms
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 class SchedulesResolverTestMixin(CacheIsolationMixin):
@@ -109,9 +109,10 @@ class TestBinnedSchedulesBaseResolver(SchedulesResolverTestMixin, TestCase):
 
         # We need to enroll with a request, because our specific experiment code expects it
         self.addCleanup(crum.set_current_request, None)
-        request = RequestFactory().get(self.site)
+        request = RequestFactory()
         request.user = user
         crum.set_current_request(request)
+
         enrollment1 = CourseEnrollment.enroll(user, overview1.id)
         with override_experiment_waffle_flag(_EXTERNAL_COURSE_UPDATES_FLAG, bucket=bucket):
             enrollment2 = CourseEnrollment.enroll(user, overview2.id)
@@ -247,7 +248,7 @@ class TestCourseNextSectionUpdateResolver(SchedulesResolverTestMixin, ModuleStor
     def test_schedule_context(self):
         resolver = self.create_resolver()
         # using this to make sure the select_related stays intact
-        with self.assertNumQueries(36):
+        with self.assertNumQueries(15):
             sc = resolver.get_schedules()
             schedules = list(sc)
 

@@ -17,7 +17,7 @@ from django.test import TestCase
 from django.test.client import RequestFactory
 from django.test.utils import override_settings
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from edx_toggles.toggles.testutils import override_waffle_flag
 from freezegun import freeze_time
 from pytz import UTC
@@ -35,7 +35,7 @@ from openedx.core.djangolib.markup import HTML, Text
 from openedx.core.djangolib.testing.utils import skip_unless_lms
 from common.djangoapps.third_party_auth.tests.testutil import ThirdPartyAuthTestMixin, simulate_running_pipeline
 from common.djangoapps.util.testing import UrlResetMixin
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 
 
 @skip_unless_lms
@@ -217,7 +217,7 @@ class LoginAndRegistrationTest(ThirdPartyAuthTestMixin, UrlResetMixin, ModuleSto
         with with_comprehensive_theme_context(theme):
             response = self.client.get(reverse(url_name), params, HTTP_ACCEPT="text/html")
 
-        expected_url = f'/login?{self._finish_auth_url_param(params)}'
+        expected_url = '/login?{}'.format(self._finish_auth_url_param(params))
         self.assertNotContains(response, expected_url)
 
     @mock.patch.dict(settings.FEATURES, {"ENABLE_THIRD_PARTY_AUTH": False})
@@ -655,7 +655,7 @@ class LoginAndRegistrationTest(ThirdPartyAuthTestMixin, UrlResetMixin, ModuleSto
         '/account/finish_auth?next=%2Fdashboard'
         """
         return urlencode({
-            'next': f'/account/finish_auth?{urlencode(params)}'
+            'next': '/account/finish_auth?{}'.format(urlencode(params))
         })
 
     def test_english_by_default(self):

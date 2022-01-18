@@ -1,9 +1,9 @@
 # lint-amnesty, pylint: disable=missing-module-docstring
 import datetime
 import hashlib
-from unittest import mock
 
 import ddt
+import mock
 import pytz
 from crum import set_current_request
 from django.contrib.auth.models import AnonymousUser, User  # lint-amnesty, pylint: disable=imported-auth-user
@@ -26,23 +26,22 @@ from common.djangoapps.student.models import (
     ManualEnrollmentAudit,
     PendingEmailChange,
     PendingNameChange,
-    UserCelebration,
-    UserProfile
+    UserCelebration
 )
-from common.djangoapps.student.models_api import confirm_name_change, do_name_change_request, get_name
 from common.djangoapps.student.tests.factories import AccountRecoveryFactory, CourseEnrollmentFactory, UserFactory
 from lms.djangoapps.courseware.models import DynamicUpgradeDeadlineConfiguration
 from lms.djangoapps.courseware.toggles import (
     COURSEWARE_MICROFRONTEND_PROGRESS_MILESTONES,
     COURSEWARE_MICROFRONTEND_PROGRESS_MILESTONES_STREAK_CELEBRATION,
+    REDIRECT_TO_COURSEWARE_MICROFRONTEND
 )
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.schedules.models import Schedule
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangolib.testing.utils import skip_unless_lms
-from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
-from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
+from xmodule.modulestore.tests.factories import CourseFactory
 
 
 @ddt.ddt
@@ -99,7 +98,7 @@ class CourseEnrollmentTests(SharedModuleStoreTestCase):  # lint-amnesty, pylint:
         enrollments = CourseEnrollment.enrollments_for_user(self.user).order_by(Lower('course_id'))
         hash_elements = [self.user.username]
         hash_elements += [
-            f'{str(enrollment.course_id).lower()}={enrollment.mode.lower()}' for
+            '{course_id}={mode}'.format(course_id=str(enrollment.course_id).lower(), mode=enrollment.mode.lower()) for
             enrollment in enrollments]
         expected = hashlib.md5('&'.join(hash_elements).encode('utf-8')).hexdigest()
         assert CourseEnrollment.generate_enrollment_status_hash(self.user) == expected
@@ -249,6 +248,7 @@ class CourseEnrollmentTests(SharedModuleStoreTestCase):  # lint-amnesty, pylint:
         assert enrollment_refetched.all()[0] == enrollment
 
 
+@override_waffle_flag(REDIRECT_TO_COURSEWARE_MICROFRONTEND, active=True)
 @override_waffle_flag(COURSEWARE_MICROFRONTEND_PROGRESS_MILESTONES, active=True)
 @override_waffle_flag(COURSEWARE_MICROFRONTEND_PROGRESS_MILESTONES_STREAK_CELEBRATION, active=True)
 class UserCelebrationTests(SharedModuleStoreTestCase):
@@ -264,7 +264,7 @@ class UserCelebrationTests(SharedModuleStoreTestCase):
     def setUp(self):
         super().setUp()
         self.user = UserFactory()
-        self.request = mock.MagicMock()
+        self.request = mock.Mock()
         self.request.user = self.user
         CourseEnrollmentFactory(course_id=self.course_key)
         UserCelebration.STREAK_LENGTHS_TO_CELEBRATE = [3]
@@ -467,56 +467,21 @@ class PendingNameChangeTests(SharedModuleStoreTestCase):
         super().setUpClass()
         cls.user = UserFactory()
         cls.user2 = UserFactory()
-        cls.name = cls.user.profile.name
-        cls.new_name = 'New Name'
-        cls.updated_name = 'Updated Name'
-        cls.rationale = 'Testing name change'
 
-    def test_do_name_change_request(self):
-        """
-        Test basic name change request functionality.
-        """
-        do_name_change_request(self.user, self.new_name, self.rationale)
-        self.assertEqual(PendingNameChange.objects.count(), 1)
-
-    def test_same_name(self):
-        """
-        Test that attempting a name change with the same name as the user's current profile
-        name will not result in a new pending name change request.
-        """
-        pending_name_change = do_name_change_request(self.user, self.name, self.rationale)[0]
-        self.assertIsNone(pending_name_change)
-
-    def test_update_name_change(self):
-        """
-        Test that if a user already has a name change request, creating another request will
-        update the current one.
-        """
-        do_name_change_request(self.user, self.new_name, self.rationale)
-        do_name_change_request(self.user, self.updated_name, self.rationale)
-        self.assertEqual(PendingNameChange.objects.count(), 1)
-        pending_name_change = PendingNameChange.objects.get(user=self.user)
-        self.assertEqual(pending_name_change.new_name, self.updated_name)
-
-    def test_confirm_name_change(self):
-        """
-        Test that confirming a name change request updates the user's profile name and deletes
-        the request.
-        """
-        pending_name_change = do_name_change_request(self.user, self.new_name, self.rationale)[0]
-        confirm_name_change(self.user, pending_name_change)
-        user_profile = UserProfile.objects.get(user=self.user)
-        self.assertEqual(user_profile.name, self.new_name)
-        self.assertEqual(PendingNameChange.objects.count(), 0)
+    def setUp(self):  # lint-amnesty, pylint: disable=super-method-not-called
+        self.name_change, _ = PendingNameChange.objects.get_or_create(
+            user=self.user,
+            new_name='New Name PII',
+            rationale='for testing!'
+        )
+        assert 1 == len(PendingNameChange.objects.all())
 
     def test_delete_by_user_removes_pending_name_change(self):
-        do_name_change_request(self.user, self.new_name, self.rationale)
         record_was_deleted = PendingNameChange.delete_by_user_value(self.user, field='user')
         assert record_was_deleted
         assert 0 == len(PendingNameChange.objects.all())
 
     def test_delete_by_user_no_effect_for_user_with_no_name_change(self):
-        do_name_change_request(self.user, self.new_name, self.rationale)
         record_was_deleted = PendingNameChange.delete_by_user_value(self.user2, field='user')
         assert not record_was_deleted
         assert 1 == len(PendingNameChange.objects.all())
@@ -765,30 +730,3 @@ class TestUserPostSaveCallback(SharedModuleStoreTestCase):
                 course_enrollment.save()
 
         return user
-
-
-class TestProfile(SharedModuleStoreTestCase):
-    """
-    Tests for the user profile
-    """
-    def setUp(self):
-        super().setUp()
-        self.user = UserFactory.create()
-        self.profile = UserProfile.objects.get(user_id=self.user.id)
-        self.name = self.profile.name
-        self.course = CourseFactory.create()
-
-    def test_name(self):
-        """
-        Test retrieval of the name
-        """
-        assert self.name
-        name = get_name(self.user.id)
-        assert name == self.name
-
-    def test_name_missing_profile(self):
-        """
-        Test retrieval of the name when the user profile doesn't exist
-        """
-        name = get_name(None)
-        assert not name

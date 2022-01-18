@@ -12,7 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from edx_django_utils import monitoring as monitoring_utils
 from edx_django_utils.plugins import get_plugins_view_context
@@ -29,7 +29,6 @@ from lms.djangoapps.commerce.utils import EcommerceService
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.experiments.utils import get_dashboard_course_info, get_experiment_user_metadata_context
 from lms.djangoapps.verify_student.services import IDVerificationService
-from openedx.core.djangoapps.agreements.toggles import is_integrity_signature_enabled
 from openedx.core.djangoapps.catalog.utils import (
     get_programs,
     get_pseudo_session_for_entitlement,
@@ -45,7 +44,7 @@ from openedx.core.djangoapps.util.maintenance_banner import add_maintenance_bann
 from openedx.core.djangolib.markup import HTML, Text
 from openedx.features.enterprise_support.api import (
     get_dashboard_consent_notification,
-    get_enterprise_learner_portal_context,
+    get_enterprise_learner_portal_enabled_message
 )
 from common.djangoapps.student.api import COURSE_DASHBOARD_PLUGIN_VIEW_NAME
 from common.djangoapps.student.helpers import cert_info, check_verify_status_by_course, get_resume_urls_for_enrollments
@@ -58,7 +57,7 @@ from common.djangoapps.student.models import (
     UserProfile
 )
 from common.djangoapps.util.milestones_helpers import get_pre_requisite_courses_not_completed
-from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger("edx.student")
 
@@ -473,22 +472,6 @@ def get_dashboard_course_limit():
     return course_limit
 
 
-def check_for_unacknowledged_notices(context):
-    """
-    Checks the notices apps plugin context to see if there are any unacknowledged notices the user needs to take action
-    on. If so, build a redirect url to the first unack'd notice.
-    """
-    notice_url = None
-
-    notices = context.get("plugins", {}).get("notices", {}).get("unacknowledged_notices")
-    if notices:
-        # We will only show one notice to the user one at a time. Build a redirect URL to the first notice in the
-        # list of unacknowledged notices.
-        notice_url = f"{settings.LMS_ROOT_URL}{notices[0]}?next={settings.LMS_ROOT_URL}/dashboard/"
-
-    return notice_url
-
-
 @login_required
 @ensure_csrf_cookie
 @add_maintenance_banner
@@ -593,6 +576,9 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
 
     enterprise_message = get_dashboard_consent_notification(request, user, course_enrollments)
 
+    # Display a message guiding the user to their Enterprise's Learner Portal if enabled
+    enterprise_learner_portal_enabled_message = get_enterprise_learner_portal_enabled_message(request)
+
     recovery_email_message = recovery_email_activation_message = None
     if is_secondary_email_feature_enabled():
         try:
@@ -619,9 +605,11 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
                 )
             )
 
-    # Disable lookup of Enterprise consent_required_course due to ENT-727
+
+# Disable lookup of Enterprise consent_required_course due to ENT-727
     # Will re-enable after fixing WL-1315
     consent_required_courses = set()
+    enterprise_customer_name = None
 
     # Account activation message
     account_activation_messages = [
@@ -649,7 +637,7 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
     inverted_programs = meter.invert_programs()
 
     urls, programs_data = {}, {}
-    bundles_on_dashboard_flag = LegacyWaffleFlag(experiments_namespace, 'bundles_on_dashboard', __name__)  # lint-amnesty, pylint: disable=toggle-missing-annotation
+    bundles_on_dashboard_flag = LegacyWaffleFlag(experiments_namespace, 'bundles_on_dashboard', __name__)
 
     # TODO: Delete this code and the relevant HTML code after testing LEARNER-3072 is complete
     if bundles_on_dashboard_flag.is_enabled() and inverted_programs and list(inverted_programs.items()):
@@ -693,7 +681,7 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
     # there is no verification messaging to display.
     verify_status_by_course = check_verify_status_by_course(user, course_enrollments)
     cert_statuses = {
-        enrollment.course_id: cert_info(request.user, enrollment)
+        enrollment.course_id: cert_info(request.user, enrollment.course_overview)
         for enrollment in course_enrollments
     }
 
@@ -716,12 +704,6 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
     enrolled_courses_either_paid = frozenset(
         enrollment.course_id for enrollment in course_enrollments
         if enrollment.is_paid_course()
-    )
-
-    # Checks if a course enrollment redeemed using a voucher is refundable
-    enrolled_courses_voucher_refundable = frozenset(
-        enrollment.course_id for enrollment in course_enrollments
-        if enrollment.is_order_voucher_refundable()
     )
 
     # If there are *any* denied reverifications that have not been toggled off,
@@ -749,17 +731,8 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
     else:
         redirect_message = ''
 
-    all_integrity_enabled = True
-    if not course_enrollments:
-        all_integrity_enabled = is_integrity_signature_enabled(None)
-    for enrollment in course_enrollments:
-        if not is_integrity_signature_enabled(enrollment.course_id):
-            all_integrity_enabled = False
-            break
-
     valid_verification_statuses = ['approved', 'must_reverify', 'pending', 'expired']
-    display_sidebar_on_dashboard = not all_integrity_enabled and \
-        verification_status['status'] in valid_verification_statuses and \
+    display_sidebar_on_dashboard = verification_status['status'] in valid_verification_statuses and \
         verification_status['should_display']
 
     # Filter out any course enrollment course cards that are associated with fulfilled entitlements
@@ -768,13 +741,12 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
             enr for enr in course_enrollments if entitlement.enrollment_course_run.course_id != enr.course_id
         ]
 
-    show_account_activation_popup = request.COOKIES.get(settings.SHOW_ACTIVATE_CTA_POPUP_COOKIE_NAME, None)
-
     context = {
         'urls': urls,
         'programs_data': programs_data,
         'enterprise_message': enterprise_message,
         'consent_required_courses': consent_required_courses,
+        'enterprise_customer_name': enterprise_customer_name,
         'enrollment_message': enrollment_message,
         'redirect_message': Text(redirect_message),
         'account_activation_messages': account_activation_messages,
@@ -799,12 +771,10 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
         'verification_errors': verification_errors,
         'denied_banner': denied_banner,
         'billing_email': settings.PAYMENT_SUPPORT_EMAIL,
-        'show_account_activation_popup': show_account_activation_popup,
         'user': user,
         'logout_url': reverse('logout'),
         'platform_name': platform_name,
         'enrolled_courses_either_paid': enrolled_courses_either_paid,
-        'enrolled_courses_voucher_refundable': enrolled_courses_voucher_refundable,
         'provider_states': [],
         'courses_requirements_not_met': courses_requirements_not_met,
         'nav_hidden': True,
@@ -819,15 +789,12 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
         'empty_dashboard_message': empty_dashboard_message,
         'recovery_email_message': recovery_email_message,
         'recovery_email_activation_message': recovery_email_activation_message,
+        'enterprise_learner_portal_enabled_message': enterprise_learner_portal_enabled_message,
         'show_load_all_courses_link': show_load_all_courses_link(user, course_limit, course_enrollments),
         # TODO START: clean up as part of REVEM-199 (START)
         'course_info': get_dashboard_course_info(user, course_enrollments),
         # TODO START: clean up as part of REVEM-199 (END)
     }
-
-    # Include enterprise learner portal metadata and messaging
-    enterprise_learner_portal_context = get_enterprise_learner_portal_context(request)
-    context.update(enterprise_learner_portal_context)
 
     context_from_plugins = get_plugins_view_context(
         ProjectType.LMS,
@@ -835,10 +802,6 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
         context
     )
     context.update(context_from_plugins)
-
-    notice_url = check_for_unacknowledged_notices(context)
-    if notice_url:
-        return redirect(notice_url)
 
     course = None
     context.update(
@@ -863,12 +826,4 @@ def student_dashboard(request):  # lint-amnesty, pylint: disable=too-many-statem
         'resume_button_urls': resume_button_urls
     })
 
-    response = render_to_response('dashboard.html', context)
-    if show_account_activation_popup:
-        response.delete_cookie(
-            settings.SHOW_ACTIVATE_CTA_POPUP_COOKIE_NAME,
-            domain=settings.SESSION_COOKIE_DOMAIN,
-            path='/',
-        )
-
-    return response
+    return render_to_response('dashboard.html', context)

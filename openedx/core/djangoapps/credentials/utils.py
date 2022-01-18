@@ -34,8 +34,7 @@ def get_credentials_api_client(user, org=None):
         org (str): Optional organization to look up the site config for, rather than the current request
 
     """
-    scopes = ['email', 'profile', 'user_id']
-    jwt = create_jwt_for_user(user, scopes=scopes)
+    jwt = create_jwt_for_user(user)
 
     if org is None:
         url = CredentialsApiConfig.current().internal_api_url  # by current request

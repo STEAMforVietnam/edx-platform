@@ -2,10 +2,9 @@
 URLs file for the Entitlements API.
 """
 
-from django.conf.urls import include
-from django.urls import path
+from django.conf.urls import include, url
 
 app_name = 'entitlements'
 urlpatterns = [
-    path('v1/', include('common.djangoapps.entitlements.rest_api.v1.urls')),
+    url(r'^v1/', include('common.djangoapps.entitlements.rest_api.v1.urls')),
 ]

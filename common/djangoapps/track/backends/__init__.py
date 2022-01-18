@@ -12,7 +12,7 @@ import abc
 import six
 
 
-class BaseBackend(metaclass=abc.ABCMeta):
+class BaseBackend(six.with_metaclass(abc.ABCMeta, object)):
     """
     Abstract Base Class for event tracking backends.
 
