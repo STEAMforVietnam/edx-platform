@@ -6,11 +6,11 @@ Utility methods related to file handling.
 import os
 from datetime import datetime
 
-import six
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.core.files.storage import DefaultStorage, get_valid_filename
-from django.utils.translation import ugettext as _
-from django.utils.translation import ungettext
+from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 from pytz import UTC
 
 
@@ -18,7 +18,7 @@ class FileValidationException(Exception):
     """
     An exception thrown during file validation.
     """
-    pass
+    pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
 
 def store_uploaded_file(
@@ -59,7 +59,7 @@ def store_uploaded_file(
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
         if file_extension not in allowed_file_types:
             file_types = "', '".join(allowed_file_types)
-            msg = ungettext(
+            msg = ngettext(
                 "The file must end with the extension '{file_types}'.",
                 "The file must end with one of the following extensions: '{file_types}'.",
                 len(allowed_file_types)).format(file_types=file_types)
@@ -90,16 +90,30 @@ def store_uploaded_file(
 
 def course_filename_prefix_generator(course_id, separator='_'):
     """
-    Generates a course-identifying unicode string for use in a file
-    name.
+    Generates a course-identifying unicode string for use in a file name.
 
     Args:
         course_id (object): A course identification object.
+        separator (str): The character or chain of characters used for separating course details in
+            the filename.
     Returns:
-        str: A unicode string which can safely be inserted into a
-            filename.
+        str: A unicode string which can safely be inserted into a filename.
     """
-    return get_valid_filename(six.text_type(separator).join([course_id.org, course_id.course, course_id.run]))
+    filename = str(separator).join([
+        course_id.org,
+        course_id.course,
+        course_id.run
+    ])
+
+    enable_course_filename_ccx_suffix = settings.FEATURES.get(
+        'ENABLE_COURSE_FILENAME_CCX_SUFFIX',
+        False
+    )
+
+    if enable_course_filename_ccx_suffix and getattr(course_id, 'ccx', None):
+        filename = separator.join([filename, 'ccx', course_id.ccx])
+
+    return get_valid_filename(filename)
 
 
 def course_and_time_based_filename_generator(course_id, base_name):
@@ -118,14 +132,14 @@ def course_and_time_based_filename_generator(course_id, base_name):
             and the current time. Note that there will be no extension.
 
     """
-    return u"{course_prefix}_{base_name}_{timestamp_str}".format(
+    return "{course_prefix}_{base_name}_{timestamp_str}".format(
         course_prefix=course_filename_prefix_generator(course_id),
         base_name=get_valid_filename(base_name),
         timestamp_str=datetime.now(UTC).strftime("%Y-%m-%d-%H%M%S")
     )
 
 
-class UniversalNewlineIterator(object):
+class UniversalNewlineIterator:
     """
     This iterable class can be used as a wrapper around a file-like
     object which does not inherently support being read in
@@ -143,8 +157,6 @@ class UniversalNewlineIterator(object):
         """
         Replace CR and CRLF with LF within `string`.
         """
-        if six.PY2:
-            return string.replace('\r\n', '\n').replace('\r', '\n')
         return string.replace('\r\n', '\n').replace('\r', '\n').encode('utf-8')
 
     def generate_lines(self):
@@ -165,7 +177,7 @@ class UniversalNewlineIterator(object):
                     line = char
                     yield self.sanitize(last_line)
                 else:
-                    line += six.text_type(char) if isinstance(char, int) else char
+                    line += str(char) if isinstance(char, int) else char
             buf = self.original_file.read(self.buffer_size)
             if not buf and line:
                 yield self.sanitize(line)

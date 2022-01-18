@@ -5,19 +5,27 @@ Course Duration Limit Configuration Models
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
-from django.utils.encoding import python_2_unicode_compatible
-from django.utils.translation import ugettext_lazy as _
+
+from django.utils.translation import gettext_lazy as _
 
 from openedx.core.djangoapps.config_model_utils.models import StackedConfigurationModel
 from openedx.features.content_type_gating.helpers import correct_modes_for_fbe, enrollment_date_for_fbe
 
 
-@python_2_unicode_compatible
 class CourseDurationLimitConfig(StackedConfigurationModel):
     """
     Configuration to manage the Course Duration Limit facility.
 
     .. no_pii:
+
+    .. toggle_name: CourseDurationLimitConfig.enabled
+    .. toggle_implementation: ConfigurationModel
+    .. toggle_default: False
+    .. toggle_description: When enabled, users will have a limited time to complete and audit the course. The exact
+       duration is given by the "weeks_to_complete" course detail. When enabled, it is necessary to also define the
+       "enabled_as_of" flag: only enrollments created after this date will be affected.
+    .. toggle_use_cases: opt_in
+    .. toggle_creation_date: 2018-11-02
     """
 
     STACKABLE_FIELDS = ('enabled', 'enabled_as_of')

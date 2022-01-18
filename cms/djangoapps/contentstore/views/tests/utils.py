@@ -5,9 +5,10 @@ Utilities for view tests.
 
 import json
 
-from contentstore.tests.utils import CourseTestCase
-from contentstore.views.helpers import xblock_studio_url
-from xmodule.modulestore.tests.factories import ItemFactory
+from cms.djangoapps.contentstore.tests.utils import CourseTestCase
+from xmodule.modulestore.tests.factories import ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+
+from ..helpers import xblock_studio_url
 
 
 class StudioPageTestCase(CourseTestCase):
@@ -16,7 +17,7 @@ class StudioPageTestCase(CourseTestCase):
     """
 
     def setUp(self):
-        super(StudioPageTestCase, self).setUp()
+        super().setUp()
         self.chapter = ItemFactory.create(parent_location=self.course.location,
                                           category='chapter', display_name="Week 1")
         self.sequential = ItemFactory.create(parent_location=self.chapter.location,
@@ -36,7 +37,7 @@ class StudioPageTestCase(CourseTestCase):
         """
         Returns the HTML for the xblock when shown within a unit or container page.
         """
-        preview_url = '/xblock/{usage_key}/{view_name}'.format(usage_key=xblock.location, view_name=view_name)
+        preview_url = f'/xblock/{xblock.location}/{view_name}'
         resp = self.client.get_json(preview_url)
         self.assertEqual(resp.status_code, 200)
         resp_content = json.loads(resp.content.decode('utf-8'))
@@ -65,7 +66,7 @@ class StudioPageTestCase(CourseTestCase):
         )
         self.validate_html_for_action_button(
             html,
-            'button class="btn-default edit-button action-button">',
+            'button class="btn-default edit-button action-button"',
             can_edit
         )
         self.validate_html_for_action_button(

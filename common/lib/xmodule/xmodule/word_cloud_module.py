@@ -12,9 +12,8 @@ import logging
 
 from pkg_resources import resource_string
 
-import six
-from six.moves import map
 from web_fragments.fragment import Fragment
+from xblock.core import XBlock
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
 from xmodule.editing_module import EditingMixin
 from xmodule.raw_module import EmptyDataRawMixin
@@ -45,6 +44,7 @@ def pretty_bool(value):
     return value in bool_dict
 
 
+@XBlock.needs('mako')
 class WordCloudBlock(  # pylint: disable=abstract-method
     EmptyDataRawMixin,
     XmlMixin,
@@ -141,7 +141,7 @@ class WordCloudBlock(  # pylint: disable=abstract-method
     def get_state(self):
         """Return success json answer for client."""
         if self.submitted:
-            total_count = sum(six.itervalues(self.all_words))
+            total_count = sum(self.all_words.values())
             return json.dumps({
                 'status': 'success',
                 'submitted': True,
@@ -274,12 +274,13 @@ class WordCloudBlock(  # pylint: disable=abstract-method
                 'error': 'Unknown Command!'
             })
 
-    def student_view(self, context):
+    @XBlock.supports('multi_device')
+    def student_view(self, context):  # lint-amnesty, pylint: disable=unused-argument
         """
         Renders the output that a student will see.
         """
         fragment = Fragment()
-        fragment.add_content(self.system.render_template('word_cloud.html', {
+        fragment.add_content(self.runtime.service(self, 'mako').render_template('word_cloud.html', {
             'ajax_url': self.ajax_url,
             'display_name': self.display_name,
             'instructions': self.instructions,
@@ -304,8 +305,32 @@ class WordCloudBlock(  # pylint: disable=abstract-method
         Return the studio view.
         """
         fragment = Fragment(
-            self.system.render_template(self.mako_template, self.get_context())
+            self.runtime.service(self, 'mako').render_template(self.mako_template, self.get_context())
         )
         add_webpack_to_fragment(fragment, 'WordCloudBlockStudio')
         shim_xmodule_js(fragment, self.studio_js_module_name)
         return fragment
+
+    def index_dictionary(self):
+        """
+        Return dictionary prepared with module content and type for indexing.
+        """
+        # return key/value fields in a Python dict object
+        # values may be numeric / string or dict
+        # default implementation is an empty dict
+
+        xblock_body = super().index_dictionary()
+
+        index_body = {
+            "display_name": self.display_name,
+            "instructions": self.instructions,
+        }
+
+        if "content" in xblock_body:
+            xblock_body["content"].update(index_body)
+        else:
+            xblock_body["content"] = index_body
+
+        xblock_body["content_type"] = "Word Cloud"
+
+        return xblock_body

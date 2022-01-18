@@ -6,14 +6,12 @@ CourseGrade Class
 from abc import abstractmethod
 from collections import OrderedDict, defaultdict
 
-import six
 from ccx_keys.locator import CCXLocator
 from django.conf import settings
-from django.utils.encoding import python_2_unicode_compatible
 from lazy import lazy
 
 from openedx.core.lib.grade_utils import round_away_from_zero
-from xmodule import block_metadata_utils
+from xmodule import block_metadata_utils  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .config import assume_zero_if_absent
 from .scores import compute_percent
@@ -21,8 +19,7 @@ from .subsection_grade import ZeroSubsectionGrade
 from .subsection_grade_factory import SubsectionGradeFactory
 
 
-@python_2_unicode_compatible
-class CourseGradeBase(object):
+class CourseGradeBase:
     """
     Base class for Course Grades.
     """
@@ -38,8 +35,8 @@ class CourseGradeBase(object):
         self.force_update_subsections = force_update_subsections
 
     def __str__(self):
-        return u'Course Grade: percent: {}, letter_grade: {}, passed: {}'.format(
-            six.text_type(self.percent),
+        return 'Course Grade: percent: {}, letter_grade: {}, passed: {}'.format(
+            str(self.percent),
             self.letter_grade,
             self.passed,
         )
@@ -56,12 +53,23 @@ class CourseGradeBase(object):
         """
         Returns the subsection grade for the given subsection usage key.
 
-        Note: does NOT check whether the user has access to the subsection.
-        Assumes that if a grade exists, the user has access to it.  If the
-        grade doesn't exist then either the user does not have access to
-        it or hasn't attempted any problems in the subsection.
+        Raises `KeyError` if the course structure does not contain the key.
+
+        If the course structure contains the key, this will always succeed
+        (and return a grade) regardless of whether the user can access that section;
+        it is up to the caller to ensure that the grade isn't
+        shown to users that shouldn't be able to access it
+        (e.g. a student shouldn't see a grade for an unreleased subsection);
         """
-        return self._get_subsection_grade(self.course_data.effective_structure[subsection_key])
+        # look in the user structure first and fallback to the collected;
+        # however, we assume the state of course_data is intentional,
+        # so we use effective_structure to avoid additional fetching
+        subsection = (
+            self.course_data.effective_structure[subsection_key]
+            if subsection_key in self.course_data.effective_structure
+            else self.course_data.collected_structure[subsection_key]
+        )
+        return self._get_subsection_grade(subsection)
 
     @lazy
     def graded_subsections_by_format(self):
@@ -70,7 +78,7 @@ class CourseGradeBase(object):
         a dict keyed by subsection format types.
         """
         subsections_by_format = defaultdict(OrderedDict)
-        for chapter in six.itervalues(self.chapter_grades):
+        for chapter in self.chapter_grades.values():
             for subsection_grade in chapter['sections']:
                 if subsection_grade.graded:
                     graded_total = subsection_grade.graded_total
@@ -99,7 +107,7 @@ class CourseGradeBase(object):
         keyed by subsection location.
         """
         subsection_grades = defaultdict(OrderedDict)
-        for chapter in six.itervalues(self.chapter_grades):
+        for chapter in self.chapter_grades.values():
             for subsection_grade in chapter['sections']:
                 subsection_grades[subsection_grade.location] = subsection_grade
         return subsection_grades
@@ -110,7 +118,7 @@ class CourseGradeBase(object):
         Returns a dict of problem scores keyed by their locations.
         """
         problem_scores = {}
-        for chapter in six.itervalues(self.chapter_grades):
+        for chapter in self.chapter_grades.values():
             for subsection_grade in chapter['sections']:
                 problem_scores.update(subsection_grade.problem_scores)
         return problem_scores
@@ -211,8 +219,7 @@ class CourseGradeBase(object):
         """
         chapter_subsection_grades = self._get_subsection_grades(course_structure, chapter.location)
         return {
-            # xss-lint: disable=python-deprecated-display-name
-            'display_name': block_metadata_utils.display_name_with_default_escaped(chapter),
+            'display_name': block_metadata_utils.display_name_with_default(chapter),
             'url_name': block_metadata_utils.url_name_for_block(chapter),
             'sections': chapter_subsection_grades,
         }
@@ -249,7 +256,7 @@ class CourseGrade(CourseGradeBase):
     Course Grade class when grades are updated or read from storage.
     """
     def __init__(self, user, course_data, *args, **kwargs):
-        super(CourseGrade, self).__init__(user, course_data, *args, **kwargs)
+        super().__init__(user, course_data, *args, **kwargs)
         self._subsection_grade_factory = SubsectionGradeFactory(user, course_data=course_data)
 
     def update(self):
@@ -270,7 +277,7 @@ class CourseGrade(CourseGradeBase):
         return self
 
     @lazy
-    def attempted(self):
+    def attempted(self):  # lint-amnesty, pylint: disable=invalid-overridden-method
         """
         Returns whether any of the subsections in this course
         have been attempted by the student.
@@ -278,7 +285,7 @@ class CourseGrade(CourseGradeBase):
         if assume_zero_if_absent(self.course_data.course_key):
             return True
 
-        for chapter in six.itervalues(self.chapter_grades):
+        for chapter in self.chapter_grades.values():
             for subsection_grade in chapter['sections']:
                 if subsection_grade.all_total.first_attempted:
                     return True

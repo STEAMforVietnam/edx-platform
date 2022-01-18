@@ -7,8 +7,8 @@ from django.test.testcases import TestCase
 from opaque_keys.edx.keys import CourseKey
 
 import openedx.core.djangoapps.django_comment_common.models as models
-from xmodule.modulestore.tests.django_utils import TEST_DATA_MIXED_MODULESTORE, ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import ToyCourseFactory
+from xmodule.modulestore.tests.django_utils import TEST_DATA_MIXED_MODULESTORE, ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import ToyCourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class RoleClassTestCase(ModuleStoreTestCase):
@@ -18,7 +18,7 @@ class RoleClassTestCase(ModuleStoreTestCase):
     MODULESTORE = TEST_DATA_MIXED_MODULESTORE
 
     def setUp(self):
-        super(RoleClassTestCase, self).setUp()
+        super().setUp()
 
         # For course ID, syntax edx/classname/classdate is important
         # because xmodel.course_module.id_to_location looks for a string to split
@@ -40,13 +40,13 @@ class RoleClassTestCase(ModuleStoreTestCase):
         # Roles with the same FORUM_ROLE in same class also receives the same
         # permission.
         # Is this desirable behavior?
-        self.assertTrue(self.student_role.has_permission("delete_thread"))
-        self.assertTrue(self.student_2_role.has_permission("delete_thread"))
-        self.assertFalse(self.TA_role.has_permission("delete_thread"))
+        assert self.student_role.has_permission('delete_thread')
+        assert self.student_2_role.has_permission('delete_thread')
+        assert not self.TA_role.has_permission('delete_thread')
 
     def test_inherit_permission(self):
         self.TA_role.inherit_permissions(self.student_role)
-        self.assertTrue(self.TA_role.has_permission("delete_thread"))
+        assert self.TA_role.has_permission('delete_thread')
         # Despite being from 2 different courses, TA_role_2 can still inherit
         # permissions from TA_role without error
         self.TA_role_2.inherit_permissions(self.TA_role)
@@ -58,8 +58,8 @@ class PermissionClassTestCase(TestCase):
     """
 
     def setUp(self):
-        super(PermissionClassTestCase, self).setUp()
+        super().setUp()
         self.permission = models.Permission.objects.get_or_create(name="test")[0]
 
     def test_unicode(self):
-        self.assertEqual(str(self.permission), "test")
+        assert str(self.permission) == 'test'

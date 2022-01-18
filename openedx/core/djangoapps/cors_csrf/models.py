@@ -3,11 +3,10 @@
 
 from config_models.models import ConfigurationModel
 from django.db import models
-from django.utils.encoding import python_2_unicode_compatible
-from django.utils.translation import ugettext_lazy as _
+
+from django.utils.translation import gettext_lazy as _
 
 
-@python_2_unicode_compatible
 class XDomainProxyConfiguration(ConfigurationModel):
     """
     Cross-domain proxy configuration.
@@ -19,7 +18,7 @@ class XDomainProxyConfiguration(ConfigurationModel):
 
     whitelist = models.fields.TextField(
         help_text=_(
-            u"List of domains that are allowed to make cross-domain "
+            "List of domains that are allowed to make cross-domain "
             "requests to this site.  Please list each domain on its own line."
         )
     )

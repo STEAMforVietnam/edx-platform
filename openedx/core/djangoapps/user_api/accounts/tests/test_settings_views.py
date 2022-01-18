@@ -1,8 +1,7 @@
 """ Tests for views related to account settings. """
-# -*- coding: utf-8 -*-
 
 
-import mock
+from unittest import mock
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.messages.middleware import MessageMiddleware
@@ -12,6 +11,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from edx_rest_api_client import exceptions
 
+from edx_toggles.toggles.testutils import override_waffle_flag
 from lms.djangoapps.commerce.models import CommerceConfiguration
 from lms.djangoapps.commerce.tests import factories
 from lms.djangoapps.commerce.tests.mocks import mock_get_orders
@@ -23,11 +23,10 @@ from openedx.core.djangoapps.site_configuration.tests.mixins import SiteMixin
 from openedx.core.djangoapps.user_api.accounts.settings_views import account_settings_context, get_user_orders
 from openedx.core.djangoapps.user_api.accounts.toggles import REDIRECT_TO_ACCOUNT_MICROFRONTEND
 from openedx.core.djangoapps.user_api.tests.factories import UserPreferenceFactory
-from openedx.core.djangoapps.waffle_utils.testutils import override_waffle_flag
 from openedx.core.djangolib.testing.utils import skip_unless_lms
-from student.tests.factories import UserFactory
-from third_party_auth.tests.testutil import ThirdPartyAuthTestMixin
 from openedx.features.enterprise_support.utils import get_enterprise_readonly_account_fields
+from common.djangoapps.student.tests.factories import UserFactory
+from common.djangoapps.third_party_auth.tests.testutil import ThirdPartyAuthTestMixin
 
 
 @skip_unless_lms
@@ -49,7 +48,7 @@ class AccountSettingsViewTest(ThirdPartyAuthTestMixin, SiteMixin, ProgramsApiCon
 
     @mock.patch("django.conf.settings.MESSAGE_STORAGE", 'django.contrib.messages.storage.cookie.CookieStorage')
     def setUp(self):  # pylint: disable=arguments-differ
-        super(AccountSettingsViewTest, self).setUp()
+        super().setUp()
         self.user = UserFactory.create(username=self.USERNAME, password=self.PASSWORD)
         CommerceConfiguration.objects.create(cache_ttl=10, enabled=True)
         self.client.login(username=self.USERNAME, password=self.PASSWORD)
@@ -84,34 +83,30 @@ class AccountSettingsViewTest(ThirdPartyAuthTestMixin, SiteMixin, ProgramsApiCon
             context = account_settings_context(self.request)
 
             user_accounts_api_url = reverse("accounts_api", kwargs={'username': self.user.username})
-            self.assertEqual(context['user_accounts_api_url'], user_accounts_api_url)
+            assert context['user_accounts_api_url'] == user_accounts_api_url
 
             user_preferences_api_url = reverse('preferences_api', kwargs={'username': self.user.username})
-            self.assertEqual(context['user_preferences_api_url'], user_preferences_api_url)
+            assert context['user_preferences_api_url'] == user_preferences_api_url
 
             for attribute in self.FIELDS:
-                self.assertIn(attribute, context['fields'])
+                assert attribute in context['fields']
 
-            self.assertEqual(
-                context['user_accounts_api_url'], reverse("accounts_api", kwargs={'username': self.user.username})
-            )
-            self.assertEqual(
-                context['user_preferences_api_url'], reverse('preferences_api', kwargs={'username': self.user.username})
-            )
+            assert context['user_accounts_api_url'] == reverse('accounts_api', kwargs={'username': self.user.username})
+            assert context['user_preferences_api_url'] ==\
+                   reverse('preferences_api', kwargs={'username': self.user.username})
 
-            self.assertEqual(context['duplicate_provider'], 'facebook')
-            self.assertEqual(context['auth']['providers'][0]['name'], 'Facebook')
-            self.assertEqual(context['auth']['providers'][1]['name'], 'Google')
+            assert context['duplicate_provider'] == 'facebook'
+            assert context['auth']['providers'][0]['name'] == 'Facebook'
+            assert context['auth']['providers'][1]['name'] == 'Google'
 
-            self.assertEqual(context['sync_learner_profile_data'], False)
-            self.assertEqual(context['edx_support_url'], settings.SUPPORT_SITE_LINK)
-            self.assertEqual(context['enterprise_name'], None)
-            self.assertEqual(
-                context['enterprise_readonly_account_fields'],
-                {'fields': list(get_enterprise_readonly_account_fields(self.user))}
-            )
+            assert context['sync_learner_profile_data'] is False
+            assert context['edx_support_url'] == settings.SUPPORT_SITE_LINK
+            assert context['enterprise_name'] is None
+            assert context['enterprise_readonly_account_fields'] ==\
+                   {'fields': list(get_enterprise_readonly_account_fields(self.user))}
+
             expected_beta_language = {'code': 'lt-lt', 'name': settings.LANGUAGE_DICT.get('lt-lt')}
-            self.assertEqual(context['beta_language'], expected_beta_language)
+            assert context['beta_language'] == expected_beta_language
 
     @mock.patch('openedx.core.djangoapps.user_api.accounts.settings_views.enterprise_customer_for_request')
     @mock.patch('openedx.features.enterprise_support.utils.third_party_auth.provider.Registry.get')
@@ -129,34 +124,27 @@ class AccountSettingsViewTest(ThirdPartyAuthTestMixin, SiteMixin, ProgramsApiCon
         context = account_settings_context(self.request)
 
         user_accounts_api_url = reverse("accounts_api", kwargs={'username': self.user.username})
-        self.assertEqual(context['user_accounts_api_url'], user_accounts_api_url)
+        assert context['user_accounts_api_url'] == user_accounts_api_url
 
         user_preferences_api_url = reverse('preferences_api', kwargs={'username': self.user.username})
-        self.assertEqual(context['user_preferences_api_url'], user_preferences_api_url)
+        assert context['user_preferences_api_url'] == user_preferences_api_url
 
         for attribute in self.FIELDS:
-            self.assertIn(attribute, context['fields'])
+            assert attribute in context['fields']
 
-        self.assertEqual(
-            context['user_accounts_api_url'], reverse("accounts_api", kwargs={'username': self.user.username})
-        )
-        self.assertEqual(
-            context['user_preferences_api_url'], reverse('preferences_api', kwargs={'username': self.user.username})
-        )
+        assert context['user_accounts_api_url'] == reverse('accounts_api', kwargs={'username': self.user.username})
+        assert context['user_preferences_api_url'] ==\
+               reverse('preferences_api', kwargs={'username': self.user.username})
 
-        self.assertEqual(context['duplicate_provider'], 'facebook')
-        self.assertEqual(context['auth']['providers'][0]['name'], 'Facebook')
-        self.assertEqual(context['auth']['providers'][1]['name'], 'Google')
+        assert context['duplicate_provider'] == 'facebook'
+        assert context['auth']['providers'][0]['name'] == 'Facebook'
+        assert context['auth']['providers'][1]['name'] == 'Google'
 
-        self.assertEqual(
-            context['sync_learner_profile_data'], mock_get_auth_provider.return_value.sync_learner_profile_data
-        )
-        self.assertEqual(context['edx_support_url'], settings.SUPPORT_SITE_LINK)
-        self.assertEqual(context['enterprise_name'], dummy_enterprise_customer['name'])
-        self.assertEqual(
-            context['enterprise_readonly_account_fields'],
-            {'fields': list(get_enterprise_readonly_account_fields(self.user))}
-        )
+        assert context['sync_learner_profile_data'] == mock_get_auth_provider.return_value.sync_learner_profile_data
+        assert context['edx_support_url'] == settings.SUPPORT_SITE_LINK
+        assert context['enterprise_name'] == dummy_enterprise_customer['name']
+        assert context['enterprise_readonly_account_fields'] ==\
+               {'fields': list(get_enterprise_readonly_account_fields(self.user))}
 
     def test_view(self):
         """
@@ -203,13 +191,13 @@ class AccountSettingsViewTest(ThirdPartyAuthTestMixin, SiteMixin, ProgramsApiCon
                 'receipt_url': '/checkout/receipt/?order_number=' + order['number'],
                 'lines': order['lines'],
             }
-            self.assertEqual(order_detail[i], expected)
+            assert order_detail[i] == expected
 
     def test_commerce_order_detail_exception(self):
         with mock_get_orders(exception=exceptions.HttpNotFoundError):
             order_detail = get_user_orders(self.user)
 
-        self.assertEqual(order_detail, [])
+        assert not order_detail
 
     def test_incomplete_order_detail(self):
         response = {
@@ -227,7 +215,7 @@ class AccountSettingsViewTest(ThirdPartyAuthTestMixin, SiteMixin, ProgramsApiCon
         with mock_get_orders(response=response):
             order_detail = get_user_orders(self.user)
 
-        self.assertEqual(order_detail, [])
+        assert not order_detail
 
     def test_order_history_with_no_product(self):
         response = {
@@ -250,23 +238,34 @@ class AccountSettingsViewTest(ThirdPartyAuthTestMixin, SiteMixin, ProgramsApiCon
         with mock_get_orders(response=response):
             order_detail = get_user_orders(self.user)
 
-        self.assertEqual(len(order_detail), 1)
+        assert len(order_detail) == 1
 
     def test_redirect_view(self):
+        old_url_path = reverse('account_settings')
         with override_waffle_flag(REDIRECT_TO_ACCOUNT_MICROFRONTEND, active=True):
-            old_url_path = reverse('account_settings')
-
-            # Test with waffle flag active and site setting disabled, does not redirect
-            response = self.client.get(path=old_url_path)
-            for attribute in self.FIELDS:
-                self.assertContains(response, attribute)
-
-            # Test with waffle flag active and site setting enabled, redirects to microfrontend
-            site_domain = 'othersite.example.com'
-            self.set_up_site(site_domain, {
-                'SITE_NAME': site_domain,
-                'ENABLE_ACCOUNT_MICROFRONTEND': True
-            })
-            self.client.login(username=self.USERNAME, password=self.PASSWORD)
+            # Test with waffle flag active and none site setting, redirects to microfrontend
             response = self.client.get(path=old_url_path)
             self.assertRedirects(response, settings.ACCOUNT_MICROFRONTEND_URL, fetch_redirect_response=False)
+
+        # Test with waffle flag disabled and site setting disabled, does not redirect
+        response = self.client.get(path=old_url_path)
+        for attribute in self.FIELDS:
+            self.assertContains(response, attribute)
+
+        # Test with site setting disabled, does not redirect
+        site_domain = 'othersite.example.com'
+        site = self.set_up_site(site_domain, {
+            'SITE_NAME': site_domain,
+            'ENABLE_ACCOUNT_MICROFRONTEND': False
+        })
+        self.client.login(username=self.USERNAME, password=self.PASSWORD)
+        response = self.client.get(path=old_url_path)
+        for attribute in self.FIELDS:
+            self.assertContains(response, attribute)
+
+        # Test with site setting enabled, redirects to microfrontend
+        site.configuration.site_values['ENABLE_ACCOUNT_MICROFRONTEND'] = True
+        site.configuration.save()
+        site.__class__.objects.clear_cache()
+        response = self.client.get(path=old_url_path)
+        self.assertRedirects(response, settings.ACCOUNT_MICROFRONTEND_URL, fetch_redirect_response=False)

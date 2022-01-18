@@ -3,30 +3,34 @@ Views for user API
 """
 
 
-import six
+from completion.exceptions import UnavailableCompletionData
+from completion.utilities import get_key_to_last_completed_block
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.contrib.auth.signals import user_logged_in
+from django.db import transaction
 from django.shortcuts import redirect
 from django.utils import dateparse
+from django.utils.decorators import method_decorator
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey
 from rest_framework import generics, views
 from rest_framework.decorators import api_view
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from xblock.fields import Scope
 from xblock.runtime import KeyValueStore
-from django.contrib.auth.models import User
 
+from common.djangoapps.student.models import CourseEnrollment, User  # lint-amnesty, pylint: disable=reimported
 from lms.djangoapps.courseware.access import is_mobile_available_for_user
+from lms.djangoapps.courseware.access_utils import ACCESS_GRANTED
 from lms.djangoapps.courseware.courses import get_current_child
 from lms.djangoapps.courseware.model_data import FieldDataCache
 from lms.djangoapps.courseware.module_render import get_module_for_descriptor
 from lms.djangoapps.courseware.views.index import save_positions_recursively_up
-from lms.djangoapps.courseware.access_utils import ACCESS_GRANTED
-from mobile_api.utils import API_V05
+from lms.djangoapps.mobile_api.utils import API_V1, API_V05
 from openedx.features.course_duration_limits.access import check_course_expired
-from student.models import CourseEnrollment, User
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .. import errors
 from ..decorators import mobile_course_access, mobile_view
@@ -70,18 +74,21 @@ class UserDetail(generics.RetrieveAPIView):
     lookup_field = 'username'
 
     def get_serializer_context(self):
-        context = super(UserDetail, self).get_serializer_context()
+        context = super().get_serializer_context()
         context['api_version'] = self.kwargs.get('api_version')
         return context
 
 
 @mobile_view(is_user=True)
+@method_decorator(transaction.non_atomic_requests, name='dispatch')
 class UserCourseStatus(views.APIView):
     """
     **Use Cases**
 
         Get or update the ID of the module that the specified user last
         visited in the specified course.
+
+        Get ID of the last completed block in case of version v1
 
     **Example Requests**
 
@@ -110,9 +117,21 @@ class UserCourseStatus(views.APIView):
           visited in the course.
         * last_visited_module_path: The ID of the modules in the path from the
           last visited module to the course module.
+
+        For version v1 GET request response includes the following values.
+
+        * last_visited_block_id: ID of the last completed block.
+
     """
 
     http_method_names = ["get", "patch"]
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.method in SAFE_METHODS:
+            return super().dispatch(request, *args, **kwargs)
+        else:
+            with transaction.atomic():
+                return super().dispatch(request, *args, **kwargs)
 
     def _last_visited_module_path(self, request, course):
         """
@@ -127,7 +146,7 @@ class UserCourseStatus(views.APIView):
             request.user, request, course, field_data_cache, course.id, course=course
         )
 
-        path = [course_module]
+        path = [course_module] if course_module else []
         chapter = get_current_child(course_module, min_depth=2)
         if chapter is not None:
             path.append(chapter)
@@ -143,7 +162,7 @@ class UserCourseStatus(views.APIView):
         Returns the course status
         """
         path = self._last_visited_module_path(request, course)
-        path_ids = [six.text_type(module.location) for module in path]
+        path_ids = [str(module.location) for module in path]
         return Response({
             "last_visited_module_id": path_ids[0],
             "last_visited_module_path": path_ids,
@@ -179,15 +198,26 @@ class UserCourseStatus(views.APIView):
         return self._get_course_info(request, course)
 
     @mobile_course_access(depth=2)
-    def get(self, request, course, *args, **kwargs):
+    def get(self, request, course, *args, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
         """
         Get the ID of the module that the specified user last visited in the specified course.
         """
+        user_course_status = self._get_course_info(request, course)
 
-        return self._get_course_info(request, course)
+        api_version = self.kwargs.get("api_version")
+        if api_version == API_V1:
+            # Get ID of the block that the specified user last visited in the specified course.
+            try:
+                block_id = str(get_key_to_last_completed_block(request.user, course.id))
+            except UnavailableCompletionData:
+                block_id = ""
+
+            user_course_status.data["last_visited_block_id"] = block_id
+
+        return user_course_status
 
     @mobile_course_access(depth=2)
-    def patch(self, request, course, *args, **kwargs):
+    def patch(self, request, course, *args, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
         """
         Update the ID of the module that the specified user last visited in the specified course.
         """
@@ -292,7 +322,7 @@ class UserCourseEnrollmentsList(generics.ListAPIView):
         return check_org is None or (check_org.lower() == course_org.lower())
 
     def get_serializer_context(self):
-        context = super(UserCourseEnrollmentsList, self).get_serializer_context()
+        context = super().get_serializer_context()
         context['api_version'] = self.kwargs.get('api_version')
         return context
 

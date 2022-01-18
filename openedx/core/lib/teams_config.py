@@ -6,7 +6,6 @@ Safe configuration wrapper for Course Teams feature.
 import re
 from enum import Enum
 
-import six
 from django.utils.functional import cached_property
 
 # "Arbitrarily large" but still limited
@@ -15,7 +14,7 @@ MANAGED_TEAM_MAX_TEAM_SIZE = 200
 DEFAULT_COURSE_RUN_MAX_TEAM_SIZE = 50
 
 
-class TeamsConfig(object):
+class TeamsConfig:
     """
     Configuration for the Course Teams feature on a course run.
 
@@ -28,28 +27,21 @@ class TeamsConfig(object):
         """
         self._data = data if isinstance(data, dict) else {}
 
-    def __unicode__(self):
-        """
-        Return user-friendly string.
-
-        TODO move this code to __str__ after Py3 upgrade.
-        """
-        return "Teams configuration for {} team-sets".format(len(self.teamsets))
-
     def __str__(self):
         """
         Return user-friendly string.
         """
-        return str(self.__unicode__())
+        return f"Teams configuration for {len(self.teamsets)} team-sets"
 
     def __repr__(self):
         """
         Return developer-helpful string.
         """
-        return "<{} default_max_team_size={} teamsets=[{}]>".format(
+        return "<{} default_max_team_size={} teamsets=[{}] enabled={}>".format(
             self.__class__.__name__,
             self.default_max_team_size,
             ", ".join(repr(teamset) for teamset in self.teamsets),
+            self.is_enabled,
         )
 
     def __eq__(self, other):
@@ -78,6 +70,7 @@ class TeamsConfig(object):
         JSON-friendly dictionary containing cleaned data from this TeamsConfig.
         """
         return {
+            'enabled': self.is_enabled,
             'max_team_size': self.default_max_team_size,
             'team_sets': [
                 teamset.cleaned_data for teamset in self.teamsets
@@ -89,7 +82,16 @@ class TeamsConfig(object):
         """
         Whether the Course Teams feature is enabled for this course run.
         """
-        return bool(self.teamsets)
+        # Check if the enabled field is set, and teamsets are defined
+        has_teamsets = bool(self.teamsets)
+        return self._data.get('enabled', True) and has_teamsets
+
+    @is_enabled.setter
+    def is_enabled(self, value):
+        """
+        Setter to set value of enabled value
+        """
+        self._data['enabled'] = value
 
     @cached_property
     def teamsets(self):
@@ -148,7 +150,7 @@ class TeamsConfig(object):
         try:
             teamset = self.teamsets_by_id[teamset_id]
         except KeyError:
-            raise ValueError("Team-set {!r} does not exist.".format(teamset_id))
+            raise ValueError(f"Team-set {teamset_id!r} does not exist.")  # lint-amnesty, pylint: disable=raise-missing-from
         if teamset.teamset_type != TeamsetType.open:
             return MANAGED_TEAM_MAX_TEAM_SIZE
         if teamset.max_team_size:
@@ -156,7 +158,7 @@ class TeamsConfig(object):
         return self.default_max_team_size
 
 
-class TeamsetConfig(object):
+class TeamsetConfig:
     """
     Configuration for a team-set within a course run.
 
@@ -171,19 +173,11 @@ class TeamsetConfig(object):
         """
         self._data = data if isinstance(data, dict) else {}
 
-    def __unicode__(self):
-        """
-        Return user-friendly string.
-
-        TODO move this code to __str__ after Py3 upgrade.
-        """
-        return self.name
-
     def __str__(self):
         """
         Return user-friendly string.
         """
-        return str(self.__unicode__())
+        return self.name
 
     def __repr__(self):
         """
@@ -316,8 +310,8 @@ def _clean_string(value):
     """
     Return `str(value)` if it's a string or int, otherwise "".
     """
-    if isinstance(value, six.integer_types + six.string_types):
-        return six.text_type(value)
+    if isinstance(value, (int,) + (str,)):
+        return str(value)
     return ""
 
 
@@ -325,7 +319,7 @@ def _clean_max_team_size(value):
     """
     Return `value` if it's a positive int, otherwise None.
     """
-    if not isinstance(value, six.integer_types):
+    if not isinstance(value, int):
         return None
     if value < 0:
         return None

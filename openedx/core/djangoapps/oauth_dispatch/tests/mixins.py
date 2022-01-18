@@ -2,17 +2,17 @@
 OAuth Dispatch test mixins
 """
 
-
+import pytest
 import jwt
 from django.conf import settings
 from jwkest.jwk import KEYS
 from jwkest.jws import JWS
 from jwt.exceptions import ExpiredSignatureError
 
-from student.models import UserProfile, anonymous_id_for_user
+from common.djangoapps.student.models import UserProfile, anonymous_id_for_user
 
 
-class AccessTokenMixin(object):
+class AccessTokenMixin:
     """ Mixin for tests dealing with OAuth 2 access tokens. """
 
     def assert_valid_jwt_access_token(self, access_token, user, scopes=None, should_be_expired=False, filters=None,
@@ -46,8 +46,10 @@ class AccessTokenMixin(object):
                 algorithms=[settings.JWT_AUTH['JWT_ALGORITHM']],
                 audience=audience,
                 issuer=issuer,
-                verify_expiration=verify_expiration,
-                options={'verify_signature': False},
+                options={
+                    'verify_signature': False,
+                    "verify_exp": verify_expiration
+                },
             )
 
         # Note that if we expect the claims to have expired
@@ -100,7 +102,7 @@ class AccessTokenMixin(object):
         # now we should assert that the claim is indeed
         # expired
         if should_be_expired:
-            with self.assertRaises(ExpiredSignatureError):
+            with pytest.raises(ExpiredSignatureError):
                 _decode_jwt(verify_expiration=True)
 
         return payload

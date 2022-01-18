@@ -1,33 +1,35 @@
+# lint-amnesty, pylint: disable=missing-module-docstring
+
+from unittest.mock import patch, sentinel
+
 import ddt
-import six
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.test.client import RequestFactory
 from django.test.utils import override_settings
-from mock import patch, sentinel
 
 from openedx.core.lib.tests.assertions.events import assert_event_matches
-from track import views
-from track.middleware import TrackMiddleware
-from track.tests import FROZEN_TIME, EventTrackingTestCase
+from common.djangoapps.track import views
+from common.djangoapps.track.middleware import TrackMiddleware
+from common.djangoapps.track.tests import FROZEN_TIME, EventTrackingTestCase
 
 TEST_USERNAME = 'test-username'
 TEST_USER_ID = 1000
 
 
 @ddt.ddt
-class TestTrackViews(EventTrackingTestCase):
+class TestTrackViews(EventTrackingTestCase):  # lint-amnesty, pylint: disable=missing-class-docstring
 
     @classmethod
     def setUpTestData(cls):
-        super(TestTrackViews, cls).setUpTestData()
+        super().setUpTestData()
         User.objects.create(pk=TEST_USER_ID, username=TEST_USERNAME)
 
     def setUp(self):
-        super(TestTrackViews, self).setUp()
+        super().setUp()
 
         self.request_factory = RequestFactory()
 
-        patcher = patch('track.views.tracker', autospec=True)
+        patcher = patch('common.djangoapps.track.views.tracker', autospec=True)
 
         self.mock_tracker = patcher.start()
         self.addCleanup(patcher.stop)
@@ -40,6 +42,31 @@ class TestTrackViews(EventTrackingTestCase):
         }
 
     def test_user_track(self):
+        request = self.request_factory.get('/event', {
+            'page': self.url_with_course,
+            'event_type': sentinel.event_type,
+            'event': '{}',
+            'courserun_key': 'explicit/course/id'
+        })
+
+        views.user_track(request)
+
+        actual_event = self.get_event()
+        expected_event = {
+            'context': {
+                'course_id': 'explicit/course/id',
+                'org_id': 'explicit',
+                'event_source': 'browser',
+                'page': self.url_with_course,
+                'username': 'anonymous'
+            },
+            'data': {},
+            'timestamp': FROZEN_TIME,
+            'name': str(sentinel.event_type)
+        }
+        assert_event_matches(expected_event, actual_event)
+
+    def test_user_track_with_implicit_course_id(self):
         request = self.request_factory.get('/event', {
             'page': self.url_with_course,
             'event_type': sentinel.event_type,
@@ -109,11 +136,11 @@ class TestTrackViews(EventTrackingTestCase):
 
     @ddt.data(
         {
-            'event_data': u'{{"username": "{}"}}'.format(TEST_USERNAME),
+            'event_data': f'{{"username": "{TEST_USERNAME}"}}',
             'expected_event_data': {"username": TEST_USERNAME, "user_id": TEST_USER_ID}
         },
         {
-            'event_data': u'{"username": "unknown-user"}',
+            'event_data': '{"username": "unknown-user"}',
             'expected_event_data': {"username": "unknown-user"},
         }
     )
@@ -141,7 +168,7 @@ class TestTrackViews(EventTrackingTestCase):
         assert_event_matches(expected_event, actual_event)
 
     @override_settings(
-        EVENT_TRACKING_PROCESSORS=[{'ENGINE': 'track.shim.LegacyFieldMappingProcessor'}],
+        EVENT_TRACKING_PROCESSORS=[{'ENGINE': 'common.djangoapps.track.shim.LegacyFieldMappingProcessor'}],
     )
     def test_user_track_with_middleware_and_processors(self):
         self.recreate_tracker()
@@ -182,7 +209,7 @@ class TestTrackViews(EventTrackingTestCase):
                     'course_id': 'foo/bar/baz',
                     'org_id': 'foo',
                     'user_id': user_id,
-                    'path': u'/event'
+                    'path': '/event'
                 },
             }
         finally:
@@ -236,6 +263,7 @@ class TestTrackViews(EventTrackingTestCase):
                     'referer': '',
                     'client_id': None,
                     'course_id': 'foo/bar/baz',
+                    'enterprise_uuid': '',
                     'path': self.path_with_course,
                     'page': None
                 }
@@ -277,6 +305,7 @@ class TestTrackViews(EventTrackingTestCase):
                     'referer': '',
                     'client_id': '1033501218.1368477899',
                     'course_id': 'foo/bar/baz',
+                    'enterprise_uuid': '',
                     'path': self.path_with_course,
                     'page': None
                 }
@@ -317,7 +346,7 @@ class TestTrackViews(EventTrackingTestCase):
         }
 
         task_info = {
-            six.text_type(sentinel.task_key): sentinel.task_value
+            str(sentinel.task_key): sentinel.task_value
         }
         expected_event_data = dict(task_info)
         expected_event_data.update(self.event)

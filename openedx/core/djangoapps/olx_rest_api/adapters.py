@@ -10,13 +10,13 @@ from opaque_keys.edx.keys import AssetKey, CourseKey
 from fs.memoryfs import MemoryFS
 from fs.wrapfs import WrapFS
 
-from static_replace import replace_static_urls
-from xmodule.contentstore.content import StaticContent
-from xmodule.assetstore.assetmgr import AssetManager
-from xmodule.modulestore.django import modulestore as store
-from xmodule.modulestore.exceptions import ItemNotFoundError
-from xmodule.exceptions import NotFoundError
-from xmodule.xml_module import XmlParserMixin
+from common.djangoapps.static_replace import replace_static_urls
+from xmodule.contentstore.content import StaticContent  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.assetstore.assetmgr import AssetManager  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore as store  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.exceptions import NotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.xml_module import XmlParserMixin  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ def collect_assets_from_text(text, course_id, include_content=False):
             path = path[8:]
         info = {
             'path': path,
-            'url': '/' + str(course_id.make_asset_key("asset", path)),
+            'url': '/' + str(StaticContent.compute_location(course_id, path)),
         }
         if include_content:
             content = get_asset_content_from_path(course_id, path)

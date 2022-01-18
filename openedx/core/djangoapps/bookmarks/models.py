@@ -5,10 +5,9 @@ Models for Bookmarks.
 
 import logging
 
-import six
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.db import models
-from django.utils.encoding import python_2_unicode_compatible
+
 from jsonfield.fields import JSONField
 from model_utils.models import TimeStampedModel
 from opaque_keys.edx.django.models import CourseKeyField, UsageKeyField
@@ -27,7 +26,7 @@ def prepare_path_for_serialization(path):
     """
     Return the data from a list of PathItems ready for serialization to json.
     """
-    return [(six.text_type(path_item.usage_key), path_item.display_name) for path_item in path]
+    return [(str(path_item.usage_key), path_item.display_name) for path_item in path]
 
 
 def parse_path_data(path_data):
@@ -42,7 +41,6 @@ def parse_path_data(path_data):
     return path
 
 
-@python_2_unicode_compatible
 class Bookmark(TimeStampedModel):
     """
     Bookmarks model.
@@ -56,7 +54,7 @@ class Bookmark(TimeStampedModel):
 
     xblock_cache = models.ForeignKey('bookmarks.XBlockCache', on_delete=models.CASCADE)
 
-    class Meta(object):
+    class Meta:
         """
         Bookmark metadata.
         """
@@ -107,7 +105,7 @@ class Bookmark(TimeStampedModel):
         """
         Return the resource id: {username,usage_id}.
         """
-        return u"{0},{1}".format(self.user.username, self.usage_key)
+        return f"{self.user.username},{self.usage_key}"
 
     @property
     def display_name(self):
@@ -173,10 +171,10 @@ class Bookmark(TimeStampedModel):
             try:
                 path = search.path_to_location(modulestore(), usage_key, full_path=True)
             except ItemNotFoundError:
-                log.error(u'Block with usage_key: %s not found.', usage_key)
+                log.error('Block with usage_key: %s not found.', usage_key)
                 return []
             except NoPathToItem:
-                log.error(u'No path to block with usage_key: %s.', usage_key)
+                log.error('No path to block with usage_key: %s.', usage_key)
                 return []
 
             path_data = []
@@ -193,7 +191,6 @@ class Bookmark(TimeStampedModel):
         return path_data
 
 
-@python_2_unicode_compatible
 class XBlockCache(TimeStampedModel):
     """
     XBlockCache model to store info about xblocks.
@@ -210,7 +207,7 @@ class XBlockCache(TimeStampedModel):
     )
 
     def __str__(self):
-        return six.text_type(self.usage_key)
+        return str(self.usage_key)
 
     @property
     def paths(self):

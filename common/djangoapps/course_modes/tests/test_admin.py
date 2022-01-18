@@ -7,24 +7,23 @@ import unittest
 from datetime import datetime, timedelta
 
 import ddt
-import six
 from django.conf import settings
 from django.urls import reverse
 from pytz import UTC, timezone
 
-from course_modes.admin import CourseModeForm
-from course_modes.models import CourseMode
-from course_modes.tests.factories import CourseModeFactory
+from common.djangoapps.course_modes.admin import CourseModeForm
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.course_modes.tests.factories import CourseModeFactory
 # Technically, we shouldn't be importing verify_student, since it's
 # defined in the LMS and course_modes is in common.  However, the benefits
 # of putting all this configuration in one place outweigh the downsides.
 # Once the course admin tool is deployed, we can remove this dependency.
 from lms.djangoapps.verify_student.models import VerificationDeadline
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from student.tests.factories import UserFactory
-from util.date_utils import get_time_display
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from common.djangoapps.student.tests.factories import UserFactory
+from common.djangoapps.util.date_utils import get_time_display
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 # We can only test this in the LMS because the course modes admin relies
@@ -47,7 +46,7 @@ class AdminCourseModePageTest(ModuleStoreTestCase):
         CourseOverview.load_from_module_store(course.id)
 
         data = {
-            'course': six.text_type(course.id),
+            'course': str(course.id),
             'mode_slug': 'verified',
             'mode_display_name': 'verified',
             'min_price': 10,
@@ -62,19 +61,21 @@ class AdminCourseModePageTest(ModuleStoreTestCase):
         response = self.client.post(reverse('admin:course_modes_coursemode_add'), data=data)
         self.assertRedirects(response, reverse('admin:course_modes_coursemode_changelist'))
 
+        course_mode = CourseMode.objects.get(course_id=str(course.id), mode_slug='verified')
+
         # Verify that datetime is appears on list page
         response = self.client.get(reverse('admin:course_modes_coursemode_changelist'))
         self.assertContains(response, get_time_display(expiration, '%B %d, %Y, %H:%M  %p'))
 
         # Verify that on the edit page the datetime value appears as UTC.
-        resp = self.client.get(reverse('admin:course_modes_coursemode_change', args=(1,)))
+        resp = self.client.get(reverse('admin:course_modes_coursemode_change', args=(course_mode.id,)))
         self.assertContains(resp, expiration.date())
         self.assertContains(resp, expiration.time())
 
         # Verify that the expiration datetime is the same as what we set
         # (hasn't changed because of a timezone translation).
-        course_mode = CourseMode.objects.get(pk=1)
-        self.assertEqual(course_mode.expiration_datetime.replace(tzinfo=None), expiration.replace(tzinfo=None))
+        course_mode.refresh_from_db()
+        assert course_mode.expiration_datetime.replace(tzinfo=None) == expiration.replace(tzinfo=None)
 
 
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
@@ -91,7 +92,7 @@ class AdminCourseModeFormTest(ModuleStoreTestCase):
         """
         Create a test course.
         """
-        super(AdminCourseModeFormTest, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create()
         CourseOverview.load_from_module_store(self.course.id)
 
@@ -116,12 +117,9 @@ class AdminCourseModeFormTest(ModuleStoreTestCase):
         # but ONLY for verified modes.
         loaded_deadline = form.initial.get("verification_deadline")
         if expect_deadline:
-            self.assertEqual(
-                loaded_deadline.replace(tzinfo=None),
-                self.VERIFICATION_DEADLINE.replace(tzinfo=None)
-            )
+            assert loaded_deadline.replace(tzinfo=None) == self.VERIFICATION_DEADLINE.replace(tzinfo=None)
         else:
-            self.assertIs(loaded_deadline, None)
+            assert loaded_deadline is None
 
     @ddt.data("verified", "professional")
     def test_set_verification_deadline(self, course_mode):
@@ -140,7 +138,7 @@ class AdminCourseModeFormTest(ModuleStoreTestCase):
 
         # Check that the deadline was updated
         updated_deadline = VerificationDeadline.deadline_for_course(self.course.id)
-        self.assertEqual(updated_deadline, new_deadline)
+        assert updated_deadline == new_deadline
 
     def test_disable_verification_deadline(self):
         # Configure a verification deadline for the course
@@ -154,7 +152,7 @@ class AdminCourseModeFormTest(ModuleStoreTestCase):
         form.save()
 
         # Check that the deadline was disabled
-        self.assertIs(VerificationDeadline.deadline_for_course(self.course.id), None)
+        assert VerificationDeadline.deadline_for_course(self.course.id) is None
 
     @ddt.data("honor", "professional", "no-id-professional", "credit")
     def test_validate_upgrade_deadline_only_for_verified(self, course_mode):
@@ -202,7 +200,7 @@ class AdminCourseModeFormTest(ModuleStoreTestCase):
             mode_slug=mode,
         )
         return CourseModeForm({
-            "course": six.text_type(self.course.id),
+            "course": str(self.course.id),
             "mode_slug": mode,
             "mode_display_name": mode,
             "_expiration_datetime": upgrade_deadline,
@@ -221,4 +219,4 @@ class AdminCourseModeFormTest(ModuleStoreTestCase):
     def _assert_form_has_error(self, form, error):
         """Check that a form has a validation error. """
         validation_errors = form.errors.get("__all__", [])
-        self.assertIn(error, validation_errors)
+        assert error in validation_errors

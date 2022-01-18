@@ -5,18 +5,19 @@ CSV processing and generation utilities for Teams LMS app.
 import csv
 from collections import Counter
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.db.models import Prefetch
 
+from common.djangoapps.student.models import CourseEnrollment
+from lms.djangoapps.program_enrollments.models import ProgramCourseEnrollment, ProgramEnrollment
 from lms.djangoapps.teams.api import (
+    ORGANIZATION_PROTECTED_MODES,
     OrganizationProtectionStatus,
     user_organization_protection_status,
-    ORGANIZATION_PROTECTED_MODES,
     user_protection_status_matches_team
 )
 from lms.djangoapps.teams.models import CourseTeam, CourseTeamMembership
-from lms.djangoapps.program_enrollments.models import ProgramCourseEnrollment, ProgramEnrollment
-from student.models import CourseEnrollment
+
 from .utils import emit_team_event
 
 
@@ -25,7 +26,7 @@ def load_team_membership_csv(course, response):
     Load a CSV detailing course membership.
 
     Arguments:
-        course (CourseDescriptor): Course module for which CSV
+        course (CourseBlock): Course module for which CSV
             download has been requested.
         response (HttpResponse): Django response object to which
             the CSV content will be written.
@@ -71,7 +72,7 @@ def _lookup_team_membership_data(course):
     team_membership_data = []
     for course_enrollment in course_enrollments:
         # This dict contains all the user's team memberships keyed by teamset
-        student_row = teamset_memberships_by_user.get(course_enrollment.user, dict())
+        student_row = teamset_memberships_by_user.get(course_enrollment.user, {})
         student_row['user'] = _get_displayed_user_identifier(course_enrollment)
         student_row['mode'] = course_enrollment.mode
         team_membership_data.append(student_row)
@@ -130,18 +131,18 @@ def _group_teamset_memberships_by_user(course_team_memberships):
             per user represented in input
         }
     """
-    teamset_memberships_by_user = dict()
+    teamset_memberships_by_user = {}
     for team_membership in course_team_memberships:
         user = team_membership.user
         if user not in teamset_memberships_by_user:
-            teamset_memberships_by_user[user] = dict()
+            teamset_memberships_by_user[user] = {}
         topic_id = team_membership.team.topic_id
         team_name = team_membership.team.name
         teamset_memberships_by_user[user][topic_id] = team_name
     return teamset_memberships_by_user
 
 
-class TeamMembershipImportManager(object):
+class TeamMembershipImportManager:
     """
     A manager class that is responsible the import process of csv file including validation and creation of
     team_courseteam and teams_courseteammembership objects.
@@ -170,7 +171,7 @@ class TeamMembershipImportManager(object):
         """
         Parse an input CSV file and pass to `set_team_memberships` for processing
         """
-        csv_reader = csv.DictReader((line.decode('utf-8-sig').strip() for line in input_file.readlines()))
+        csv_reader = csv.DictReader(line.decode('utf-8-sig').strip() for line in input_file.readlines())
         return self.set_team_memberships(csv_reader)
 
     def set_team_memberships(self, csv_reader):
@@ -299,7 +300,7 @@ class TeamMembershipImportManager(object):
         Ensures that username exists only once in an input file
         """
         if username in usernames_found_so_far:
-            error_message = 'Username {} listed more than once in file.'.format(username)
+            error_message = f'Username {username} listed more than once in file.'
             if self.add_error_and_check_if_max_exceeded(error_message):
                 return False
         return True
@@ -314,7 +315,7 @@ class TeamMembershipImportManager(object):
         This method will add a validation error and return False if this is the case.
         """
         if None in row:
-            error_message = "Team(s) {0} don't have matching teamsets.".format(
+            error_message = "Team(s) {} don't have matching teamsets.".format(
                 row[None]
             )
             if self.add_error_and_check_if_max_exceeded(error_message):
@@ -374,7 +375,7 @@ class TeamMembershipImportManager(object):
         if self.is_FERPA_bubble_breached(teamset_id, team_name) or \
                 not self.is_enrollment_protection_for_existing_team_matches_user(user, team_name, teamset_id):
             error_message = \
-                'Team {} cannot have Master’s track users mixed with users in other tracks.'.format(team_name)
+                f'Team {team_name} cannot have Master’s track users mixed with users in other tracks.'
             self.add_error_and_check_if_max_exceeded(error_message)
             return False
         return True

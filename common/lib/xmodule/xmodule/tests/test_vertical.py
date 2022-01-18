@@ -8,12 +8,12 @@ Tests for vertical module.
 from collections import namedtuple
 from datetime import datetime, timedelta
 import json
-import pytz
-import six
+from unittest.mock import Mock, patch
 
+import pytz
 import ddt
 from fs.memoryfs import MemoryFS
-from mock import Mock, patch
+from django.contrib.auth.models import AnonymousUser
 
 from . import get_test_system
 from .helpers import StubUserService
@@ -36,7 +36,7 @@ def get_json_request(data):
     )
 
 
-class StubCompletionService(object):
+class StubCompletionService:
     """
     A stub implementation of the CompletionService for testing without access to django
     """
@@ -83,11 +83,14 @@ class BaseVerticalBlockTest(XModuleXmlImportTest):
     Tests for the BaseVerticalBlock.
     """
     test_html = 'Test HTML'
-    test_problem = 'Test Problem'
+    test_problem = 'Test_Problem'
+    test_html_nested = 'Nest Nested HTML'
+    test_problem_nested = 'Nest_Nested_Problem'
 
     def setUp(self):
-        super(BaseVerticalBlockTest, self).setUp()
-        # construct module
+        super().setUp()
+        # construct module: course/sequence/vertical - problems
+        #                                           \_  nested_vertical / problems
         course = xml.CourseFactory.build()
         sequence = xml.SequenceFactory.build(parent=course)
         vertical = xml.VerticalFactory.build(parent=sequence)
@@ -95,6 +98,10 @@ class BaseVerticalBlockTest(XModuleXmlImportTest):
         self.course = self.process_xml(course)
         xml.HtmlFactory(parent=vertical, url_name='test-html', text=self.test_html)
         xml.ProblemFactory(parent=vertical, url_name='test-problem', text=self.test_problem)
+
+        nested_vertical = xml.VerticalFactory.build(parent=vertical)
+        xml.HtmlFactory(parent=nested_vertical, url_name='test_html_nested', text=self.test_html_nested)
+        xml.ProblemFactory(parent=nested_vertical, url_name='test_problem_nested', text=self.test_problem_nested)
 
         self.course = self.process_xml(course)
         course_seq = self.course.get_children()[0]
@@ -110,6 +117,10 @@ class BaseVerticalBlockTest(XModuleXmlImportTest):
         self.problem_block = self.vertical.get_children()[1]
         self.problem_block.has_score = True
         self.problem_block.graded = True
+        self.extra_vertical_block = self.vertical.get_children()[2]  # VerticalBlockWithMixins
+        self.nested_problem_block = self.extra_vertical_block.get_children()[1]
+        self.nested_problem_block.has_score = True
+        self.nested_problem_block.graded = True
 
         self.username = "bilbo"
         self.default_context = {"bookmarked": False, "username": self.username}
@@ -126,7 +137,7 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
         Assert content has/hasn't all the bookmark info.
         """
         assertion('bookmark_id', content)
-        assertion('{},{}'.format(self.username, six.text_type(self.vertical.location)), content)
+        assertion(f'{self.username},{str(self.vertical.location)}', content)
         assertion('bookmarked', content)
         assertion('show_bookmark_button', content)
 
@@ -147,30 +158,31 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
         now = datetime.now(pytz.UTC)
         self.vertical.due = now + timedelta(days=days)
         if view == STUDENT_VIEW:
-            self.module_system._services['user'] = StubUserService()
+            self.module_system._services['user'] = StubUserService(user=Mock(username=self.username))
             self.module_system._services['completion'] = StubCompletionService(enabled=True,
                                                                                completion_value=completion_value)
         elif view == PUBLIC_VIEW:
-            self.module_system._services['user'] = StubUserService(is_anonymous=True)
+            self.module_system._services['user'] = StubUserService(user=AnonymousUser())
 
         html = self.module_system.render(
             self.vertical, view, self.default_context if context is None else context
         ).content
-        self.assertIn(self.test_html, html)
+        assert self.test_html in html
         if view == STUDENT_VIEW:
-            self.assertIn(self.test_problem, html)
+            assert self.test_problem in html
         else:
-            self.assertNotIn(self.test_problem, html)
-        self.assertIn("'due': datetime.datetime({year}, {month}, {day}".format(
-            year=self.vertical.due.year, month=self.vertical.due.month, day=self.vertical.due.day), html)
+            assert self.test_problem not in html
+        assert f"'due': datetime.datetime({self.vertical.due.year}, {self.vertical.due.month}, {self.vertical.due.day}"\
+               in html
         if view == STUDENT_VIEW:
             self.assert_bookmark_info(self.assertIn, html)
         else:
             self.assert_bookmark_info(self.assertNotIn, html)
         if context:
-            self.assertIn("'subsection_format': '{}'".format(context['format']), html)
-            self.assertIn("'completed': {}".format(completion_value == 1), html)
-            self.assertIn("'past_due': {}".format(self.vertical.due < now), html)
+            assert "'has_assignments': True" in html
+            assert "'subsection_format': '{}'".format(context['format']) in html
+            assert f"'completed': {completion_value == 1}" in html
+            assert f"'past_due': {self.vertical.due < now}" in html
 
     @ddt.data(True, False)
     def test_render_problem_without_score(self, has_score):
@@ -178,7 +190,7 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
         Test the rendering of the student and public view.
         """
         self.module_system._services['bookmarks'] = Mock()
-        self.module_system._services['user'] = StubUserService()
+        self.module_system._services['user'] = StubUserService(user=Mock())
         self.module_system._services['completion'] = StubCompletionService(enabled=True, completion_value=0)
 
         now = datetime.now(pytz.UTC)
@@ -187,11 +199,50 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
 
         html = self.module_system.render(self.vertical, STUDENT_VIEW, self.default_context).content
         if has_score:
-            self.assertIn("'completed': False", html)
-            self.assertIn("'past_due': True", html)
+            assert "'has_assignments': True" in html
+            assert "'completed': False" in html
+            assert "'past_due': True" in html
         else:
-            self.assertIn("'completed': None", html)
-            self.assertIn("'past_due': False", html)
+            assert "'has_assignments': False" in html
+            assert "'completed': None" in html
+            assert "'past_due': False" in html
+
+    @ddt.data((True, True), (True, False), (False, True), (False, False))
+    @ddt.unpack
+    def test_render_access_denied_blocks(self, node_has_access_error, child_has_access_error):
+        """ Tests access denied blocks are not rendered when hide_access_error_blocks is True """
+        self.module_system._services['bookmarks'] = Mock()
+        self.module_system._services['user'] = StubUserService(user=Mock())
+        self.vertical.due = datetime.now(pytz.UTC) + timedelta(days=-1)
+        self.problem_block.has_access_error = node_has_access_error
+        self.nested_problem_block.has_access_error = child_has_access_error
+
+        context = {'username': self.username, 'hide_access_error_blocks': True}
+        html = self.module_system.render(self.vertical, STUDENT_VIEW, context).content
+
+        if node_has_access_error and child_has_access_error:
+            assert self.test_problem not in html
+            assert self.test_problem_nested not in html
+        if node_has_access_error and not child_has_access_error:
+            assert self.test_problem not in html
+            assert self.test_problem_nested in html
+        if not node_has_access_error and child_has_access_error:
+            assert self.test_problem in html
+            assert self.test_problem_nested not in html
+        if not node_has_access_error and not child_has_access_error:
+            assert self.test_problem in html
+            assert self.test_problem_nested in html
+
+    @ddt.data(True, False)
+    def test_block_has_access_error(self, has_access_error):
+        """ Tests block_has_access_error gives the correct result for child node questions """
+        # Use special block from setup (vertical/nested_vertical/problem)
+        # has_access_error is set on problem an extra level down, so we have to recurse to pass
+
+        self.nested_problem_block.has_access_error = has_access_error
+        should_block = self.vertical.block_has_access_error(self.vertical)
+
+        assert should_block == has_access_error
 
     @ddt.unpack
     @ddt.data(
@@ -212,11 +263,10 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
             )
             self.module_system.render(self.vertical, STUDENT_VIEW, self.default_context)
             if mark_completed_enabled:
-                self.assertEqual(
-                    mock_student_view.call_args[0][1]['wrap_xblock_data']['mark-completed-on-view-after-delay'], 9876
-                )
+                assert mock_student_view.call_args[0][1]['wrap_xblock_data']['mark-completed-on-view-after-delay'] ==\
+                       9876
             else:
-                self.assertNotIn('wrap_xblock_data', mock_student_view.call_args[0][1])
+                assert 'wrap_xblock_data' not in mock_student_view.call_args[0][1]
 
     def test_render_studio_view(self):
         """
@@ -227,8 +277,8 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
             'is_unit_page': True
         }
         html = self.module_system.render(self.vertical, AUTHOR_VIEW, context).content
-        self.assertNotIn(self.test_html, html)
-        self.assertNotIn(self.test_problem, html)
+        assert self.test_html not in html
+        assert self.test_problem not in html
 
         # Vertical should render reorderable children on the container page
         reorderable_items = set()
@@ -237,5 +287,5 @@ class VerticalBlockTestCase(BaseVerticalBlockTest):
             'reorderable_items': reorderable_items,
         }
         html = self.module_system.render(self.vertical, AUTHOR_VIEW, context).content
-        self.assertIn(self.test_html, html)
-        self.assertIn(self.test_problem, html)
+        assert self.test_html in html
+        assert self.test_problem in html

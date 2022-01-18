@@ -1,5 +1,6 @@
 <header class="js-program-header program-header full-width-banner"></header>
 <!-- TODO: consider if article is the most appropriate element here -->
+
 <article class="program-details-content">
     <div class="program-heading">
             <% if (completedCount === totalCount) { %>
@@ -22,7 +23,7 @@
                 </div>
             <% } %>
             <% if (is_learner_eligible_for_one_click_purchase && (typeof is_mobile_only === 'undefined' || is_mobile_only === false)) { %>
-            <a href="<%- completeProgramURL %>" class="btn-brand btn cta-primary upgrade-button complete-program">
+            <a href="<%- completeProgramURL %>" class="btn-brand btn cta-primary upgrade-button complete-program" id="program_dashboard_course_upsell_all_button">
                 <%- gettext('Upgrade All Remaining Courses (')%>
                 <% if (discount_data.is_discounted) { %>
                     <span class='list-price'>
@@ -76,3 +77,4 @@
     </div>
 </article>
 <aside class="js-program-sidebar program-sidebar"></aside>
+

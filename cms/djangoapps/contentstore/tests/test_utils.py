@@ -1,22 +1,28 @@
 """ Tests for utils. """
-
-
 import collections
 from datetime import datetime, timedelta
+from unittest import mock
+from unittest.mock import Mock, patch
+from uuid import uuid4
 
-import six
+import ddt
+from django.conf import settings
 from django.test import TestCase
-from opaque_keys.edx.locator import CourseLocator
+from django.test.utils import override_settings
+from opaque_keys.edx.locator import CourseLocator, LibraryLocator
+from path import Path as path
 from pytz import UTC
+from user_tasks.models import UserTaskArtifact, UserTaskStatus
 
-from contentstore import utils
-from contentstore.tests.utils import CourseTestCase
+from cms.djangoapps.contentstore import utils
+from cms.djangoapps.contentstore.tasks import ALL_ALLOWED_XBLOCKS, validate_course_olx
+from cms.djangoapps.contentstore.tests.utils import TEST_DATA_DIR, CourseTestCase
 from openedx.core.djangoapps.site_configuration.tests.test_util import with_site_configuration_context
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.partitions.partitions import Group, UserPartition
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import Group, UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class LMSLinksTestCase(TestCase):
@@ -28,7 +34,7 @@ class LMSLinksTestCase(TestCase):
         location = course_key.make_usage_key('vertical', 'contacting_us')
         link = utils.get_lms_link_for_item(location, False)
         self.assertEqual(link, "//localhost:8000/courses/course-v1:mitX+101+test/jump_to/block-v1:mitX+101+test+type"
-                         "@vertical+block@contacting_us")
+                               "@vertical+block@contacting_us")
 
         # test preview
         link = utils.get_lms_link_for_item(location, True)
@@ -42,7 +48,7 @@ class LMSLinksTestCase(TestCase):
         location = course_key.make_usage_key('course', 'test')
         link = utils.get_lms_link_for_item(location)
         self.assertEqual(link, "//localhost:8000/courses/course-v1:mitX+101+test/jump_to/block-v1:mitX+101+test+type"
-                         "@course+block@test")
+                               "@course+block@test")
 
     def lms_link_for_certificate_web_view_test(self):
         """ Tests get_lms_link_for_certificate_web_view. """
@@ -83,7 +89,7 @@ class ExtraPanelTabTestCase(TestCase):
         if tabs is None:
             tabs = []
         course = collections.namedtuple('MockCourse', ['tabs'])
-        if isinstance(tabs, six.string_types):
+        if isinstance(tabs, str):
             course.tabs = self.get_tab_type_dicts(tabs)
         else:
             course.tabs = tabs
@@ -95,7 +101,7 @@ class XBlockVisibilityTestCase(SharedModuleStoreTestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(XBlockVisibilityTestCase, cls).setUpClass()
+        super().setUpClass()
 
         cls.dummy_user = ModuleStoreEnum.UserID.test
         cls.past = datetime(1970, 1, 1, tzinfo=UTC)
@@ -168,7 +174,7 @@ class ReleaseDateSourceTest(CourseTestCase):
     """Tests for finding the source of an xblock's release date."""
 
     def setUp(self):
-        super(ReleaseDateSourceTest, self).setUp()
+        super().setUp()
 
         self.chapter = ItemFactory.create(category='chapter', parent_location=self.course.location)
         self.sequential = ItemFactory.create(category='sequential', parent_location=self.chapter.location)
@@ -222,7 +228,7 @@ class StaffLockTest(CourseTestCase):
     """Base class for testing staff lock functions."""
 
     def setUp(self):
-        super(StaffLockTest, self).setUp()
+        super().setUp()
 
         self.chapter = ItemFactory.create(category='chapter', parent_location=self.course.location)
         self.sequential = ItemFactory.create(category='sequential', parent_location=self.chapter.location)
@@ -332,7 +338,7 @@ class GroupVisibilityTest(CourseTestCase):
     """
 
     def setUp(self):
-        super(GroupVisibilityTest, self).setUp()
+        super().setUp()
 
         chapter = ItemFactory.create(category='chapter', parent_location=self.course.location)
         sequential = ItemFactory.create(category='sequential', parent_location=chapter.location)
@@ -432,7 +438,7 @@ class GetUserPartitionInfoTest(ModuleStoreTestCase):
 
     def setUp(self):
         """Create a dummy course. """
-        super(GetUserPartitionInfoTest, self).setUp()
+        super().setUp()
         self.course = CourseFactory()
         self.block = ItemFactory.create(category="problem", parent_location=self.course.location)
 
@@ -465,18 +471,18 @@ class GetUserPartitionInfoTest(ModuleStoreTestCase):
         expected = [
             {
                 "id": 0,
-                "name": u"Cohort user partition",
-                "scheme": u"cohort",
+                "name": "Cohort user partition",
+                "scheme": "cohort",
                 "groups": [
                     {
                         "id": 0,
-                        "name": u"Group A",
+                        "name": "Group A",
                         "selected": False,
                         "deleted": False,
                     },
                     {
                         "id": 1,
-                        "name": u"Group B",
+                        "name": "Group B",
                         "selected": False,
                         "deleted": False,
                     },
@@ -484,12 +490,12 @@ class GetUserPartitionInfoTest(ModuleStoreTestCase):
             },
             {
                 "id": 1,
-                "name": u"Random user partition",
-                "scheme": u"random",
+                "name": "Random user partition",
+                "scheme": "random",
                 "groups": [
                     {
                         "id": 0,
-                        "name": u"Group C",
+                        "name": "Group C",
                         "selected": False,
                         "deleted": False,
                     },
@@ -617,3 +623,116 @@ class GetUserPartitionInfoTest(ModuleStoreTestCase):
     def _get_partition_info(self, schemes=None):
         """Retrieve partition info and selected groups. """
         return utils.get_user_partition_info(self.block, schemes=schemes)
+
+
+@patch.dict(settings.FEATURES, ENABLE_COURSE_OLX_VALIDATION=True)
+@mock.patch('olxcleaner.validate')
+@ddt.ddt
+class ValidateCourseOlxTests(CourseTestCase):
+    """Tests for olx validation"""
+
+    def setUp(self):
+        super().setUp()
+        self.LOGGER = 'cms.djangoapps.contentstore.tasks.LOGGER'
+        self.data_dir = path(TEST_DATA_DIR)
+        self.toy_course_path = self.data_dir / 'course_ignore'
+        self.status = UserTaskStatus.objects.create(
+            user=self.user, task_id=str(uuid4()), task_class='sample_task', name='CourseImport', total_steps=4
+        )
+
+    def test_with_library_locator(self, mock_olxcleaner_validate):
+        """
+        Tests that olx is validation is skipped with library locator.
+        """
+        library_key = LibraryLocator(org='TestOrg', library='TestProbs')
+        self.assertTrue(validate_course_olx(library_key, self.toy_course_path, self.status))
+        self.assertFalse(mock_olxcleaner_validate.called)
+
+    def test_config_settings_enabled(self, mock_olxcleaner_validate):
+        """
+        Tests olx validation with config setting is disabled.
+        """
+        with patch.dict(settings.FEATURES, ENABLE_COURSE_OLX_VALIDATION=False):
+            self.assertTrue(validate_course_olx(self.course.id, self.toy_course_path, self.status))
+            self.assertFalse(mock_olxcleaner_validate.called)
+
+    def test_config_settings_disabled(self, mock_olxcleaner_validate):
+        """
+        Tests olx validation with config setting is enabled.
+        """
+        with patch.dict(settings.FEATURES, ENABLE_COURSE_OLX_VALIDATION=True):
+            self.assertTrue(validate_course_olx(self.course.id, self.toy_course_path, self.status))
+            self.assertTrue(mock_olxcleaner_validate.called)
+
+    def test_exception_during_validation(self, mock_olxcleaner_validate):
+        """
+        Tests olx validation in case of unexpected error.
+
+        In case of any unexpected exception during the olx validation,
+         the course import continues and information is logged on the server.
+        """
+        mock_olxcleaner_validate.side_effect = Exception
+        with mock.patch(self.LOGGER) as patched_log:
+            self.assertTrue(validate_course_olx(self.course.id, self.toy_course_path, self.status))
+            self.assertTrue(mock_olxcleaner_validate.called)
+            patched_log.exception.assert_called_once_with(
+                f'Course import {self.course.id}: CourseOlx could not be validated')
+
+    def test_no_errors(self, mock_olxcleaner_validate):
+        """
+        Tests olx validation with no errors.
+        Verify that in case for no validation errors, no artifact object is created.
+        """
+        mock_olxcleaner_validate.return_value = [
+            Mock(),
+            Mock(errors=[], return_error=Mock(return_value=False)),
+            Mock()
+        ]
+        self.assertTrue(validate_course_olx(self.course.id, self.toy_course_path, self.status))
+        task_artifact = UserTaskArtifact.objects.filter(status=self.status, name='OLX_VALIDATION_ERROR').first()
+        self.assertIsNone(task_artifact)
+        self.assertTrue(mock_olxcleaner_validate.called)
+
+    @mock.patch('cms.djangoapps.contentstore.tasks.report_error_summary')
+    @mock.patch('cms.djangoapps.contentstore.tasks.report_errors')
+    def test_creates_artifact(self, mock_report_errors, mock_report_error_summary, mock_olxcleaner_validate):
+        """
+        Tests olx validation in case of errors.
+        Verify that in case of olx validation errors, course import does fail & errors
+        are logged in task artifact.
+        """
+        errors = [Mock(description='DuplicateURLNameError', level_val=3)]
+
+        mock_olxcleaner_validate.return_value = [
+            Mock(),
+            Mock(errors=errors, return_error=Mock(return_value=True)),
+            Mock()
+        ]
+        mock_report_errors.return_value = [f'ERROR {error.description} found in content' for error in errors]
+        mock_report_error_summary.return_value = [f'Errors: {len(errors)}']
+
+        with patch(self.LOGGER) as patched_log:
+            self.assertFalse(validate_course_olx(self.course.id, self.toy_course_path, self.status))
+            patched_log.error.assert_called_once_with(
+                f'Course import {self.course.id}: CourseOlx validation failed.')
+
+        task_artifact = UserTaskArtifact.objects.filter(status=self.status, name='OLX_VALIDATION_ERROR').first()
+        self.assertIsNotNone(task_artifact)
+
+    def test_validate_calls_with(self, mock_olxcleaner_validate):
+        """
+        Tests that olx library is called with expected keyword arguments.
+        """
+        allowed_xblocks = ALL_ALLOWED_XBLOCKS
+        steps = 2
+        ignore = ['edx-xblock']
+        mock_olxcleaner_validate.return_value = [Mock(), Mock(errors=[], return_error=Mock(return_value=False)), Mock()]
+
+        with override_settings(COURSE_OLX_VALIDATION_STAGE=steps, COURSE_OLX_VALIDATION_IGNORE_LIST=ignore):
+            validate_course_olx(self.course.id, self.toy_course_path, self.status)
+            mock_olxcleaner_validate.assert_called_with(
+                filename=self.toy_course_path,
+                steps=steps,
+                ignore=ignore,
+                allowed_xblocks=allowed_xblocks
+            )

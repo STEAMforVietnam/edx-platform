@@ -1,14 +1,14 @@
-
+# lint-amnesty, pylint: disable=missing-module-docstring
 
 import json
 import six
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.http import HttpResponse
 from eventtracking import tracker as eventtracker
-from ipware.ip import get_ip
+from ipware.ip import get_client_ip
 
-from track import contexts, shim, tracker
+from common.djangoapps.track import contexts, shim, tracker
 
 
 def _get_request_header(request, header_name, default=''):
@@ -22,7 +22,7 @@ def _get_request_header(request, header_name, default=''):
 def _get_request_ip(request, default=''):
     """Helper method to get IP from a request's META dict, if present."""
     if request is not None and hasattr(request, 'META'):
-        return get_ip(request)
+        return get_client_ip(request)[0]
     else:
         return default
 
@@ -69,25 +69,27 @@ def user_track(request):
     """
     Log when POST call to "event" URL is made by a user.
 
-    GET or POST call should provide "event_type", "event", and "page" arguments.
+    GET or POST call should provide "event_type", "event", and "page" arguments. It may optionally provide
+    a "courserun_key" argument (otherwise may be extracted from the page).
     """
     try:
         username = request.user.username
-    except:
+    except:  # lint-amnesty, pylint: disable=bare-except
         username = "anonymous"
 
     name = _get_request_value(request, 'event_type')
     data = _get_request_value(request, 'event', {})
+    course_id_string = _get_request_value(request, 'courserun_key', None)
     page = _get_request_value(request, 'page')
 
-    if isinstance(data, six.string_types) and len(data) > 0:
+    if isinstance(data, str) and len(data) > 0:
         try:
             data = json.loads(data)
             _add_user_id_for_username(data)
         except ValueError:
             pass
 
-    context_override = contexts.course_context_from_url(page)
+    context_override = contexts.course_context_from_url(page, course_id_string)
     context_override['username'] = username
     context_override['event_source'] = 'browser'
     context_override['page'] = page
@@ -109,7 +111,7 @@ def server_track(request, event_type, event, page=None):
 
     try:
         username = request.user.username
-    except:
+    except:  # lint-amnesty, pylint: disable=bare-except
         username = "anonymous"
 
     context_override = _get_course_context(page)

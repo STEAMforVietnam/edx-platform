@@ -34,7 +34,8 @@ def get_credentials_api_client(user, org=None):
         org (str): Optional organization to look up the site config for, rather than the current request
 
     """
-    jwt = create_jwt_for_user(user)
+    scopes = ['email', 'profile', 'user_id']
+    jwt = create_jwt_for_user(user, scopes=scopes)
 
     if org is None:
         url = CredentialsApiConfig.current().internal_api_url  # by current request
@@ -71,9 +72,9 @@ def get_credentials(user, program_uuid=None, credential_type=None):
     # Bypass caching for staff users, who may be generating credentials and
     # want to see them displayed immediately.
     use_cache = credential_configuration.is_cache_enabled and not user.is_staff
-    cache_key = '{}.{}'.format(credential_configuration.CACHE_KEY, user.username) if use_cache else None
+    cache_key = f'{credential_configuration.CACHE_KEY}.{user.username}' if use_cache else None
     if cache_key and program_uuid:
-        cache_key = '{}.{}'.format(cache_key, program_uuid)
+        cache_key = f'{cache_key}.{program_uuid}'
     api = get_credentials_api_client(user)
 
     return get_edx_api_data(

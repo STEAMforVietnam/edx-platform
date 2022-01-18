@@ -9,10 +9,11 @@ from os.path import abspath, dirname, join
 
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
-# pylint: enable=unicode-format-string
+# pylint: enable=unicode-format-string  # lint-amnesty, pylint: disable=bad-option-value
 #####################################################################
-from openedx.core.djangoapps.plugins import constants as plugin_constants
-from openedx.core.djangoapps.plugins import plugin_settings
+from edx_django_utils.plugins import add_plugins
+
+from openedx.core.djangoapps.plugins.constants import ProjectType, SettingsType
 
 from .production import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
@@ -29,24 +30,27 @@ LMS_BASE = 'localhost:18000'
 CMS_BASE = 'localhost:18010'
 SITE_NAME = LMS_BASE
 
+SESSION_COOKIE_NAME = 'lms_sessionid'
+
 # By default don't use a worker, execute tasks as if they were local functions
 CELERY_ALWAYS_EAGER = True
 HTTPS = 'off'
 
-LMS_ROOT_URL = 'http://{}'.format(LMS_BASE)
+LMS_ROOT_URL = f'http://{LMS_BASE}'
 LMS_INTERNAL_ROOT_URL = LMS_ROOT_URL
-ENTERPRISE_API_URL = '{}/enterprise/api/v1/'.format(LMS_INTERNAL_ROOT_URL)
+ENTERPRISE_API_URL = f'{LMS_INTERNAL_ROOT_URL}/enterprise/api/v1/'
 IDA_LOGOUT_URI_LIST = [
     'http://localhost:18130/logout/',  # ecommerce
     'http://localhost:18150/logout/',  # credentials
     'http://localhost:18381/logout/',  # discovery
+    'http://localhost:18010/logout/',  # studio
 ]
 
 ################################ LOGGERS ######################################
 
 LOG_OVERRIDES = [
-    ('track.contexts', logging.CRITICAL),
-    ('track.middleware', logging.CRITICAL),
+    ('common.djangoapps.track.contexts', logging.CRITICAL),
+    ('common.djangoapps.track.middleware', logging.CRITICAL),
     ('lms.djangoapps.discussion.django_comment_client.utils', logging.CRITICAL),
 ]
 for log_name, log_level in LOG_OVERRIDES:
@@ -92,6 +96,7 @@ DEBUG_TOOLBAR_PANELS = (
     'debug_toolbar.panels.sql.SQLPanel',
     'debug_toolbar.panels.signals.SignalsPanel',
     'debug_toolbar.panels.logging.LoggingPanel',
+    'debug_toolbar.panels.history.HistoryPanel',
     # ProfilingPanel has been intentionally removed for default devstack.py
     # runtimes for performance reasons. If you wish to re-enable it in your
     # local development environment, please create a new settings file
@@ -103,9 +108,10 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 
-def should_show_debug_toolbar(request):
+def should_show_debug_toolbar(request):  # lint-amnesty, pylint: disable=missing-function-docstring
     # We always want the toolbar on devstack unless running tests from another Docker container
-    if request.get_host().startswith('edx.devstack.lms:'):
+    hostname = request.get_host()
+    if hostname.startswith('edx.devstack.lms:') or hostname.startswith('lms.devstack.edx:'):
         return False
     return True
 
@@ -135,17 +141,6 @@ WEBPACK_CONFIG_PATH = 'webpack.dev.config.js'
 ########################### VERIFIED CERTIFICATES #################################
 
 FEATURES['AUTOMATIC_VERIFY_STUDENT_IDENTITY_FOR_TESTING'] = True
-FEATURES['ENABLE_PAYMENT_FAKE'] = True
-
-CC_PROCESSOR_NAME = 'CyberSource2'
-CC_PROCESSOR = {
-    'CyberSource2': {
-        "PURCHASE_ENDPOINT": '/shoppingcart/payment_fake/',
-        "SECRET_KEY": 'abcd123',
-        "ACCESS_KEY": 'abcd123',
-        "PROFILE_ID": 'edx',
-    }
-}
 
 ########################### External REST APIs #################################
 FEATURES['ENABLE_OAUTH2_PROVIDER'] = True
@@ -159,9 +154,6 @@ FEATURES['PREVENT_CONCURRENT_LOGINS'] = False
 
 ########################### Milestones #################################
 FEATURES['MILESTONES_APP'] = True
-
-########################### Milestones #################################
-FEATURES['ORGANIZATIONS_APP'] = True
 
 ########################### Entrance Exams #################################
 FEATURES['ENTRANCE_EXAMS'] = True
@@ -185,7 +177,10 @@ FEATURES['CERTIFICATES_HTML_VIEW'] = True
 
 
 ########################## Course Discovery #######################
-LANGUAGE_MAP = {'terms': {lang: display for lang, display in ALL_LANGUAGES}, 'name': 'Language'}
+LANGUAGE_MAP = {
+    'terms': dict(ALL_LANGUAGES),
+    'name': 'Language',
+}
 COURSE_DISCOVERY_MEANINGS = {
     'org': {
         'name': 'Organization',
@@ -221,21 +216,17 @@ SEARCH_SKIP_ENROLLMENT_START_DATE_FILTERING = True
 
 
 ########################## Shopping cart ##########################
-FEATURES['ENABLE_SHOPPING_CART'] = True
-FEATURES['STORE_BILLING_INFO'] = True
-FEATURES['ENABLE_PAID_COURSE_REGISTRATION'] = True
 FEATURES['ENABLE_COSMETIC_DISPLAY_PRICE'] = True
 
 ######################### Program Enrollments #####################
 FEATURES['ENABLE_ENROLLMENT_RESET'] = True
 
-######################### New Courseware MFE #####################
-FEATURES['ENABLE_COURSEWARE_MICROFRONTEND'] = True
-
 ########################## Third Party Auth #######################
 
-if FEATURES.get('ENABLE_THIRD_PARTY_AUTH') and 'third_party_auth.dummy.DummyBackend' not in AUTHENTICATION_BACKENDS:
-    AUTHENTICATION_BACKENDS = ['third_party_auth.dummy.DummyBackend'] + list(AUTHENTICATION_BACKENDS)
+if FEATURES.get('ENABLE_THIRD_PARTY_AUTH') and (
+        'common.djangoapps.third_party_auth.dummy.DummyBackend' not in AUTHENTICATION_BACKENDS
+):
+    AUTHENTICATION_BACKENDS = ['common.djangoapps.third_party_auth.dummy.DummyBackend'] + list(AUTHENTICATION_BACKENDS)
 
 ############## ECOMMERCE API CONFIGURATION SETTINGS ###############
 ECOMMERCE_PUBLIC_URL_ROOT = 'http://localhost:18130'
@@ -251,6 +242,17 @@ CREDENTIALS_PUBLIC_SERVICE_URL = 'http://localhost:18150'
 ############################### BLOCKSTORE #####################################
 BLOCKSTORE_API_URL = "http://edx.devstack.blockstore:18250/api/v1/"
 
+########################## PROGRAMS LEARNER PORTAL ##############################
+LEARNER_PORTAL_URL_ROOT = 'http://localhost:8734'
+
+########################## ENTERPRISE LEARNER PORTAL ##############################
+ENTERPRISE_LEARNER_PORTAL_NETLOC = 'localhost:8734'
+ENTERPRISE_LEARNER_PORTAL_BASE_URL = 'http://' + ENTERPRISE_LEARNER_PORTAL_NETLOC
+
+########################## ENTERPRISE ADMIN PORTAL ##############################
+ENTERPRISE_ADMIN_PORTAL_NETLOC = 'localhost:1991'
+ENTERPRISE_ADMIN_PORTAL_BASE_URL = 'http://' + ENTERPRISE_ADMIN_PORTAL_NETLOC
+
 ###################### Cross-domain requests ######################
 FEATURES['ENABLE_CORS_HEADERS'] = True
 CORS_ALLOW_CREDENTIALS = True
@@ -260,15 +262,32 @@ CORS_ALLOW_HEADERS = corsheaders_default_headers + (
     'use-jwt-cookie',
 )
 
-LOGIN_REDIRECT_WHITELIST = [CMS_BASE]
+LOGIN_REDIRECT_WHITELIST.extend([
+    CMS_BASE,
+    # Allow redirection to all micro-frontends.
+    # Please add your MFE if is not already listed here.
+    # Note: For this to work, the MFE must set BASE_URL in its .env.development to:
+    #   BASE_URL=http://localhost:$PORT
+    # as opposed to:
+    #   BASE_URL=localhost:$PORT
+    'localhost:1997',  # frontend-app-account
+    'localhost:1976',  # frontend-app-program-console
+    'localhost:1994',  # frontend-app-gradebook
+    'localhost:2000',  # frontend-app-learning
+    'localhost:2001',  # frontend-app-course-authoring
+    'localhost:3001',  # frontend-app-library-authoring
+    'localhost:18400',  # frontend-app-publisher
+    ENTERPRISE_LEARNER_PORTAL_NETLOC,  # frontend-app-learner-portal-enterprise
+    ENTERPRISE_ADMIN_PORTAL_NETLOC,  # frontend-app-admin-portal
+])
 
 ###################### JWTs ######################
 JWT_AUTH.update({
     'JWT_AUDIENCE': 'lms-key',
-    'JWT_ISSUER': '{}/oauth2'.format(LMS_ROOT_URL),
+    'JWT_ISSUER': f'{LMS_ROOT_URL}/oauth2',
     'JWT_ISSUERS': [{
         'AUDIENCE': 'lms-key',
-        'ISSUER': '{}/oauth2'.format(LMS_ROOT_URL),
+        'ISSUER': f'{LMS_ROOT_URL}/oauth2',
         'SECRET_KEY': 'lms-secret',
     }],
     'JWT_SECRET_KEY': 'lms-secret',
@@ -293,7 +312,7 @@ JWT_AUTH.update({
         'y5ZLcTUomo4rZLjghVpq6KZxfS6I1Vz79ZsMVUWEdXOYePCKKsrQG20ogQEkmTf9FT_SouC6jPcHLXw"}]}'
     ),
 })
-plugin_settings.add_plugins(__name__, plugin_constants.ProjectType.LMS, plugin_constants.SettingsType.DEVSTACK)
+add_plugins(__name__, ProjectType.LMS, SettingsType.DEVSTACK)
 
 
 ######################### Django Rest Framework ########################
@@ -316,6 +335,11 @@ EDXNOTES_CLIENT_NAME = 'edx_notes_api-backend-service'
 ############## Settings for Microfrontends  #########################
 LEARNING_MICROFRONTEND_URL = 'http://localhost:2000'
 ACCOUNT_MICROFRONTEND_URL = 'http://localhost:1997'
+AUTHN_MICROFRONTEND_URL = 'http://localhost:1999'
+AUTHN_MICROFRONTEND_DOMAIN = 'localhost:1999'
+
+################### FRONTEND APPLICATION DISCUSSIONS ###################
+DISCUSSIONS_MICROFRONTEND_URL = 'http://localhost:2002'
 
 ############## Docker based devstack settings #######################
 
@@ -360,14 +384,12 @@ MKTG_URLS = {
     'WHAT_IS_VERIFIED_CERT': '/verified-certificate',
 }
 
-ENTERPRISE_LEARNER_PORTAL_BASE_URL = 'http://localhost:8734'
-
 ENTERPRISE_MARKETING_FOOTER_QUERY_PARAMS = {}
 
 CREDENTIALS_SERVICE_USERNAME = 'credentials_worker'
 
 COURSE_CATALOG_URL_ROOT = 'http://edx.devstack.discovery:18381'
-COURSE_CATALOG_API_URL = '{}/api/v1'.format(COURSE_CATALOG_URL_ROOT)
+COURSE_CATALOG_API_URL = f'{COURSE_CATALOG_URL_ROOT}/api/v1'
 
 SYSTEM_WIDE_ROLE_CLASSES = os.environ.get("SYSTEM_WIDE_ROLE_CLASSES", SYSTEM_WIDE_ROLE_CLASSES)
 SYSTEM_WIDE_ROLE_CLASSES.append(
@@ -379,13 +401,11 @@ if FEATURES.get('ENABLE_ENTERPRISE_INTEGRATION'):
         'enterprise.SystemWideEnterpriseUserRoleAssignment',
     )
 
-# List of enterprise customer uuids to exclude from transition to use of enterprise-catalog
-ENTERPRISE_CUSTOMERS_EXCLUDED_FROM_CATALOG = ()
-
 #####################################################################
-# See if the developer has any local overrides.
-if os.path.isfile(join(dirname(abspath(__file__)), 'private.py')):
-    from .private import *  # pylint: disable=import-error,wildcard-import
+
+# django-session-cookie middleware
+DCS_SESSION_COOKIE_SAMESITE = 'Lax'
+DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL = True
 
 ########################## THEMING  #######################
 # If you want to enable theming in devstack, uncomment this section and add any relevant
@@ -409,3 +429,20 @@ if os.path.isfile(join(dirname(abspath(__file__)), 'private.py')):
 # Uncomment the lines below if you'd like to see SQL statements in your devstack LMS log.
 # LOGGING['handlers']['console']['level'] = 'DEBUG'
 # LOGGING['loggers']['django.db.backends'] = {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False}
+
+################### Special Exams (Proctoring) and Prereqs ###################
+FEATURES['ENABLE_SPECIAL_EXAMS'] = True
+FEATURES['ENABLE_PREREQUISITE_COURSES'] = True
+
+# Used in edx-proctoring for ID generation in lieu of SECRET_KEY - dummy value
+# (ref MST-637)
+PROCTORING_USER_OBFUSCATION_KEY = '85920908f28904ed733fe576320db18cabd7b6cd'
+
+#################### Webpack Configuration Settings ##############################
+WEBPACK_LOADER['DEFAULT']['TIMEOUT'] = 5
+
+################# New settings must go ABOVE this line #################
+########################################################################
+# See if the developer has any local overrides.
+if os.path.isfile(join(dirname(abspath(__file__)), 'private.py')):
+    from .private import *  # pylint: disable=import-error,wildcard-import

@@ -6,17 +6,17 @@ existing data accordingly.
 
 import os
 import unittest
+from io import StringIO
 
-import mock
+from unittest import mock
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.utils.six import StringIO
 from requests import exceptions
 from requests.models import Response
 
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
-from third_party_auth.tests.factories import SAMLConfigurationFactory, SAMLProviderConfigFactory
+from common.djangoapps.third_party_auth.tests.factories import SAMLConfigurationFactory, SAMLProviderConfigFactory
 
 
 def mock_get(status_code=200):
@@ -27,14 +27,14 @@ def mock_get(status_code=200):
     Returns:
         returns a function that can be used as a mock function for requests.get.
     """
-    def _(url=None, *args, **kwargs):  # pylint: disable=unused-argument
+    def _(url=None, *args, **kwargs):  # lint-amnesty, pylint: disable=keyword-arg-before-vararg, unused-argument
         """
         mock method for requests.get, this method will read xml file, form a Response object from the
         contents of this file, set status code and return the Response object.
         """
         url = url.split("/")[-1] if url else "testshib-providers.xml"
 
-        file_path = os.path.dirname(os.path.realpath(__file__)) + "/test_data/{}".format(url)
+        file_path = os.path.dirname(os.path.realpath(__file__)) + f"/test_data/{url}"
         with open(file_path) as providers:
             xml = providers.read()
 
@@ -51,12 +51,13 @@ class TestSAMLCommand(CacheIsolationTestCase):
     """
     Test django management command for fetching saml metadata.
     """
+
     def setUp(self):
         """
         Setup operations for saml configurations. these operations contain
         creation of SAMLConfiguration and SAMLProviderConfig records in database.
         """
-        super(TestSAMLCommand, self).setUp()
+        super().setUp()
 
         self.stdout = StringIO()
 
@@ -105,7 +106,7 @@ class TestSAMLCommand(CacheIsolationTestCase):
         """
         expected = "\nDone.\n1 provider(s) found in database.\n1 skipped and 0 attempted.\n0 updated and 0 failed.\n"
         call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
     @mock.patch("requests.get", mock_get())
     def test_fetch_saml_metadata(self):
@@ -118,7 +119,7 @@ class TestSAMLCommand(CacheIsolationTestCase):
 
         expected = "\nDone.\n1 provider(s) found in database.\n0 skipped and 1 attempted.\n1 updated and 0 failed.\n"
         call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
     @mock.patch("requests.get", mock_get(status_code=404))
     def test_fetch_saml_metadata_failure(self):
@@ -133,7 +134,7 @@ class TestSAMLCommand(CacheIsolationTestCase):
 
         with self.assertRaisesRegex(CommandError, r"HTTPError: 404 Client Error"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
     @mock.patch("requests.get", mock_get(status_code=200))
     def test_fetch_multiple_providers_data(self):
@@ -178,7 +179,7 @@ class TestSAMLCommand(CacheIsolationTestCase):
         expected = '\n3 provider(s) found in database.\n0 skipped and 3 attempted.\n2 updated and 1 failed.\n'
         with self.assertRaisesRegex(CommandError, r"MetadataParseError: Can't find EntityDescriptor for entityID"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
         # Now add a fourth configuration, and indicate that it should not be included in the update
         self.__create_saml_configurations__(
@@ -201,7 +202,7 @@ class TestSAMLCommand(CacheIsolationTestCase):
         expected = '\nDone.\n4 provider(s) found in database.\n1 skipped and 3 attempted.\n0 updated and 1 failed.\n'
         with self.assertRaisesRegex(CommandError, r"MetadataParseError: Can't find EntityDescriptor for entityID"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
     @mock.patch("requests.get")
     def test_saml_request_exceptions(self, mocked_get):
@@ -217,19 +218,19 @@ class TestSAMLCommand(CacheIsolationTestCase):
 
         with self.assertRaisesRegex(CommandError, "SSLError:"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
         mocked_get.side_effect = exceptions.ConnectionError
 
         with self.assertRaisesRegex(CommandError, "ConnectionError:"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
         mocked_get.side_effect = exceptions.HTTPError
 
         with self.assertRaisesRegex(CommandError, "HTTPError:"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
     @mock.patch("requests.get", mock_get(status_code=200))
     def test_saml_parse_exceptions(self):
@@ -254,7 +255,7 @@ class TestSAMLCommand(CacheIsolationTestCase):
 
         with self.assertRaisesRegex(CommandError, "MetadataParseError: Can't find EntityDescriptor for entityID"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()
 
     @mock.patch("requests.get")
     def test_xml_parse_exceptions(self, mocked_get):
@@ -274,4 +275,4 @@ class TestSAMLCommand(CacheIsolationTestCase):
 
         with self.assertRaisesRegex(CommandError, "XMLSyntaxError:"):
             call_command("saml", pull=True, stdout=self.stdout)
-        self.assertIn(expected, self.stdout.getvalue())
+        assert expected in self.stdout.getvalue()

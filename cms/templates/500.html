@@ -1,7 +1,7 @@
 <%page expression_filter="h"/>
 <%!
 from openedx.core.djangolib.markup import HTML, Text
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 %>
 <%inherit file="base.html" />
 <%block name="title">
@@ -29,7 +29,6 @@ ${Text(_("{studio_name} Server Error")).format(
           studio_name=Text(settings.STUDIO_SHORT_NAME),
         )}
         ${_("We've logged the error and our staff is currently working to resolve this error as soon as possible.")}
-        )}
       </p>
     </article>
   </section>

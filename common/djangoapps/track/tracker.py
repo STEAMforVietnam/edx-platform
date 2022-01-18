@@ -24,10 +24,10 @@ import inspect
 import warnings
 from importlib import import_module
 
-import six
+import six  # lint-amnesty, pylint: disable=unused-import
 from django.conf import settings
 
-from track.backends import BaseBackend
+from common.djangoapps.track.backends import BaseBackend
 
 __all__ = ['send']
 
@@ -45,7 +45,7 @@ def _initialize_backends_from_django_settings():
 
     config = getattr(settings, 'TRACKING_BACKENDS', {})
 
-    for name, values in six.iteritems(config):
+    for name, values in config.items():
         # Ignore empty values to turn-off default tracker backends
         if values:
             engine = values['ENGINE']
@@ -67,7 +67,7 @@ def _instantiate_backend_from_name(name, options):
         module_name = '.'.join(parts[:-1])
         class_name = parts[-1]
     except IndexError:
-        raise ValueError('Invalid event track backend %s' % name)
+        raise ValueError('Invalid event track backend %s' % name)  # lint-amnesty, pylint: disable=raise-missing-from
 
     # Get and verify the backend class
 
@@ -77,7 +77,7 @@ def _instantiate_backend_from_name(name, options):
         if not inspect.isclass(cls) or not issubclass(cls, BaseBackend):
             raise TypeError
     except (ValueError, AttributeError, TypeError, ImportError):
-        raise ValueError('Cannot find event track backend %s' % name)
+        raise ValueError('Cannot find event track backend %s' % name)  # lint-amnesty, pylint: disable=raise-missing-from
 
     backend = cls(**options)
 
@@ -92,7 +92,7 @@ def send(event):
     warnings.warn(
         'track.tracker module is deprecated. Please use eventtracking to send events.', DeprecationWarning
     )
-    for name, backend in six.iteritems(backends):
+    for name, backend in backends.items():  # lint-amnesty, pylint: disable=unused-variable
         backend.send(event)
 
 

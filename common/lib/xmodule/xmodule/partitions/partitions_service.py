@@ -6,14 +6,18 @@ persist the assignments.
 
 
 import logging
+from typing import Dict
 
-import six
 from django.conf import settings
-
+from django.contrib.auth import get_user_model
 from openedx.core.lib.cache_utils import request_cached
 from openedx.core.lib.dynamic_partitions_generators import DynamicPartitionGeneratorsPluginManager
+
 from xmodule.modulestore.django import modulestore
 from xmodule.partitions.partitions import get_partition_from_id
+from .partitions import Group
+
+User = get_user_model()
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +44,8 @@ def get_all_partitions_for_course(course, active_only=False):
     return all_partitions
 
 
-def get_user_partition_groups(course_key, user_partitions, user, partition_dict_key='name'):
+def get_user_partition_groups(course_key: str, user_partitions: list, user: User,
+                              partition_dict_key: str = 'name') -> Dict[str, Group]:
     """
     Collect group ID for each partition in this course for this user.
      Arguments:
@@ -83,7 +88,7 @@ def _get_dynamic_partitions(course):
     return generated_partitions
 
 
-class PartitionService(object):
+class PartitionService:
     """
     This is an XBlock service that returns information about the user partitions associated
     with a given course.
@@ -138,8 +143,8 @@ class PartitionService(object):
         user_partition = self.get_user_partition(user_partition_id)
         if user_partition is None:
             raise ValueError(
-                "Configuration problem!  No user_partition with id {0} "
-                "in course {1}".format(user_partition_id, self._course_id)
+                "Configuration problem!  No user_partition with id {} "
+                "in course {}".format(user_partition_id, self._course_id)
             )
 
         group = self.get_group(user, user_partition)

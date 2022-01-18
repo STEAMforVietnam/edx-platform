@@ -8,14 +8,28 @@ from web_fragments.fragment import Fragment
 from .x_module import DescriptorSystem, XModuleDescriptor, shim_xmodule_js
 
 
-class MakoDescriptorSystem(DescriptorSystem):
+class MakoDescriptorSystem(DescriptorSystem):  # lint-amnesty, pylint: disable=abstract-method
+    """
+    Descriptor system that renders mako templates.
+    """
     def __init__(self, render_template, **kwargs):
-        super(MakoDescriptorSystem, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.render_template = render_template
 
+        # Add the MakoService to the descriptor system.
+        #
+        # This is not needed by most XBlocks, because they are initialized with a full runtime ModuleSystem that already
+        # has the MakoService.
+        # However, there are a few cases where the XBlock only has the descriptor system instead of the full module
+        # runtime. Specifically:
+        # * in the Instructor Dashboard bulk emails tab, when rendering the HtmlBlock for its WYSIWYG editor.
+        # * during testing, when using the ModuleSystemTestCase to fetch factory-created blocks.
+        from common.djangoapps.edxmako.services import MakoService
+        self._services['mako'] = MakoService()
 
-class MakoTemplateBlockBase(object):
+
+class MakoTemplateBlockBase:
     """
     XBlock intended as a mixin that uses a mako template
     to specify the module html.
@@ -27,7 +41,7 @@ class MakoTemplateBlockBase(object):
     # pylint: disable=no-member
 
     def __init__(self, *args, **kwargs):
-        super(MakoTemplateBlockBase, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if getattr(self.runtime, 'render_template', None) is None:
             raise TypeError(
                 '{runtime} must have a render_template function'

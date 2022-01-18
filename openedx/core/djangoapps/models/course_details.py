@@ -6,16 +6,14 @@ CourseDetails
 import logging
 import re
 
-import six
 from django.conf import settings
 
-from openedx.core.djangoapps.models.config.waffle import enable_course_detail_update_certificate_date
-from openedx.core.djangoapps.signals.signals import COURSE_CERT_DATE_CHANGE
 from openedx.core.djangolib.markup import HTML
 from openedx.core.lib.courses import course_image_url
-from xmodule.fields import Date
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.data import CertificatesDisplayBehaviors  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.fields import Date  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import ItemNotFoundError  # lint-amnesty, pylint: disable=wrong-import-order
 
 # This list represents the attribute keys for a course's 'about' info.
 # Note: The 'video' attribute is intentionally excluded as it must be
@@ -36,7 +34,7 @@ ABOUT_ATTRIBUTES = [
 ]
 
 
-class CourseDetails(object):
+class CourseDetails:
     """
     An interface for extracting course information from the modulestore.
     """
@@ -51,6 +49,8 @@ class CourseDetails(object):
         self.end_date = None  # 'end'
         self.enrollment_start = None
         self.enrollment_end = None
+        self.certificate_available_date = None
+        self.certificates_display_behavior = None
         self.syllabus = None  # a pdf file asset
         self.title = ""
         self.subtitle = ""
@@ -85,7 +85,7 @@ class CourseDetails(object):
         Retrieve an attribute from a course's "about" info
         """
         if attribute not in ABOUT_ATTRIBUTES + ['video']:
-            raise ValueError(u"'{0}' is not a valid course about attribute.".format(attribute))
+            raise ValueError(f"'{attribute}' is not a valid course about attribute.")
 
         usage_key = course_key.make_usage_key('about', attribute)
         try:
@@ -111,7 +111,12 @@ class CourseDetails(object):
         course_details = cls(course_key.org, course_key.course, course_key.run)
         course_details.start_date = course_descriptor.start
         course_details.end_date = course_descriptor.end
-        course_details.certificate_available_date = course_descriptor.certificate_available_date
+        updated_available_date, updated_display_behavior = cls.validate_certificate_settings(
+            course_descriptor.certificate_available_date,
+            course_descriptor.certificates_display_behavior
+        )
+        course_details.certificate_available_date = updated_available_date
+        course_details.certificates_display_behavior = updated_display_behavior
         course_details.enrollment_start = course_descriptor.enrollment_start
         course_details.enrollment_end = course_descriptor.enrollment_end
         course_details.pre_requisite_courses = course_descriptor.pre_requisite_courses
@@ -154,7 +159,7 @@ class CourseDetails(object):
         """
         video_id = cls.fetch_youtube_video_id(course_key)
         if video_id:
-            return "http://www.youtube.com/watch?v={0}".format(video_id)
+            return f"http://www.youtube.com/watch?v={video_id}"
 
     @classmethod
     def update_about_item(cls, course, about_key, data, user_id, store=None):
@@ -246,8 +251,13 @@ class CourseDetails(object):
         if converted != descriptor.certificate_available_date:
             dirty = True
             descriptor.certificate_available_date = converted
-            if enable_course_detail_update_certificate_date(course_key):
-                COURSE_CERT_DATE_CHANGE.send_robust(sender=cls, course_key=six.text_type(course_key))
+
+        if (
+            'certificates_display_behavior' in jsondict
+            and jsondict['certificates_display_behavior'] != descriptor.certificates_display_behavior
+        ):
+            descriptor.certificates_display_behavior = jsondict['certificates_display_behavior']
+            dirty = True
 
         if 'course_image_name' in jsondict and jsondict['course_image_name'] != descriptor.course_image:
             descriptor.course_image = jsondict['course_image_name']
@@ -325,7 +335,7 @@ class CourseDetails(object):
         if keystring_matcher:
             return keystring_matcher.group(0)
         else:
-            logging.warn("ignoring the content because it doesn't not conform to expected pattern: " + raw_video)
+            logging.warn("ignoring the content because it doesn't not conform to expected pattern: " + raw_video)  # lint-amnesty, pylint: disable=deprecated-method, logging-not-lazy
             return None
 
     @staticmethod
@@ -339,7 +349,35 @@ class CourseDetails(object):
         result = None
         if video_key:
             result = (
-                HTML(u'<iframe title="YouTube Video" width="560" height="315" src="//www.youtube.com/embed/{}?rel=0" '
+                HTML('<iframe title="YouTube Video" width="560" height="315" src="//www.youtube.com/embed/{}?rel=0" '
                      'frameborder="0" allowfullscreen=""></iframe>').format(video_key)
             )
         return result
+
+    @classmethod
+    def validate_certificate_settings(cls, certificate_available_date, certificates_display_behavior):
+        """
+        Takes the stored values for certificate_available_date and certificates_display_behavior and verifies they work
+        together in tandem per ADR: lms/djangoapps/certificates/docs/decisions/005-cert-display-settings.rst
+
+        Arguments:
+            stored_certificate_available_date (str): certificate_available_date from the modulestore
+            stored_certificates_display_behavior (str):
+
+        Returns:
+            tuple[str, str]: updated certificate_available_date, updated certificates_display_behavior
+            None
+        """
+        # If V2 is not enable, return original values
+        if not settings.FEATURES.get("ENABLE_V2_CERT_DISPLAY_SETTINGS", False):
+            return (certificate_available_date, certificates_display_behavior)
+
+        # "early_no_info" will always show regardless of settings
+        if certificates_display_behavior == CertificatesDisplayBehaviors.EARLY_NO_INFO:
+            return (None, CertificatesDisplayBehaviors.EARLY_NO_INFO)
+
+        # If the date is set and "early_no_info" isn't
+        if certificate_available_date:
+            return (certificate_available_date, CertificatesDisplayBehaviors.END_WITH_DATE)
+
+        return (None, CertificatesDisplayBehaviors.END)

@@ -7,15 +7,16 @@ access control rules.
 import ddt
 from stevedore.extension import Extension, ExtensionManager
 
+from common.djangoapps.student.tests.factories import StaffFactory
+from common.djangoapps.student.tests.factories import UserFactory
 import lms.djangoapps.courseware.access as access
-from lms.djangoapps.courseware.tests.factories import StaffFactory, UserFactory
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.partitions.partitions import USER_PARTITION_SCHEME_NAMESPACE, Group, UserPartition
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import USER_PARTITION_SCHEME_NAMESPACE, Group, UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
 
 
-class MemoryUserPartitionScheme(object):
+class MemoryUserPartitionScheme:
     """
     In-memory partition scheme for testing.
     """
@@ -80,7 +81,7 @@ class GroupAccessTestCase(ModuleStoreTestCase):
         modulestore().update_item(block, 1)
 
     def setUp(self):
-        super(GroupAccessTestCase, self).setUp()
+        super().setUp()
 
         UserPartition.scheme_extensions = ExtensionManager.make_test_instance(
             [
@@ -176,23 +177,21 @@ class GroupAccessTestCase(ModuleStoreTestCase):
         side-effects in other tests.
         """
         UserPartition.scheme_extensions = None
-        super(GroupAccessTestCase, self).tearDown()
+        super().tearDown()
 
     def check_access(self, user, block_location, is_accessible):
         """
         DRY helper.
         """
-        self.assertIs(
-            bool(access.has_access(user, 'load', modulestore().get_item(block_location), self.course.id)),
-            is_accessible
-        )
+        assert bool(access.has_access(user, 'load', modulestore().get_item(block_location), self.course.id))\
+               is is_accessible
 
     def ensure_staff_access(self, block_location):
         """
         Another DRY helper.
         """
         block = modulestore().get_item(block_location)
-        self.assertTrue(access.has_access(self.staff, 'load', block, self.course.id))
+        assert access.has_access(self.staff, 'load', block, self.course.id)
 
     # NOTE: in all the tests that follow, `block_specified` and
     # `block_accessed` designate the place where group_access rules are

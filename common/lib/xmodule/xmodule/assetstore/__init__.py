@@ -8,24 +8,11 @@ from datetime import datetime
 
 import dateutil.parser
 import pytz
-import six
-from contracts import contract, new_contract
 from lxml import etree
 from opaque_keys.edx.keys import AssetKey, CourseKey
 
-new_contract('AssetKey', AssetKey)
-new_contract('CourseKey', CourseKey)
-new_contract('datetime', datetime)
-new_contract('basestring', six.string_types[0])
-if six.PY2:
-    new_contract('long', long)
-else:
-    new_contract('long', int)
-new_contract('AssetElement', lambda x: isinstance(x, etree._Element) and x.tag == "asset")  # pylint: disable=protected-access
-new_contract('AssetsElement', lambda x: isinstance(x, etree._Element) and x.tag == "assets")  # pylint: disable=protected-access
 
-
-class AssetMetadata(object):
+class AssetMetadata:
     """
     Stores the metadata associated with a particular course asset. The asset metadata gets stored
     in the modulestore.
@@ -50,18 +37,11 @@ class AssetMetadata(object):
     ASSET_XML_TAG = 'asset'
 
     # Top-level directory name in exported course XML which holds asset metadata.
-    EXPORTED_ASSET_DIR = u'assets'
+    EXPORTED_ASSET_DIR = 'assets'
 
     # Filename of all asset metadata exported as XML.
-    EXPORTED_ASSET_FILENAME = u'assets.xml'
+    EXPORTED_ASSET_FILENAME = 'assets.xml'
 
-    @contract(asset_id='AssetKey',
-              pathname='str|None', internal_name='str|None',
-              locked='bool|None', contenttype='str|None',
-              thumbnail='str|None', fields='dict|None',
-              curr_version='str|None', prev_version='str|None',
-              created_by='int|long|None', created_by_email='str|None', created_on='datetime|None',
-              edited_by='int|long|None', edited_by_email='str|None', edited_on='datetime|None')
     def __init__(self, asset_id,
                  pathname=None, internal_name=None,
                  locked=None, contenttype=None,
@@ -128,7 +108,7 @@ class AssetMetadata(object):
         Arguments:
             attr_dict: Prop, val dictionary of all attributes to set.
         """
-        for attr, val in six.iteritems(attr_dict):
+        for attr, val in attr_dict.items():
             if attr in self.ATTRS_ALLOWED_TO_UPDATE:
                 setattr(self, attr, val)
             else:
@@ -159,7 +139,6 @@ class AssetMetadata(object):
             }
         }
 
-    @contract(asset_doc='dict|None')
     def from_storable(self, asset_doc):
         """
         Fill in all metadata fields from a MongoDB document.
@@ -183,7 +162,6 @@ class AssetMetadata(object):
         self.edited_by_email = asset_doc['edit_info']['edited_by_email']
         self.edited_on = asset_doc['edit_info']['edited_on']
 
-    @contract(node='AssetElement')
     def from_xml(self, node):
         """
         Walk the etree XML node and fill in the asset metadata.
@@ -199,7 +177,7 @@ class AssetMetadata(object):
                     continue
                 elif tag == 'locked':
                     # Boolean.
-                    value = True if value == "true" else False
+                    value = True if value == "true" else False  # lint-amnesty, pylint: disable=simplifiable-if-expression
                 elif value == 'None':
                     # None.
                     value = None
@@ -214,7 +192,6 @@ class AssetMetadata(object):
                     value = json.loads(value)
                 setattr(self, tag, value)
 
-    @contract(node='AssetElement')
     def to_xml(self, node):
         """
         Add the asset data as XML to the passed-in node.
@@ -238,11 +215,10 @@ class AssetMetadata(object):
             elif isinstance(value, dict):
                 value = json.dumps(value)
             else:
-                value = six.text_type(value)
+                value = str(value)
             child.text = value
 
     @staticmethod
-    @contract(node='AssetsElement', assets=list)
     def add_all_assets_as_xml(node, assets):
         """
         Take a list of AssetMetadata objects. Add them all to the node.
@@ -253,11 +229,10 @@ class AssetMetadata(object):
             asset.to_xml(asset_node)
 
 
-class CourseAssetsFromStorage(object):
+class CourseAssetsFromStorage:
     """
     Wrapper class for asset metadata lists returned from modulestore storage.
     """
-    @contract(course_id='CourseKey', asset_md=dict)
     def __init__(self, course_id, doc_id, asset_md):
         """
         Params:
@@ -304,7 +279,7 @@ class CourseAssetsFromStorage(object):
         """
         Iterates over the items of the asset dict.
         """
-        return six.iteritems(self.asset_md)
+        return self.asset_md.items()
 
     def items(self):
         """

@@ -5,12 +5,11 @@ of adding new logic that manipulates the Course Outline for a given student.
 import logging
 from datetime import datetime
 
-from django.contrib.auth import get_user_model
-from opaque_keys.edx.keys import CourseKey, UsageKey
+from opaque_keys.edx.keys import CourseKey  # lint-amnesty, pylint: disable=unused-import
+from openedx.core import types
 
-from ..data import ScheduleData, ScheduleItemData
+from ...data import CourseOutlineData
 
-User = get_user_model()
 log = logging.getLogger(__name__)
 
 
@@ -35,7 +34,8 @@ class OutlineProcessor:
     additional methods to return specific metadata to feed into
     UserCourseOutlineDetailsData.
     """
-    def __init__(self, course_key: CourseKey, user: User, at_time: datetime):
+
+    def __init__(self, course_key: CourseKey, user: types.User, at_time: datetime):
         """
         Basic initialization.
 
@@ -46,7 +46,7 @@ class OutlineProcessor:
         self.user = user
         self.at_time = at_time
 
-    def load_data(self):
+    def load_data(self, full_course_outline: CourseOutlineData):  # pylint: disable=unused-argument
         """
         Fetch whatever data you need about the course and user here.
 
@@ -59,9 +59,9 @@ class OutlineProcessor:
         tens of milliseconds, even on courses with hundreds of learning
         sequences.
         """
-        pass
+        pass  # lint-amnesty, pylint: disable=unnecessary-pass
 
-    def inaccessible_sequences(self, full_course_outline):
+    def inaccessible_sequences(self, full_course_outline: CourseOutlineData):  # pylint: disable=unused-argument
         """
         Return a set/frozenset of Sequence UsageKeys that are not accessible.
 
@@ -70,7 +70,7 @@ class OutlineProcessor:
         """
         return frozenset()
 
-    def usage_keys_to_remove(self, full_course_outline):
+    def usage_keys_to_remove(self, full_course_outline: CourseOutlineData):  # pylint: disable=unused-argument
         """
         Return a set/frozenset of UsageKeys to remove altogether.
 

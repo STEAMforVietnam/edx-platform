@@ -10,10 +10,10 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils.translation import ugettext as _
 
-from edxnotes.helpers import is_feature_enabled as is_edxnotes_enabled
+from lms.djangoapps.edxnotes.helpers import is_feature_enabled as is_edxnotes_enabled
 from openedx.core.djangolib.js_utils import js_escaped_string
 from openedx.core.djangolib.markup import HTML
-from openedx.features.course_experience import course_home_page_title, COURSE_OUTLINE_PAGE_FLAG
+from openedx.features.course_experience import course_home_page_title, DISABLE_COURSE_OUTLINE_PAGE_FLAG
 %>
 <%
    include_special_exams = (
@@ -112,6 +112,48 @@ from openedx.features.course_experience import course_home_page_title, COURSE_OU
       </script>
   % endif
 
+  <script type="text/javascript">
+    /* Helper function isInViewport checks whether
+    the given element is in viewport vertically or not */
+    function isInViewport(el) {
+      const scroll = window.scrollY || window.pageYOffset
+      const elementTop = el.getBoundingClientRect().top + scroll
+      const viewport = {
+        top: scroll,
+        bottom: scroll + window.innerHeight,
+      }
+      const elementMid = elementTop + el.clientHeight/2
+      // Returns true if the middle of the element is in the viewport.
+      return elementMid >= viewport.top && elementMid <= viewport.bottom
+    }
+
+    /* Add a jQuery plugin to override the focus behavior.
+    When focused, if the element in not in the viewport then
+    the element will be scrolled to the bottom of the viewport.
+    */
+    (function ($) {
+      $.fn.extend({
+        focus: (function(orig) {
+          return function(delay, fn) {
+            orig.apply(this, arguments);
+            this.each(function(){
+              var elem = this;
+              // Scroll only when the element is not in the viewport and it contains the notification-btn.
+              if (elem.classList.contains('notification-btn') && !isInViewport(elem)) {
+                this.scrollIntoView({
+                  behaviour: 'auto',
+                  block: 'end',
+                })
+              }
+            })
+            return this;
+          }
+        })($.fn.focus),
+
+      })
+    })(jQuery)
+  </script>
+
 ${HTML(fragment.foot_html())}
 
 </%block>
@@ -177,7 +219,7 @@ ${HTML(fragment.foot_html())}
                 <nav aria-label="${_('Course')}" class="sr-is-focusable" tabindex="-1">
                     <div class="has-breadcrumbs">
                         <div class="breadcrumbs">
-                            % if COURSE_OUTLINE_PAGE_FLAG.is_enabled(course.id):
+                            % if not DISABLE_COURSE_OUTLINE_PAGE_FLAG.is_enabled(course.id):
                                 <span class="nav-item nav-item-course">
                                     <a href="${course_url}">${course_home_page_title(course)}</a>
                                 </span>
@@ -195,7 +237,9 @@ ${HTML(fragment.foot_html())}
                                 </span>
                                 <span class="icon fa fa-angle-right" aria-hidden="true"></span>
                             % endif
-                            <span class="nav-item nav-item-sequence">${sequence_title}</span>
+                            % if sequence_title:
+                                <span class="nav-item nav-item-sequence">${sequence_title}</span>
+                            % endif
                         </div>
                     </div>
                 </nav>

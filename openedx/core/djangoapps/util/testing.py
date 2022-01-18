@@ -11,10 +11,10 @@ from openedx.core.djangoapps.django_comment_common.models import Role
 from openedx.core.djangoapps.django_comment_common.utils import seed_permissions_roles
 from openedx.core.djangoapps.user_api.tests.factories import UserCourseTagFactory
 from openedx.core.lib.teams_config import TeamsConfig
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.partitions.partitions import Group, UserPartition
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions import Group, UserPartition  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class ContentGroupTestCase(ModuleStoreTestCase):
@@ -25,7 +25,7 @@ class ContentGroupTestCase(ModuleStoreTestCase):
     and a non-cohorted user with no special access.
     """
     def setUp(self):
-        super(ContentGroupTestCase, self).setUp()
+        super().setUp()
 
         self.course = CourseFactory.create(
             org='org', number='number', run='run',
@@ -144,7 +144,7 @@ class TestConditionalContent(ModuleStoreTestCase):
                             -> vertical (Group B)
                                 -> problem
         """
-        super(TestConditionalContent, self).setUp()
+        super().setUp()
 
         # Create user partitions
         self.user_partition_group_a = 0
@@ -190,13 +190,13 @@ class TestConditionalContent(ModuleStoreTestCase):
         UserCourseTagFactory(
             user=self.student_a,
             course_id=self.course.id,
-            key='xblock.partition_service.partition_{0}'.format(self.partition.id),
+            key=f'xblock.partition_service.partition_{self.partition.id}',
             value=str(self.user_partition_group_a)
         )
         UserCourseTagFactory(
             user=self.student_b,
             course_id=self.course.id,
-            key='xblock.partition_service.partition_{0}'.format(self.partition.id),
+            key=f'xblock.partition_service.partition_{self.partition.id}',
             value=str(self.user_partition_group_b)
         )
 

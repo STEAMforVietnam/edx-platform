@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 End-to-end tests for the Account Settings page.
 """
@@ -14,9 +13,9 @@ class AccountSettingsTestMixin(EventsTestMixin, AcceptanceTest):
     Mixin with helper methods to test the account settings page.
     """
 
-    CHANGE_INITIATED_EVENT_NAME = u"edx.user.settings.change_initiated"
+    CHANGE_INITIATED_EVENT_NAME = "edx.user.settings.change_initiated"
     USER_SETTINGS_CHANGED_EVENT_NAME = 'edx.user.settings.changed'
-    ACCOUNT_SETTINGS_REFERER = u"/account/settings"
+    ACCOUNT_SETTINGS_REFERER = "/account/settings"
 
     shard = 23
 
@@ -37,7 +36,7 @@ class AccountSettingsTestMixin(EventsTestMixin, AcceptanceTest):
         """
         Create a unique user and return the account's username and id.
         """
-        username = "test_{uuid}".format(uuid=self.unique_id[0:6])
+        username = f"test_{self.unique_id[0:6]}"
         auto_auth_page = AutoAuthPage(
             self.browser,
             username=username,

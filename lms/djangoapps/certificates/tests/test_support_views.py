@@ -4,28 +4,25 @@ Tests for certificate app views used by the support team.
 
 
 import json
+from unittest import mock
 from uuid import uuid4
 
 import ddt
-import six
-
 from django.conf import settings
 from django.test.utils import override_settings
 from django.urls import reverse
-from mock import patch
 from opaque_keys.edx.keys import CourseKey
 
-from lms.djangoapps.certificates import api
+from common.djangoapps.student.models import CourseEnrollment
+from common.djangoapps.student.roles import GlobalStaff, SupportStaffRole
+from common.djangoapps.student.tests.factories import UserFactory
 from lms.djangoapps.certificates.models import CertificateInvalidation, CertificateStatuses, GeneratedCertificate
-from lms.djangoapps.certificates.tests.factories import CertificateInvalidationFactory
-from lms.djangoapps.grades.tests.utils import mock_passing_grade
+from lms.djangoapps.certificates.tests.factories import CertificateInvalidationFactory, GeneratedCertificateFactory
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
-from student.models import CourseEnrollment
-from student.roles import GlobalStaff, SupportStaffRole
-from student.tests.factories import UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
+CAN_GENERATE_METHOD = 'lms.djangoapps.certificates.generation_handler._can_generate_regular_certificate'
 FEATURES_WITH_CERTS_ENABLED = settings.FEATURES.copy()
 FEATURES_WITH_CERTS_ENABLED['CERTIFICATES_HTML_VIEW'] = True
 
@@ -50,14 +47,14 @@ class CertificateSupportTestCase(ModuleStoreTestCase):
     CERT_GRADE = 0.89
     CERT_STATUS = CertificateStatuses.downloadable
     CERT_MODE = "verified"
-    CERT_DOWNLOAD_URL = "http://www.example.com/cert.pdf"
+    CERT_DOWNLOAD_URL = "https://www.example.com/cert.pdf"
 
     def setUp(self):
         """
         Create a support team member and a student with a certificate.
         Log in as the support team member.
         """
-        super(CertificateSupportTestCase, self).setUp()
+        super().setUp()
         CourseFactory(
             org=CertificateSupportTestCase.EXISTED_COURSE_KEY_1.org,
             course=CertificateSupportTestCase.EXISTED_COURSE_KEY_1.course,
@@ -80,7 +77,7 @@ class CertificateSupportTestCase(ModuleStoreTestCase):
         )
 
         # Create certificates for the student
-        self.cert = GeneratedCertificate.eligible_certificates.create(
+        self.cert = GeneratedCertificateFactory(
             user=self.student,
             course_id=self.CERT_COURSE_KEY,
             grade=self.CERT_GRADE,
@@ -92,7 +89,7 @@ class CertificateSupportTestCase(ModuleStoreTestCase):
 
         # Login as support staff
         success = self.client.login(username=self.SUPPORT_USERNAME, password=self.SUPPORT_PASSWORD)
-        self.assertTrue(success, msg="Couldn't log in as support staff")
+        assert success, "Couldn't log in as support staff"
 
 
 @ddt.ddt
@@ -105,15 +102,16 @@ class CertificateSearchTests(CertificateSupportTestCase):
         """
         Create a course
         """
-        super(CertificateSearchTests, self).setUp()
+        super().setUp()
         self.course = CourseFactory(
             org=self.CERT_COURSE_KEY.org,
             course=self.CERT_COURSE_KEY.course,
             run=self.CERT_COURSE_KEY.run,
         )
         self.course.cert_html_view_enabled = True
+        self.course_key = self.course.id  # pylint: disable=no-member
 
-        #course certificate configurations
+        # Course certificate configurations
         certificates = [
             {
                 'id': 1,
@@ -127,10 +125,10 @@ class CertificateSearchTests(CertificateSupportTestCase):
         ]
 
         self.course.certificates = {'certificates': certificates}
-        self.course.save()
+        self.course.save()  # pylint: disable=no-member
         self.store.update_item(self.course, self.user.id)
         self.course_overview = CourseOverviewFactory(
-            id=self.course.id,
+            id=self.course_key,
             cert_html_view_enabled=True,
         )
 
@@ -144,7 +142,7 @@ class CertificateSearchTests(CertificateSupportTestCase):
         # Create a user and log in
         user = UserFactory(username="foo", password="foo")
         success = self.client.login(username="foo", password="foo")
-        self.assertTrue(success, msg="Could not log in")
+        assert success, 'Could not log in'
 
         # Assign the user to the role
         if role is not None:
@@ -156,7 +154,7 @@ class CertificateSearchTests(CertificateSupportTestCase):
         if has_access:
             self.assertContains(response, json.dumps([]))
         else:
-            self.assertEqual(response.status_code, 403)
+            assert response.status_code == 403
 
     @ddt.data(
         (CertificateSupportTestCase.STUDENT_USERNAME, True),
@@ -166,19 +164,19 @@ class CertificateSearchTests(CertificateSupportTestCase):
         ("", False),
         (CertificateSupportTestCase.STUDENT_USERNAME, False, 'invalid_key'),
         (CertificateSupportTestCase.STUDENT_USERNAME, False,
-            six.text_type(CertificateSupportTestCase.COURSE_NOT_EXIST_KEY)),
+            str(CertificateSupportTestCase.COURSE_NOT_EXIST_KEY)),
         (CertificateSupportTestCase.STUDENT_USERNAME, True,
-            six.text_type(CertificateSupportTestCase.EXISTED_COURSE_KEY_1)),
+            str(CertificateSupportTestCase.EXISTED_COURSE_KEY_1)),
     )
     @ddt.unpack
     def test_search(self, user_filter, expect_result, course_filter=None):
         response = self._search(user_filter, course_filter)
         if expect_result:
-            self.assertEqual(response.status_code, 200)
+            assert response.status_code == 200
             results = json.loads(response.content.decode('utf-8'))
-            self.assertEqual(len(results), 1)
+            assert len(results) == 1
         else:
-            self.assertEqual(response.status_code, 400)
+            assert response.status_code == 400
 
     def test_search_with_plus_sign(self):
         """
@@ -188,52 +186,48 @@ class CertificateSearchTests(CertificateSupportTestCase):
         self.student.save()
 
         response = self._search(self.student.email)
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         results = json.loads(response.content.decode('utf-8'))
 
-        self.assertEqual(len(results), 1)
+        assert len(results) == 1
         retrieved_data = results[0]
-        self.assertEqual(retrieved_data["username"], self.STUDENT_USERNAME)
+        assert retrieved_data['username'] == self.STUDENT_USERNAME
 
     def test_results(self):
         response = self._search(self.STUDENT_USERNAME)
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         results = json.loads(response.content.decode('utf-8'))
 
-        self.assertEqual(len(results), 1)
+        assert len(results) == 1
         retrieved_cert = results[0]
 
-        self.assertEqual(retrieved_cert["username"], self.STUDENT_USERNAME)
-        self.assertEqual(retrieved_cert["course_key"], six.text_type(self.CERT_COURSE_KEY))
-        self.assertEqual(retrieved_cert["created"], self.cert.created_date.isoformat())
-        self.assertEqual(retrieved_cert["modified"], self.cert.modified_date.isoformat())
-        self.assertEqual(retrieved_cert["grade"], six.text_type(self.CERT_GRADE))
-        self.assertEqual(retrieved_cert["status"], self.CERT_STATUS)
-        self.assertEqual(retrieved_cert["type"], self.CERT_MODE)
-        self.assertEqual(retrieved_cert["download_url"], self.CERT_DOWNLOAD_URL)
-        self.assertFalse(retrieved_cert["regenerate"])
+        assert retrieved_cert['username'] == self.STUDENT_USERNAME
+        assert retrieved_cert['course_key'] == str(self.CERT_COURSE_KEY)
+        assert retrieved_cert['created'] == self.cert.created_date.isoformat()
+        assert retrieved_cert['modified'] == self.cert.modified_date.isoformat()
+        assert retrieved_cert['grade'] == str(self.CERT_GRADE)
+        assert retrieved_cert['status'] == self.CERT_STATUS
+        assert retrieved_cert['type'] == self.CERT_MODE
+        assert retrieved_cert['download_url'] == self.CERT_DOWNLOAD_URL
+        assert not retrieved_cert['regenerate']
 
     @override_settings(FEATURES=FEATURES_WITH_CERTS_ENABLED)
     def test_download_link(self):
-        self.cert.course_id = self.course.id
+        self.cert.course_id = self.course_key
         self.cert.download_url = ''
         self.cert.save()
 
         response = self._search(self.STUDENT_USERNAME)
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
         results = json.loads(response.content.decode('utf-8'))
 
-        self.assertEqual(len(results), 1)
+        assert len(results) == 1
         retrieved_cert = results[0]
 
-        self.assertEqual(
-            retrieved_cert["download_url"],
-            reverse(
-                'certificates:render_cert_by_uuid',
-                kwargs={"certificate_uuid": self.cert.verify_uuid}
-            )
-        )
-        self.assertTrue(retrieved_cert["regenerate"])
+        assert retrieved_cert['download_url'] ==\
+               reverse('certificates:render_cert_by_uuid',
+                       kwargs={'certificate_uuid': self.cert.verify_uuid})
+        assert retrieved_cert['regenerate']
 
     def _search(self, user_filter, course_filter=None):
         """Execute a search and return the response. """
@@ -253,12 +247,13 @@ class CertificateRegenerateTests(CertificateSupportTestCase):
         """
         Create a course and enroll the student in the course.
         """
-        super(CertificateRegenerateTests, self).setUp()
+        super().setUp()
         self.course = CourseFactory(
             org=self.CERT_COURSE_KEY.org,
             course=self.CERT_COURSE_KEY.course,
             run=self.CERT_COURSE_KEY.run,
         )
+        self.course_key = self.course.id  # pylint: disable=no-member
         CourseEnrollment.enroll(self.student, self.CERT_COURSE_KEY, self.CERT_MODE)
 
     @ddt.data(
@@ -271,7 +266,7 @@ class CertificateRegenerateTests(CertificateSupportTestCase):
         # Create a user and log in
         user = UserFactory(username="foo", password="foo")
         success = self.client.login(username="foo", password="foo")
-        self.assertTrue(success, msg="Could not log in")
+        assert success, 'Could not log in'
 
         # Assign the user to the role
         if role is not None:
@@ -283,66 +278,32 @@ class CertificateRegenerateTests(CertificateSupportTestCase):
         response = self._regenerate()
 
         if has_access:
-            self.assertEqual(response.status_code, 400)
+            assert response.status_code == 400
         else:
-            self.assertEqual(response.status_code, 403)
-
-    def test_regenerate_certificate(self):
-        """Test web certificate regenration."""
-        self.cert.download_url = ''
-        self.cert.save()
-
-        response = self._regenerate(
-            course_key=self.course.id,
-            username=self.STUDENT_USERNAME,
-        )
-        self.assertEqual(response.status_code, 200)
-
-        # Check that the user's certificate was updated
-        # Since the student hasn't actually passed the course,
-        # we'd expect that the certificate status will be "notpassing"
-        cert = GeneratedCertificate.eligible_certificates.get(user=self.student)
-        self.assertEqual(cert.status, CertificateStatuses.notpassing)
-
-    @patch('lms.djangoapps.certificates.queue.XQueueCertInterface._generate_cert')
-    def test_regenerate_certificate_for_honor_mode(self, mock_generate_cert):
-        """Test web certificate regenration for the users who have earned the
-           certificate in honor mode
-        """
-        self.cert.mode = 'honor'
-        self.cert.download_url = ''
-        self.cert.save()
-
-        with mock_passing_grade(percent=0.75):
-            with patch('course_modes.models.CourseMode.mode_for_course') as mock_mode_for_course:
-                mock_mode_for_course.return_value = 'honor'
-                api.regenerate_user_certificates(self.student, self.course.id,
-                                                 course=self.course)
-
-                mock_generate_cert.assert_called()
+            assert response.status_code == 403
 
     def test_regenerate_certificate_missing_params(self):
         # Missing username
         response = self._regenerate(course_key=self.CERT_COURSE_KEY)
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
         # Missing course key
         response = self._regenerate(username=self.STUDENT_USERNAME)
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
     def test_regenerate_no_such_user(self):
         response = self._regenerate(
-            course_key=six.text_type(self.CERT_COURSE_KEY),
+            course_key=str(self.CERT_COURSE_KEY),
             username="invalid_username",
         )
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
     def test_regenerate_no_such_course(self):
         response = self._regenerate(
             course_key=CourseKey.from_string("edx/invalid/course"),
             username=self.STUDENT_USERNAME
         )
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
     def test_regenerate_user_is_not_enrolled(self):
         # Unenroll the user
@@ -353,8 +314,9 @@ class CertificateRegenerateTests(CertificateSupportTestCase):
             course_key=self.CERT_COURSE_KEY,
             username=self.STUDENT_USERNAME
         )
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
+    @mock.patch(CAN_GENERATE_METHOD, mock.Mock(return_value=True))
     def test_regenerate_user_has_no_certificate(self):
         # Delete the user's certificate
         GeneratedCertificate.eligible_certificates.all().delete()
@@ -364,38 +326,11 @@ class CertificateRegenerateTests(CertificateSupportTestCase):
             course_key=self.CERT_COURSE_KEY,
             username=self.STUDENT_USERNAME
         )
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
 
         # A new certificate is created
         num_certs = GeneratedCertificate.eligible_certificates.filter(user=self.student).count()
-        self.assertEqual(num_certs, 1)
-
-    def test_regenerate_cert_with_invalidated_record(self):
-        """ If the certificate is marked as invalid, regenerate the certificate
-        and verify the invalidate entry is deactivated. """
-
-        # mark certificate as invalid
-        self._invalidate_certificate(self.cert)
-        self.assertInvalidatedCertExists()
-        # after invalidation certificate status become un-available.
-        self.assertGeneratedCertExists(
-            user=self.student, status=CertificateStatuses.unavailable
-        )
-
-        # Should be able to regenerate
-        response = self._regenerate(
-            course_key=self.CERT_COURSE_KEY,
-            username=self.STUDENT_USERNAME
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertInvalidatedCertDoesNotExist()
-
-        # Check that the user's certificate was updated
-        # Since the student hasn't actually passed the course,
-        # we'd expect that the certificate status will be "notpassing"
-        self.assertGeneratedCertExists(
-            user=self.student, status=CertificateStatuses.notpassing
-        )
+        assert num_certs == 1
 
     def _regenerate(self, course_key=None, username=None):
         """Call the regeneration end-point and return the response. """
@@ -419,31 +354,20 @@ class CertificateRegenerateTests(CertificateSupportTestCase):
         )
         # Invalidate user certificate
         certificate.invalidate()
-        self.assertFalse(certificate.is_valid())
+        assert not certificate.is_valid()
 
-    def assertInvalidatedCertExists(self):
+    def assertCertInvalidationExists(self):
         """ Dry method to check certificate invalidated entry exists. """
-        self.assertTrue(
-            CertificateInvalidation.objects.filter(
-                generated_certificate__user=self.student, active=True
-            ).exists()
-        )
+        assert CertificateInvalidation.objects.filter(generated_certificate__user=self.student, active=True).exists()
 
     def assertInvalidatedCertDoesNotExist(self):
         """ Dry method to check certificate invalidated entry does not exists. """
-        self.assertFalse(
-            CertificateInvalidation.objects.filter(
-                generated_certificate__user=self.student, active=True
-            ).exists()
-        )
+        assert not CertificateInvalidation.objects\
+            .filter(generated_certificate__user=self.student, active=True).exists()
 
     def assertGeneratedCertExists(self, user, status):
         """ Dry method to check if certificate exists. """
-        self.assertTrue(
-            GeneratedCertificate.objects.filter(
-                user=user, status=status
-            ).exists()
-        )
+        assert GeneratedCertificate.objects.filter(user=user, status=status).exists()
 
 
 @ddt.ddt
@@ -456,12 +380,13 @@ class CertificateGenerateTests(CertificateSupportTestCase):
         """
         Create a course and enroll the student in the course.
         """
-        super(CertificateGenerateTests, self).setUp()
+        super().setUp()
         self.course = CourseFactory(
             org=self.EXISTED_COURSE_KEY_2.org,
             course=self.EXISTED_COURSE_KEY_2.course,
             run=self.EXISTED_COURSE_KEY_2.run
         )
+        self.course_key = self.course.id  # pylint: disable=no-member
         CourseEnrollment.enroll(self.student, self.EXISTED_COURSE_KEY_2, self.CERT_MODE)
 
     @ddt.data(
@@ -474,7 +399,7 @@ class CertificateGenerateTests(CertificateSupportTestCase):
         # Create a user and log in
         user = UserFactory(username="foo", password="foo")
         success = self.client.login(username="foo", password="foo")
-        self.assertTrue(success, msg="Could not log in")
+        assert success, 'Could not log in'
 
         # Assign the user to the role
         if role is not None:
@@ -486,39 +411,39 @@ class CertificateGenerateTests(CertificateSupportTestCase):
         response = self._generate()
 
         if has_access:
-            self.assertEqual(response.status_code, 400)
+            assert response.status_code == 400
         else:
-            self.assertEqual(response.status_code, 403)
+            assert response.status_code == 403
 
     def test_generate_certificate(self):
         response = self._generate(
-            course_key=self.course.id,
+            course_key=self.course_key,
             username=self.STUDENT_USERNAME,
         )
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
 
     def test_generate_certificate_missing_params(self):
         # Missing username
         response = self._generate(course_key=self.EXISTED_COURSE_KEY_2)
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
         # Missing course key
         response = self._generate(username=self.STUDENT_USERNAME)
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
     def test_generate_no_such_user(self):
         response = self._generate(
-            course_key=six.text_type(self.EXISTED_COURSE_KEY_2),
+            course_key=str(self.EXISTED_COURSE_KEY_2),
             username="invalid_username",
         )
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
     def test_generate_no_such_course(self):
         response = self._generate(
             course_key=CourseKey.from_string("edx/invalid/course"),
             username=self.STUDENT_USERNAME
         )
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
     def test_generate_user_is_not_enrolled(self):
         # Unenroll the user
@@ -529,8 +454,9 @@ class CertificateGenerateTests(CertificateSupportTestCase):
             course_key=self.EXISTED_COURSE_KEY_2,
             username=self.STUDENT_USERNAME
         )
-        self.assertEqual(response.status_code, 400)
+        assert response.status_code == 400
 
+    @mock.patch(CAN_GENERATE_METHOD, mock.Mock(return_value=True))
     def test_generate_user_has_no_certificate(self):
         # Delete the user's certificate
         GeneratedCertificate.eligible_certificates.all().delete()
@@ -540,11 +466,11 @@ class CertificateGenerateTests(CertificateSupportTestCase):
             course_key=self.EXISTED_COURSE_KEY_2,
             username=self.STUDENT_USERNAME
         )
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
 
         # A new certificate is created
         num_certs = GeneratedCertificate.eligible_certificates.filter(user=self.student).count()
-        self.assertEqual(num_certs, 1)
+        assert num_certs == 1
 
     def _generate(self, course_key=None, username=None):
         """Call the generation end-point and return the response. """

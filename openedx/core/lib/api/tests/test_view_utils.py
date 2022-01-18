@@ -8,9 +8,9 @@ from rest_framework.test import APITestCase
 from rest_framework.views import APIView
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 from ..view_utils import DeveloperErrorViewMixin, verify_course_exists
 
@@ -20,12 +20,12 @@ class MockAPIView(DeveloperErrorViewMixin, APIView):
     Mock API view for testing.
     """
 
-    @verify_course_exists
+    @verify_course_exists()
     def get(self, request, course_id):
         """
         Mock GET handler for testing.
         """
-        return Response("Success {}".format(course_id))
+        return Response(f"Success {course_id}")
 
 urlpatterns = [
     url(r'^mock/(?P<course_id>.*)/$', MockAPIView.as_view()),  # Only works with new-style course keys
@@ -51,7 +51,7 @@ class VerifyCourseExistsTestCase(SharedModuleStoreTestCase, APITestCase):
             org="This", course="IsA", run="Course",
             default_store=ModuleStoreEnum.Type.split,
         )
-        response = self.client.get('/mock/{}/'.format(course.id))
+        response = self.client.get(f'/mock/{course.id}/')
         assert response.status_code == 200
 
     def test_course_with_outdated_overview_200(self):
@@ -62,5 +62,5 @@ class VerifyCourseExistsTestCase(SharedModuleStoreTestCase, APITestCase):
         course_overview = CourseOverview.get_from_id(course.id)
         course_overview.version = CourseOverview.VERSION - 1
         course_overview.save()
-        response = self.client.get('/mock/{}/'.format(course.id))
+        response = self.client.get(f'/mock/{course.id}/')
         assert response.status_code == 200

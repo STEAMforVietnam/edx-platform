@@ -7,21 +7,21 @@ forums, and to the cohort admin views.
 import logging
 import random
 
-import six
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 from django.http import Http404
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from edx_django_utils.cache import RequestCache
 from eventtracking import tracker
 
 from lms.djangoapps.courseware import courses
 from openedx.core.lib.cache_utils import request_cached
-from student.models import get_user_by_username_or_email
+from openedx.core.lib.courses import get_course_by_id
+from common.djangoapps.student.models import get_user_by_username_or_email
 
 from .models import (
     CohortMembership,
@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=CourseUserGroup)
-def _cohort_added(sender, **kwargs):
+def _cohort_added(sender, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
     """Emits a tracking log event each time a cohort is created"""
     instance = kwargs["instance"]
     if kwargs["created"] and instance.group_type == CourseUserGroup.COHORT:
@@ -48,7 +48,7 @@ def _cohort_added(sender, **kwargs):
 
 
 @receiver(m2m_changed, sender=CourseUserGroup.users.through)
-def _cohort_membership_changed(sender, **kwargs):
+def _cohort_membership_changed(sender, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
     """Emits a tracking log event each time cohort membership is modified"""
     def get_event_iter(user_id_iter, cohort_iter):
         """
@@ -161,14 +161,14 @@ def get_cohort_id(user, course_key, use_cached=False):
     return None if cohort is None else cohort.id
 
 
-COHORT_CACHE_NAMESPACE = u"cohorts.get_cohort"
+COHORT_CACHE_NAMESPACE = "cohorts.get_cohort"
 
 
 def _cohort_cache_key(user_id, course_key):
     """
     Returns the cache key for the given user_id and course_key.
     """
-    return u"{}.{}".format(user_id, course_key)
+    return f"{user_id}.{course_key}"
 
 
 def bulk_cache_cohorts(course_key, users):
@@ -187,7 +187,7 @@ def bulk_cache_cohorts(course_key, users):
             for membership in
             CohortMembership.objects.filter(user__in=users, course_id=course_key).select_related('user')
         }
-        for user, membership in six.iteritems(cohorts_by_user):
+        for user, membership in cohorts_by_user.items():
             cache[_cohort_cache_key(user.id, course_key)] = membership.course_user_group
         uncohorted_users = [u for u in users if u not in cohorts_by_user]
     else:
@@ -267,8 +267,8 @@ def get_cohort(user, course_key, assign=True, use_cached=False):
         # create the same row in one of the cohort model entries:
         # CourseCohort, CohortMembership.
         log.info(
-            u"HANDLING_INTEGRITY_ERROR: IntegrityError encountered for course '%s' and user '%s': %s",
-            course_key, user.id, six.text_type(integrity_error)
+            "HANDLING_INTEGRITY_ERROR: IntegrityError encountered for course '%s' and user '%s': %s",
+            course_key, user.id, str(integrity_error)
         )
         return get_cohort(user, course_key, assign, use_cached)
 
@@ -383,14 +383,14 @@ def add_cohort(course_key, name, assignment_type):
     Add a cohort to a course.  Raises ValueError if a cohort of the same name already
     exists.
     """
-    log.debug(u"Adding cohort %s to %s", name, course_key)
+    log.debug("Adding cohort %s to %s", name, course_key)
     if is_cohort_exists(course_key, name):
         raise ValueError(_("You cannot create two cohorts with the same name"))
 
     try:
-        course = courses.get_course_by_id(course_key)
+        course = get_course_by_id(course_key)
     except Http404:
-        raise ValueError("Invalid course_key")
+        raise ValueError("Invalid course_key")  # lint-amnesty, pylint: disable=raise-missing-from
 
     cohort = CourseCohort.create(
         cohort_name=name,
@@ -432,7 +432,7 @@ def remove_user_from_cohort(cohort, username_or_email):
         membership.delete()
         COHORT_MEMBERSHIP_UPDATED.send(sender=None, user=user, course_key=course_key)
     except CohortMembership.DoesNotExist:
-        raise ValueError(u"User {} was not present in cohort {}".format(username_or_email, cohort))
+        raise ValueError(f"User {username_or_email} was not present in cohort {cohort}")  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 def add_user_to_cohort(cohort, username_or_email_or_user):
@@ -504,10 +504,10 @@ def add_user_to_cohort(cohort, username_or_email_or_user):
 
             return (None, None, True)
         except ValidationError as invalid:
-            if "@" in username_or_email_or_user:
+            if "@" in username_or_email_or_user:  # lint-amnesty, pylint: disable=no-else-raise
                 raise invalid
             else:
-                raise ex
+                raise ex  # lint-amnesty, pylint: disable=raise-missing-from
 
 
 def get_group_info_for_cohort(cohort, use_cached=False):
@@ -522,8 +522,8 @@ def get_group_info_for_cohort(cohort, use_cached=False):
     use_cached=True to use the cached value instead of fetching from the
     database.
     """
-    cache = RequestCache(u"cohorts.get_group_info_for_cohort").data
-    cache_key = six.text_type(cohort.id)
+    cache = RequestCache("cohorts.get_group_info_for_cohort").data
+    cache_key = str(cohort.id)
 
     if use_cached and cache_key in cache:
         return cache[cache_key]
@@ -594,12 +594,12 @@ def _get_course_cohort_settings(course_key):
     try:
         course_cohort_settings = CourseCohortsSettings.objects.get(course_id=course_key)
     except CourseCohortsSettings.DoesNotExist:
-        course = courses.get_course_by_id(course_key)
+        course = get_course_by_id(course_key)
         course_cohort_settings = migrate_cohort_settings(course)
     return course_cohort_settings
 
 
-def get_legacy_discussion_settings(course_key):
+def get_legacy_discussion_settings(course_key):  # lint-amnesty, pylint: disable=missing-function-docstring
 
     try:
         course_cohort_settings = CourseCohortsSettings.objects.get(course_id=course_key)
@@ -609,7 +609,7 @@ def get_legacy_discussion_settings(course_key):
             'always_cohort_inline_discussions': course_cohort_settings.always_cohort_inline_discussions
         }
     except CourseCohortsSettings.DoesNotExist:
-        course = courses.get_course_by_id(course_key)
+        course = get_course_by_id(course_key)
         return _get_cohort_settings_from_modulestore(course)
 
 

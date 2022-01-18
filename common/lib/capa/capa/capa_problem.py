@@ -23,7 +23,7 @@ from datetime import datetime
 from xml.sax.saxutils import unescape
 
 import six
-from django.utils.encoding import python_2_unicode_compatible
+
 from lxml import etree
 from pytz import UTC
 
@@ -33,7 +33,7 @@ import capa.responsetypes as responsetypes
 import capa.xqueue_interface as xqueue_interface
 from capa.correctmap import CorrectMap
 from capa.safe_exec import safe_exec
-from capa.util import contextualize_text, convert_files_to_filenames
+from capa.util import contextualize_text, convert_files_to_filenames, get_course_id_from_capa_module
 from openedx.core.djangolib.markup import HTML, Text
 from openedx.core.lib.edx_six import get_gettext
 from xmodule.stringify import stringify_children
@@ -128,7 +128,6 @@ class LoncapaSystem(object):
         self.matlab_api_key = matlab_api_key
 
 
-@python_2_unicode_compatible
 class LoncapaProblem(object):
     """
     Main class for capa Problems.
@@ -190,7 +189,17 @@ class LoncapaProblem(object):
             problem_text = problem_text.encode('utf-8')
         self.tree = etree.XML(problem_text)
 
-        self.make_xml_compatible(self.tree)
+        try:
+            self.make_xml_compatible(self.tree)
+        except Exception:
+            capa_module = self.capa_module
+            log.exception(
+                "CAPAProblemError: %s, id:%s, data: %s",
+                capa_module.display_name,
+                self.problem_id,
+                capa_module.data
+            )
+            raise
 
         # handle any <include file="foo"> tags
         self._process_includes()
@@ -275,7 +284,9 @@ class LoncapaProblem(object):
             correct_option = None
             child_options = []
             for option_element in optioninput.findall('./option'):
-                option_name = option_element.text.strip()
+                text = option_element.text
+                text = text or ''
+                option_name = text.strip()
                 if option_element.get('correct').upper() == 'TRUE':
                     correct_option = option_name
                 child_options.append("'" + option_name + "'")
@@ -290,7 +301,7 @@ class LoncapaProblem(object):
         """
         Reset internal state to unfinished, with no answers
         """
-        self.student_answers = dict()
+        self.student_answers = {}
         self.has_saved_answers = False
         self.correct_map = CorrectMap()
         self.done = False
@@ -299,7 +310,7 @@ class LoncapaProblem(object):
         """
         Set the student's answers to the responders' initial displays, if specified.
         """
-        initial_answers = dict()
+        initial_answers = {}
         for responder in self.responders.values():
             if hasattr(responder, 'get_initial_display'):
                 initial_answers.update(responder.get_initial_display())
@@ -307,7 +318,7 @@ class LoncapaProblem(object):
         self.student_answers = initial_answers
 
     def __str__(self):
-        return u"LoncapaProblem ({0})".format(self.problem_id)
+        return "LoncapaProblem ({0})".format(self.problem_id)
 
     def get_state(self):
         """
@@ -425,7 +436,7 @@ class LoncapaProblem(object):
         # if answers include File objects, convert them to filenames.
         self.student_answers = convert_files_to_filenames(answers)
         new_cmap = self.get_grade_from_current_answers(answers)
-        self.correct_map = new_cmap
+        self.correct_map = new_cmap  # lint-amnesty, pylint: disable=attribute-defined-outside-init
         return self.correct_map
 
     def supports_rescoring(self):
@@ -475,7 +486,7 @@ class LoncapaProblem(object):
             # TODO: figure out where to get file submissions when rescoring.
             if 'filesubmission' in responder.allowed_inputfields and student_answers is None:
                 _ = get_gettext(self.capa_system.i18n)
-                raise Exception(_(u"Cannot rescore problems with possible file submissions"))
+                raise Exception(_("Cannot rescore problems with possible file submissions"))
 
             # use 'student_answers' only if it is provided, and if it might contain a file
             # submission that would not exist in the persisted "student_answers".
@@ -495,8 +506,8 @@ class LoncapaProblem(object):
         (see capa_module)
         """
         # dict of (id, correct_answer)
-        answer_map = dict()
-        for response in self.responders.keys():
+        answer_map = {}
+        for response in self.responders.keys():  # lint-amnesty, pylint: disable=consider-iterating-dictionary
             results = self.responder_answers[response]
             answer_map.update(results)
 
@@ -516,7 +527,7 @@ class LoncapaProblem(object):
         get_question_answers may only return a subset of these.
         """
         answer_ids = []
-        for response in self.responders.keys():
+        for response in self.responders.keys():  # lint-amnesty, pylint: disable=consider-iterating-dictionary
             results = self.responder_answers[response]
             answer_ids.append(list(results.keys()))
         return answer_ids
@@ -657,11 +668,17 @@ class LoncapaProblem(object):
                 answer_id=answer_id,
                 choice_number=current_answer
             ))
-            assert len(elems) == 1
-            choicegroup = elems[0].getparent()
-            input_cls = inputtypes.registry.get_class_for_tag(choicegroup.tag)
-            choices_map = dict(input_cls.extract_choices(choicegroup, self.capa_system.i18n, text_only=True))
-            answer_text = choices_map[current_answer]
+            if len(elems) == 0:
+                log.warning("Answer Text Missing for answer id: %s and choice number: %s", answer_id, current_answer)
+                answer_text = "Answer Text Missing"
+            elif len(elems) == 1:
+                choicegroup = elems[0].getparent()
+                input_cls = inputtypes.registry.get_class_for_tag(choicegroup.tag)
+                choices_map = dict(input_cls.extract_choices(choicegroup, self.capa_system.i18n, text_only=True))
+                answer_text = choices_map.get(current_answer, "Answer Text Missing")
+            else:
+                log.warning("Multiple answers found for answer id: %s and choice number: %s", answer_id, current_answer)
+                answer_text = "Multiple answers found"
 
         elif isinstance(current_answer, six.string_types):
             # Already a string with the answer
@@ -670,7 +687,7 @@ class LoncapaProblem(object):
         else:
             raise NotImplementedError()
 
-        return answer_text
+        return answer_text or "Answer Text Missing"
 
     def do_targeted_feedback(self, tree):
         """
@@ -799,7 +816,7 @@ class LoncapaProblem(object):
                 try:
                     # open using LoncapaSystem OSFS filestore
                     ifp = self.capa_system.filestore.open(filename)
-                except Exception as err:
+                except Exception as err:  # lint-amnesty, pylint: disable=broad-except
                     log.warning(
                         'Error %s in problem xml include: %s',
                         err,
@@ -810,14 +827,14 @@ class LoncapaProblem(object):
                     )
                     # if debugging, don't fail - just log error
                     # TODO (vshnayder): need real error handling, display to users
-                    if not self.capa_system.DEBUG:
+                    if not self.capa_system.DEBUG:  # lint-amnesty, pylint: disable=no-else-raise
                         raise
                     else:
                         continue
                 try:
                     # read in and convert to XML
                     incxml = etree.XML(ifp.read())
-                except Exception as err:
+                except Exception as err:  # lint-amnesty, pylint: disable=broad-except
                     log.warning(
                         'Error %s in problem xml include: %s',
                         err,
@@ -826,7 +843,7 @@ class LoncapaProblem(object):
                     log.warning('Cannot parse XML in %s', (filename))
                     # if debugging, don't fail - just log error
                     # TODO (vshnayder): same as above
-                    if not self.capa_system.DEBUG:
+                    if not self.capa_system.DEBUG:  # lint-amnesty, pylint: disable=no-else-raise
                         raise
                     else:
                         continue
@@ -854,7 +871,7 @@ class LoncapaProblem(object):
         # find additional comma-separated modules search path
         path = []
 
-        for dir in raw_path:
+        for dir in raw_path:  # lint-amnesty, pylint: disable=redefined-builtin
             if not dir:
                 continue
 
@@ -920,11 +937,14 @@ class LoncapaProblem(object):
                     python_path=python_path,
                     extra_files=extra_files,
                     cache=self.capa_system.cache,
+                    limit_overrides_context=get_course_id_from_capa_module(
+                        self.capa_module
+                    ),
                     slug=self.problem_id,
                     unsafely=self.capa_system.can_execute_unsafe_code(),
                 )
             except Exception as err:
-                log.exception("Error while execing script code: " + all_code)
+                log.exception("Error while execing script code: " + all_code)  # lint-amnesty, pylint: disable=logging-not-lazy
                 msg = Text("Error while executing script code: %s" % str(err))
                 raise responsetypes.LoncapaProblemError(msg)
 
@@ -1098,7 +1118,7 @@ class LoncapaProblem(object):
             # get responder answers (do this only once, since there may be a performance cost,
             # eg with externalresponse)
             self.responder_answers = {}
-            for response in self.responders.keys():
+            for response in self.responders.keys():  # lint-amnesty, pylint: disable=consider-iterating-dictionary
                 try:
                     self.responder_answers[response] = self.responders[response].get_answers()
                 except:
@@ -1137,7 +1157,7 @@ class LoncapaProblem(object):
             response.set('multiple_inputtypes', 'true')
             group_label_tag = response.find('label')
             group_description_tags = response.findall('description')
-            group_label_tag_id = u'multiinput-group-label-{}'.format(responsetype_id)
+            group_label_tag_id = 'multiinput-group-label-{}'.format(responsetype_id)
             group_label_tag_text = ''
             if group_label_tag is not None:
                 group_label_tag.tag = 'p'
@@ -1148,7 +1168,7 @@ class LoncapaProblem(object):
 
             group_description_ids = []
             for index, group_description_tag in enumerate(group_description_tags):
-                group_description_tag_id = u'multiinput-group-description-{}-{}'.format(responsetype_id, index)
+                group_description_tag_id = 'multiinput-group-description-{}-{}'.format(responsetype_id, index)
                 group_description_tag.tag = 'p'
                 group_description_tag.set('id', group_description_tag_id)
                 group_description_tag.set('class', 'multi-inputs-group-description question-description')

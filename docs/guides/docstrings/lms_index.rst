@@ -14,11 +14,9 @@ Studio.
     lms/djangoapps/bulk_email/modules
     lms/djangoapps/courseware/modules
     lms/djangoapps/coursewarehistoryextended/modules
-    lms/djangoapps/email_marketing/modules
     lms/djangoapps/experiments/modules
     lms/djangoapps/lti_provider/modules
     lms/djangoapps/mobile_api/modules
     lms/djangoapps/notes/modules
     lms/djangoapps/rss_proxy/modules
-    lms/djangoapps/shoppingcart/modules
     lms/djangoapps/survey/modules

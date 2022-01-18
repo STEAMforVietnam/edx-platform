@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 This is the default template for our main set of AWS servers.
 
@@ -23,16 +21,16 @@ import copy
 import datetime
 import os
 
-import dateutil
 import yaml
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 from django.core.exceptions import ImproperlyConfigured
+from edx_django_utils.plugins import add_plugins
 from path import Path as path
 
-from openedx.core.djangoapps.plugins import plugin_settings, constants as plugin_constants
+from openedx.core.djangoapps.plugins.constants import ProjectType, SettingsType
 from openedx.core.lib.derived import derive_settings
 from openedx.core.lib.logsettings import get_logger_config
-from xmodule.modulestore.modulestore_settings import convert_module_store_setting_if_needed
+from xmodule.modulestore.modulestore_settings import convert_module_store_setting_if_needed  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .common import *
 
@@ -42,8 +40,8 @@ def get_env_setting(setting):
     try:
         return os.environ[setting]
     except KeyError:
-        error_msg = u"Set the %s env variable" % setting
-        raise ImproperlyConfigured(error_msg)
+        error_msg = "Set the %s env variable" % setting
+        raise ImproperlyConfigured(error_msg)  # lint-amnesty, pylint: disable=raise-missing-from
 
 ################################ ALWAYS THE SAME ##############################
 
@@ -104,20 +102,6 @@ except Exception:  # pylint: disable=broad-except
 # Do NOT calculate this dynamically at startup with git because it's *slow*.
 EDX_PLATFORM_REVISION = REVISION_CONFIG.get('EDX_PLATFORM_REVISION', EDX_PLATFORM_REVISION)
 
-# SERVICE_VARIANT specifies name of the variant used, which decides what JSON
-# configuration files are read during startup.
-SERVICE_VARIANT = os.environ.get('SERVICE_VARIANT', None)
-
-# CONFIG_ROOT specifies the directory where the JSON configuration
-# files are expected to be found. If not specified, use the project
-# directory.
-CONFIG_ROOT = path(os.environ.get('CONFIG_ROOT', ENV_ROOT))
-
-# CONFIG_PREFIX specifies the prefix of the JSON configuration files,
-# based on the service variant. If no variant is use, don't use a
-# prefix.
-CONFIG_PREFIX = SERVICE_VARIANT + "." if SERVICE_VARIANT else ""
-
 ###################################### CELERY  ################################
 
 # Don't use a connection pool, since connections are dropped by ELB.
@@ -125,7 +109,7 @@ BROKER_POOL_LIMIT = 0
 BROKER_CONNECTION_TIMEOUT = 1
 
 # For the Result Store, use the django cache named 'celery'
-CELERY_RESULT_BACKEND = 'djcelery.backends.cache:CacheBackend'
+CELERY_RESULT_BACKEND = 'django-cache'
 
 # When the broker is behind an ELB, use a heartbeat to refresh the
 # connection and to detect if it has been dropped.
@@ -134,28 +118,6 @@ BROKER_HEARTBEAT_CHECKRATE = ENV_TOKENS.get('BROKER_HEARTBEAT_CHECKRATE', 2)
 
 # Each worker should only fetch one message at a time
 CELERYD_PREFETCH_MULTIPLIER = 1
-
-# Rename the exchange and queues for each variant
-
-QUEUE_VARIANT = CONFIG_PREFIX.lower()
-
-CELERY_DEFAULT_EXCHANGE = 'edx.{0}core'.format(QUEUE_VARIANT)
-
-HIGH_PRIORITY_QUEUE = 'edx.{0}core.high'.format(QUEUE_VARIANT)
-DEFAULT_PRIORITY_QUEUE = 'edx.{0}core.default'.format(QUEUE_VARIANT)
-HIGH_MEM_QUEUE = 'edx.{0}core.high_mem'.format(QUEUE_VARIANT)
-
-CELERY_DEFAULT_QUEUE = DEFAULT_PRIORITY_QUEUE
-CELERY_DEFAULT_ROUTING_KEY = DEFAULT_PRIORITY_QUEUE
-
-CELERY_QUEUES = {
-    HIGH_PRIORITY_QUEUE: {},
-    DEFAULT_PRIORITY_QUEUE: {},
-    HIGH_MEM_QUEUE: {},
-}
-
-CELERY_ROUTES = "{}celery.Router".format(QUEUE_VARIANT)
-CELERYBEAT_SCHEDULE = {}  # For scheduling tasks, entries can be added to this dict
 
 # STATIC_ROOT specifies the directory where static files are
 # collected
@@ -193,7 +155,12 @@ SESSION_COOKIE_DOMAIN = ENV_TOKENS.get('SESSION_COOKIE_DOMAIN')
 SESSION_COOKIE_HTTPONLY = ENV_TOKENS.get('SESSION_COOKIE_HTTPONLY', True)
 
 DCS_SESSION_COOKIE_SAMESITE = ENV_TOKENS.get('DCS_SESSION_COOKIE_SAMESITE', DCS_SESSION_COOKIE_SAMESITE)
-DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL = ENV_TOKENS.get('DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL', DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL)
+DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL = ENV_TOKENS.get('DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL', DCS_SESSION_COOKIE_SAMESITE_FORCE_ALL)  # lint-amnesty, pylint: disable=line-too-long
+
+# As django-cookies-samesite package is set to be removed from base requirements when we upgrade to Django 3.2,
+# we should follow the settings name provided by Django.
+# https://docs.djangoproject.com/en/3.2/ref/settings/#session-cookie-samesite
+SESSION_COOKIE_SAMESITE = DCS_SESSION_COOKIE_SAMESITE
 
 AWS_SES_REGION_NAME = ENV_TOKENS.get('AWS_SES_REGION_NAME', 'us-east-1')
 AWS_SES_REGION_ENDPOINT = ENV_TOKENS.get('AWS_SES_REGION_ENDPOINT', 'email.us-east-1.amazonaws.com')
@@ -220,12 +187,23 @@ ALLOWED_HOSTS = [
     FEATURES['PREVIEW_LMS_BASE'],
 ]
 
+# Sometimes, OAuth2 clients want the user to redirect back to their site after logout. But to determine if the given
+# redirect URL/path is safe for redirection, the following variable is used by edX.
+LOGIN_REDIRECT_WHITELIST = ENV_TOKENS.get(
+    'LOGIN_REDIRECT_WHITELIST',
+    LOGIN_REDIRECT_WHITELIST
+)
+
 # allow for environments to specify what cookie name our login subsystem should use
 # this is to fix a bug regarding simultaneous logins between edx.org and edge.edx.org which can
 # happen with some browsers (e.g. Firefox)
 if ENV_TOKENS.get('SESSION_COOKIE_NAME', None):
     # NOTE, there's a bug in Django (http://bugs.python.org/issue18012) which necessitates this being a str()
     SESSION_COOKIE_NAME = str(ENV_TOKENS.get('SESSION_COOKIE_NAME'))
+
+# This is the domain that is used to set shared cookies between various sub-domains.
+# By default, it's set to the same thing as the SESSION_COOKIE_DOMAIN, but we want to make it overrideable.
+SHARED_COOKIE_DOMAIN = ENV_TOKENS.get('SHARED_COOKIE_DOMAIN', SESSION_COOKIE_DOMAIN)
 
 CACHES = ENV_TOKENS['CACHES']
 # Cache used for location mapping -- called many times with the same key/value
@@ -312,15 +290,17 @@ MKTG_URL_OVERRIDES.update(ENV_TOKENS.get('MKTG_URL_OVERRIDES', MKTG_URL_OVERRIDE
 # Intentional defaults.
 ID_VERIFICATION_SUPPORT_LINK = ENV_TOKENS.get('ID_VERIFICATION_SUPPORT_LINK', SUPPORT_SITE_LINK)
 PASSWORD_RESET_SUPPORT_LINK = ENV_TOKENS.get('PASSWORD_RESET_SUPPORT_LINK', SUPPORT_SITE_LINK)
-ACTIVATION_EMAIL_SUPPORT_LINK = ENV_TOKENS.get(
-    'ACTIVATION_EMAIL_SUPPORT_LINK', SUPPORT_SITE_LINK
-)
+ACTIVATION_EMAIL_SUPPORT_LINK = ENV_TOKENS.get('ACTIVATION_EMAIL_SUPPORT_LINK', SUPPORT_SITE_LINK)
+LOGIN_ISSUE_SUPPORT_LINK = ENV_TOKENS.get('LOGIN_ISSUE_SUPPORT_LINK', SUPPORT_SITE_LINK)
 
 # Timezone overrides
 TIME_ZONE = ENV_TOKENS.get('CELERY_TIMEZONE', CELERY_TIMEZONE)
 
 # Translation overrides
 LANGUAGE_DICT = dict(LANGUAGES)
+
+LANGUAGE_COOKIE_NAME = ENV_TOKENS.get('LANGUAGE_COOKIE', None) or ENV_TOKENS.get(
+    'LANGUAGE_COOKIE_NAME', LANGUAGE_COOKIE_NAME)
 
 # Additional installed apps
 for app in ENV_TOKENS.get('ADDL_INSTALLED_APPS', []):
@@ -341,12 +321,10 @@ COMMENTS_SERVICE_URL = ENV_TOKENS.get("COMMENTS_SERVICE_URL", '')
 COMMENTS_SERVICE_KEY = ENV_TOKENS.get("COMMENTS_SERVICE_KEY", '')
 CERT_QUEUE = ENV_TOKENS.get("CERT_QUEUE", 'test-pull')
 
-# git repo loading  environment
-GIT_REPO_DIR = ENV_TOKENS.get('GIT_REPO_DIR', '/edx/var/edxapp/course_repos')
-GIT_IMPORT_STATIC = ENV_TOKENS.get('GIT_IMPORT_STATIC', True)
-GIT_IMPORT_PYTHON_LIB = ENV_TOKENS.get('GIT_IMPORT_PYTHON_LIB', True)
+# Python lib settings
 PYTHON_LIB_FILENAME = ENV_TOKENS.get('PYTHON_LIB_FILENAME', 'python_lib.zip')
 
+# Code jail settings
 for name, value in ENV_TOKENS.get("CODE_JAIL", {}).items():
     oldvalue = CODE_JAIL.get(name)
     if isinstance(oldvalue, dict):
@@ -365,7 +343,7 @@ if "TRACKING_IGNORE_URL_PATTERNS" in ENV_TOKENS:
 SSL_AUTH_EMAIL_DOMAIN = ENV_TOKENS.get("SSL_AUTH_EMAIL_DOMAIN", "MIT.EDU")
 SSL_AUTH_DN_FORMAT_STRING = ENV_TOKENS.get(
     "SSL_AUTH_DN_FORMAT_STRING",
-    u"/C=US/ST=Massachusetts/O=Massachusetts Institute of Technology/OU=Client CA v1/CN={0}/emailAddress={1}"
+    "/C=US/ST=Massachusetts/O=Massachusetts Institute of Technology/OU=Client CA v1/CN={0}/emailAddress={1}"
 )
 
 # Video Caching. Pairing country codes with CDN URLs.
@@ -386,6 +364,7 @@ CSRF_TRUSTED_ORIGINS = ENV_TOKENS.get('CSRF_TRUSTED_ORIGINS', [])
 if FEATURES.get('ENABLE_CORS_HEADERS') or FEATURES.get('ENABLE_CROSS_DOMAIN_CSRF_COOKIE'):
     CORS_ALLOW_CREDENTIALS = True
     CORS_ORIGIN_WHITELIST = ENV_TOKENS.get('CORS_ORIGIN_WHITELIST', ())
+
     CORS_ORIGIN_ALLOW_ALL = ENV_TOKENS.get('CORS_ORIGIN_ALLOW_ALL', False)
     CORS_ALLOW_INSECURE = ENV_TOKENS.get('CORS_ALLOW_INSECURE', False)
     CORS_ALLOW_HEADERS = corsheaders_default_headers + (
@@ -539,12 +518,21 @@ CELERY_BROKER_VHOST = ENV_TOKENS.get("CELERY_BROKER_VHOST", "")
 CELERY_BROKER_USER = AUTH_TOKENS.get("CELERY_BROKER_USER", "")
 CELERY_BROKER_PASSWORD = AUTH_TOKENS.get("CELERY_BROKER_PASSWORD", "")
 
-BROKER_URL = "{0}://{1}:{2}@{3}/{4}".format(CELERY_BROKER_TRANSPORT,
-                                            CELERY_BROKER_USER,
-                                            CELERY_BROKER_PASSWORD,
-                                            CELERY_BROKER_HOSTNAME,
-                                            CELERY_BROKER_VHOST)
+BROKER_URL = "{}://{}:{}@{}/{}".format(CELERY_BROKER_TRANSPORT,
+                                       CELERY_BROKER_USER,
+                                       CELERY_BROKER_PASSWORD,
+                                       CELERY_BROKER_HOSTNAME,
+                                       CELERY_BROKER_VHOST)
 BROKER_USE_SSL = ENV_TOKENS.get('CELERY_BROKER_USE_SSL', False)
+
+try:
+    BROKER_TRANSPORT_OPTIONS = {
+        'fanout_patterns': True,
+        'fanout_prefix': True,
+        **ENV_TOKENS.get('CELERY_BROKER_TRANSPORT_OPTIONS', {})
+    }
+except TypeError as exc:
+    raise ImproperlyConfigured('CELERY_BROKER_TRANSPORT_OPTIONS must be a dict') from exc
 
 # Block Structures
 
@@ -566,6 +554,9 @@ TRACKING_SEGMENTIO_DISALLOWED_SUBSTRING_NAMES = ENV_TOKENS.get(
     TRACKING_SEGMENTIO_DISALLOWED_SUBSTRING_NAMES
 )
 TRACKING_SEGMENTIO_SOURCE_MAP = ENV_TOKENS.get("TRACKING_SEGMENTIO_SOURCE_MAP", TRACKING_SEGMENTIO_SOURCE_MAP)
+
+# Heartbeat
+HEARTBEAT_CELERY_ROUTING_KEY = ENV_TOKENS.get('HEARTBEAT_CELERY_ROUTING_KEY', HEARTBEAT_CELERY_ROUTING_KEY)
 
 # Student identity verification settings
 VERIFY_STUDENT = AUTH_TOKENS.get("VERIFY_STUDENT", VERIFY_STUDENT)
@@ -601,6 +592,21 @@ MAX_FAILED_LOGIN_ATTEMPTS_LOCKOUT_PERIOD_SECS = ENV_TOKENS.get(
 
 ##### LOGISTRATION RATE LIMIT SETTINGS #####
 LOGISTRATION_RATELIMIT_RATE = ENV_TOKENS.get('LOGISTRATION_RATELIMIT_RATE', LOGISTRATION_RATELIMIT_RATE)
+LOGISTRATION_API_RATELIMIT = ENV_TOKENS.get('LOGISTRATION_API_RATELIMIT', LOGISTRATION_API_RATELIMIT)
+LOGIN_AND_REGISTER_FORM_RATELIMIT = ENV_TOKENS.get(
+    'LOGIN_AND_REGISTER_FORM_RATELIMIT', LOGIN_AND_REGISTER_FORM_RATELIMIT
+)
+RESET_PASSWORD_TOKEN_VALIDATE_API_RATELIMIT = ENV_TOKENS.get(
+    'RESET_PASSWORD_TOKEN_VALIDATE_API_RATELIMIT', RESET_PASSWORD_TOKEN_VALIDATE_API_RATELIMIT
+)
+RESET_PASSWORD_API_RATELIMIT = ENV_TOKENS.get('RESET_PASSWORD_API_RATELIMIT', RESET_PASSWORD_API_RATELIMIT)
+
+##### REGISTRATION RATE LIMIT SETTINGS #####
+REGISTRATION_VALIDATION_RATELIMIT = ENV_TOKENS.get(
+    'REGISTRATION_VALIDATION_RATELIMIT', REGISTRATION_VALIDATION_RATELIMIT
+)
+
+REGISTRATION_RATELIMIT = ENV_TOKENS.get('REGISTRATION_RATELIMIT', REGISTRATION_RATELIMIT)
 
 #### PASSWORD POLICY SETTINGS #####
 AUTH_PASSWORD_VALIDATORS = ENV_TOKENS.get("AUTH_PASSWORD_VALIDATORS", AUTH_PASSWORD_VALIDATORS)
@@ -612,17 +618,22 @@ SESSION_INACTIVITY_TIMEOUT_IN_SECONDS = AUTH_TOKENS.get("SESSION_INACTIVITY_TIME
 TIME_ZONE_DISPLAYED_FOR_DEADLINES = ENV_TOKENS.get("TIME_ZONE_DISPLAYED_FOR_DEADLINES",
                                                    TIME_ZONE_DISPLAYED_FOR_DEADLINES)
 
+#### PROCTORED EXAM SETTINGS ####
+PROCTORED_EXAM_VIEWABLE_PAST_DUE = ENV_TOKENS.get('PROCTORED_EXAM_VIEWABLE_PAST_DUE', False)
+
 ##### Third-party auth options ################################################
+ENABLE_REQUIRE_THIRD_PARTY_AUTH = ENV_TOKENS.get('ENABLE_REQUIRE_THIRD_PARTY_AUTH', False)
+
 if FEATURES.get('ENABLE_THIRD_PARTY_AUTH'):
     tmp_backends = ENV_TOKENS.get('THIRD_PARTY_AUTH_BACKENDS', [
         'social_core.backends.google.GoogleOAuth2',
         'social_core.backends.linkedin.LinkedinOAuth2',
         'social_core.backends.facebook.FacebookOAuth2',
         'social_core.backends.azuread.AzureADOAuth2',
-        'social_core.backends.apple.AppleIdAuth',
-        'third_party_auth.identityserver3.IdentityServer3',
-        'third_party_auth.saml.SAMLAuthBackend',
-        'third_party_auth.lti.LTIAuthBackend',
+        'common.djangoapps.third_party_auth.appleid.AppleIdAuth',  # vendored 'social_core.backends.apple.AppleIdAuth'
+        'common.djangoapps.third_party_auth.identityserver3.IdentityServer3',
+        'common.djangoapps.third_party_auth.saml.SAMLAuthBackend',
+        'common.djangoapps.third_party_auth.lti.LTIAuthBackend',
     ])
 
     AUTHENTICATION_BACKENDS = list(tmp_backends) + list(AUTHENTICATION_BACKENDS)
@@ -648,7 +659,7 @@ if FEATURES.get('ENABLE_THIRD_PARTY_AUTH'):
 
     if ENV_TOKENS.get('THIRD_PARTY_AUTH_SAML_FETCH_PERIOD_HOURS', 24) is not None:
         CELERYBEAT_SCHEDULE['refresh-saml-metadata'] = {
-            'task': 'third_party_auth.fetch_saml_metadata',
+            'task': 'common.djangoapps.third_party_auth.fetch_saml_metadata',
             'schedule': datetime.timedelta(hours=ENV_TOKENS.get('THIRD_PARTY_AUTH_SAML_FETCH_PERIOD_HOURS', 24)),
         }
 
@@ -706,6 +717,9 @@ DEFAULT_MOBILE_AVAILABLE = ENV_TOKENS.get(
 # Enrollment API Cache Timeout
 ENROLLMENT_COURSE_DETAILS_CACHE_TIMEOUT = ENV_TOKENS.get('ENROLLMENT_COURSE_DETAILS_CACHE_TIMEOUT', 60)
 
+# Ecommerce Orders API Cache Timeout
+ECOMMERCE_ORDERS_API_CACHE_TIMEOUT = ENV_TOKENS.get('ECOMMERCE_ORDERS_API_CACHE_TIMEOUT', 3600)
+
 if FEATURES.get('ENABLE_COURSEWARE_SEARCH') or \
    FEATURES.get('ENABLE_DASHBOARD_SEARCH') or \
    FEATURES.get('ENABLE_COURSE_DISCOVERY') or \
@@ -714,7 +728,8 @@ if FEATURES.get('ENABLE_COURSEWARE_SEARCH') or \
     SEARCH_ENGINE = "search.elastic.ElasticSearchEngine"
     SEARCH_FILTER_GENERATOR = ENV_TOKENS.get('SEARCH_FILTER_GENERATOR', SEARCH_FILTER_GENERATOR)
 
-ELASTIC_SEARCH_CONFIG = ENV_TOKENS.get('ELASTIC_SEARCH_CONFIG', [{}])
+# TODO: Once we have successfully upgraded to ES7, switch this back to ELASTIC_SEARCH_CONFIG.
+ELASTIC_SEARCH_CONFIG = ENV_TOKENS.get('ELASTIC_SEARCH_CONFIG_ES7', [{}])
 
 # Facebook app
 FACEBOOK_API_VERSION = AUTH_TOKENS.get("FACEBOOK_API_VERSION")
@@ -735,8 +750,13 @@ if FEATURES.get('CUSTOM_COURSES_EDX'):
 ##### Individual Due Date Extensions #####
 if FEATURES.get('INDIVIDUAL_DUE_DATES'):
     FIELD_OVERRIDE_PROVIDERS += (
-        'courseware.student_field_overrides.IndividualStudentOverrideProvider',
+        'lms.djangoapps.courseware.student_field_overrides.IndividualStudentOverrideProvider',
     )
+
+##### Show Answer Override for Self-Paced Courses #####
+FIELD_OVERRIDE_PROVIDERS += (
+    'openedx.features.personalized_learner_schedules.show_answer.show_answer_field_override.ShowAnswerFieldOverride',
+)
 
 ##### Self-Paced Course Due Dates #####
 XBLOCK_FIELD_DATA_WRAPPERS += (
@@ -760,8 +780,8 @@ CREDIT_PROVIDER_SECRET_KEYS = AUTH_TOKENS.get("CREDIT_PROVIDER_SECRET_KEYS", {})
 
 ##################### LTI Provider #####################
 if FEATURES.get('ENABLE_LTI_PROVIDER'):
-    INSTALLED_APPS.append('lti_provider.apps.LtiProviderConfig')
-    AUTHENTICATION_BACKENDS.append('lti_provider.users.LtiBackend')
+    INSTALLED_APPS.append('lms.djangoapps.lti_provider.apps.LtiProviderConfig')
+    AUTHENTICATION_BACKENDS.append('lms.djangoapps.lti_provider.users.LtiBackend')
 
 LTI_USER_EMAIL_DOMAIN = ENV_TOKENS.get('LTI_USER_EMAIL_DOMAIN', 'lti.example.com')
 
@@ -780,10 +800,6 @@ JWT_AUTH.update(AUTH_TOKENS.get('JWT_AUTH', {}))
 STUDENTMODULEHISTORYEXTENDED_OFFSET = ENV_TOKENS.get(
     'STUDENTMODULEHISTORYEXTENDED_OFFSET', STUDENTMODULEHISTORYEXTENDED_OFFSET
 )
-
-# Cutoff date for granting audit certificates
-if ENV_TOKENS.get('AUDIT_CERT_CUTOFF_DATE', None):
-    AUDIT_CERT_CUTOFF_DATE = dateutil.parser.parse(ENV_TOKENS.get('AUDIT_CERT_CUTOFF_DATE'))
 
 ################################ Settings for Credentials Service ################################
 
@@ -842,6 +858,10 @@ ENTERPRISE_CUSTOMER_CATALOG_DEFAULT_CONTENT_FILTER = ENV_TOKENS.get(
     'ENTERPRISE_CUSTOMER_CATALOG_DEFAULT_CONTENT_FILTER',
     ENTERPRISE_CUSTOMER_CATALOG_DEFAULT_CONTENT_FILTER
 )
+INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT = ENV_TOKENS.get(
+    'INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT',
+    INTEGRATED_CHANNELS_API_CHUNK_TRANSMISSION_LIMIT
+)
 
 ############## ENTERPRISE SERVICE API CLIENT CONFIGURATION ######################
 # The LMS communicates with the Enterprise service via the EdxRestApiClient class
@@ -870,9 +890,6 @@ ENTERPRISE_CATALOG_INTERNAL_ROOT_URL = ENV_TOKENS.get(
     'ENTERPRISE_CATALOG_INTERNAL_ROOT_URL',
     ENTERPRISE_CATALOG_INTERNAL_ROOT_URL
 )
-
-# List of enterprise customer uuids to exclude from transition to use of enterprise-catalog
-ENTERPRISE_CUSTOMERS_EXCLUDED_FROM_CATALOG = ENV_TOKENS.get('ENTERPRISE_CUSTOMERS_EXCLUDED_FROM_CATALOG', ())
 
 ############## ENTERPRISE SERVICE LMS CONFIGURATION ##################################
 # The LMS has some features embedded that are related to the Enterprise service, but
@@ -910,9 +927,6 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = ENV_TOKENS.get(
 ICP_LICENSE = ENV_TOKENS.get('ICP_LICENSE', None)
 ICP_LICENSE_INFO = ENV_TOKENS.get('ICP_LICENSE_INFO', {})
 
-############## Settings for CourseGraph ############################
-COURSEGRAPH_JOB_QUEUE = ENV_TOKENS.get('COURSEGRAPH_JOB_QUEUE', DEFAULT_PRIORITY_QUEUE)
-
 # How long to cache OpenAPI schemas and UI, in seconds.
 OPENAPI_CACHE_TIMEOUT = ENV_TOKENS.get('OPENAPI_CACHE_TIMEOUT', 60 * 60)
 
@@ -939,16 +953,16 @@ DASHBOARD_COURSE_LIMIT = ENV_TOKENS.get('DASHBOARD_COURSE_LIMIT', None)
 ######################## Setting for content libraries ########################
 MAX_BLOCKS_PER_CONTENT_LIBRARY = ENV_TOKENS.get('MAX_BLOCKS_PER_CONTENT_LIBRARY', MAX_BLOCKS_PER_CONTENT_LIBRARY)
 
+########################## Derive Any Derived Settings  #######################
+
+derive_settings(__name__)
+
 ############################### Plugin Settings ###############################
 
 # This is at the bottom because it is going to load more settings after base settings are loaded
 
 # Load production.py in plugins
-plugin_settings.add_plugins(__name__, plugin_constants.ProjectType.LMS, plugin_constants.SettingsType.PRODUCTION)
-
-########################## Derive Any Derived Settings  #######################
-
-derive_settings(__name__)
+add_plugins(__name__, ProjectType.LMS, SettingsType.PRODUCTION)
 
 ############## Settings for Completion API #########################
 
@@ -956,5 +970,75 @@ derive_settings(__name__)
 # (0.0 = 0%, 1.0 = 100%)
 COMPLETION_VIDEO_COMPLETE_PERCENTAGE = ENV_TOKENS.get('COMPLETION_VIDEO_COMPLETE_PERCENTAGE',
                                                       COMPLETION_VIDEO_COMPLETE_PERCENTAGE)
-COMPLETION_VIDEO_COMPLETE_PERCENTAGE = ENV_TOKENS.get('COMPLETION_BY_VIEWING_DELAY_MS',
-                                                      COMPLETION_BY_VIEWING_DELAY_MS)
+COMPLETION_BY_VIEWING_DELAY_MS = ENV_TOKENS.get('COMPLETION_BY_VIEWING_DELAY_MS',
+                                                COMPLETION_BY_VIEWING_DELAY_MS)
+
+################# Settings for brand logos. #################
+LOGO_URL = ENV_TOKENS.get('LOGO_URL', LOGO_URL)
+LOGO_URL_PNG = ENV_TOKENS.get('LOGO_URL_PNG', LOGO_URL_PNG)
+LOGO_TRADEMARK_URL = ENV_TOKENS.get('LOGO_TRADEMARK_URL', LOGO_TRADEMARK_URL)
+FAVICON_URL = ENV_TOKENS.get('FAVICON_URL', FAVICON_URL)
+
+######################## CELERY ROUTING ########################
+
+# Defines alternate environment tasks, as a dict of form { task_name: alternate_queue }
+ALTERNATE_ENV_TASKS = {}
+
+# Defines the task -> alternate worker queue to be used when routing.
+EXPLICIT_QUEUES = {
+    'openedx.core.djangoapps.content.course_overviews.tasks.async_course_overview_update': {
+        'queue': GRADES_DOWNLOAD_ROUTING_KEY},
+    'lms.djangoapps.bulk_email.tasks.send_course_email': {
+        'queue': BULK_EMAIL_ROUTING_KEY},
+    'openedx.core.djangoapps.heartbeat.tasks.sample_task': {
+        'queue': HEARTBEAT_CELERY_ROUTING_KEY},
+    'lms.djangoapps.instructor_task.tasks.calculate_grades_csv': {
+        'queue': GRADES_DOWNLOAD_ROUTING_KEY},
+    'lms.djangoapps.instructor_task.tasks.calculate_problem_grade_report': {
+        'queue': GRADES_DOWNLOAD_ROUTING_KEY},
+    'lms.djangoapps.instructor_task.tasks.generate_certificates': {
+        'queue': GRADES_DOWNLOAD_ROUTING_KEY},
+    'lms.djangoapps.verify_student.tasks.send_verification_status_email': {
+        'queue': ACE_ROUTING_KEY},
+    'lms.djangoapps.verify_student.tasks.send_ace_message': {
+        'queue': ACE_ROUTING_KEY},
+    'lms.djangoapps.verify_student.tasks.send_request_to_ss_for_user': {
+        'queue': SOFTWARE_SECURE_VERIFICATION_ROUTING_KEY},
+    'openedx.core.djangoapps.schedules.tasks._recurring_nudge_schedule_send': {
+        'queue': ACE_ROUTING_KEY},
+    'openedx.core.djangoapps.schedules.tasks._upgrade_reminder_schedule_send': {
+        'queue': ACE_ROUTING_KEY},
+    'openedx.core.djangoapps.schedules.tasks._course_update_schedule_send': {
+        'queue': ACE_ROUTING_KEY},
+    'openedx.core.djangoapps.schedules.tasks.v1.tasks.send_grade_to_credentials': {
+        'queue': CREDENTIALS_GENERATION_ROUTING_KEY},
+    'common.djangoapps.entitlements.tasks.expire_old_entitlements': {
+        'queue': ENTITLEMENTS_EXPIRATION_ROUTING_KEY},
+    'lms.djangoapps.grades.tasks.recalculate_course_and_subsection_grades_for_user': {
+        'queue': POLICY_CHANGE_GRADES_ROUTING_KEY},
+    'lms.djangoapps.grades.tasks.recalculate_subsection_grade_v3': {
+        'queue': RECALCULATE_GRADES_ROUTING_KEY},
+    'openedx.core.djangoapps.programs.tasks.award_program_certificates': {
+        'queue': PROGRAM_CERTIFICATES_ROUTING_KEY},
+    'openedx.core.djangoapps.programs.tasks.revoke_program_certificates': {
+        'queue': PROGRAM_CERTIFICATES_ROUTING_KEY},
+    'openedx.core.djangoapps.programs.tasks.update_certificate_visible_date_on_course_update': {
+        'queue': PROGRAM_CERTIFICATES_ROUTING_KEY},
+    'openedx.core.djangoapps.programs.tasks.award_course_certificate': {
+        'queue': PROGRAM_CERTIFICATES_ROUTING_KEY},
+}
+
+LOGO_IMAGE_EXTRA_TEXT = ENV_TOKENS.get('LOGO_IMAGE_EXTRA_TEXT', '')
+
+############## XBlock extra mixins ############################
+XBLOCK_MIXINS += tuple(XBLOCK_EXTRA_MIXINS)
+
+############## Settings for course import olx validation ############################
+COURSE_OLX_VALIDATION_STAGE = ENV_TOKENS.get('COURSE_OLX_VALIDATION_STAGE', COURSE_OLX_VALIDATION_STAGE)
+COURSE_OLX_VALIDATION_IGNORE_LIST = ENV_TOKENS.get(
+    'COURSE_OLX_VALIDATION_IGNORE_LIST',
+    COURSE_OLX_VALIDATION_IGNORE_LIST
+)
+
+################# show account activate cta after register ########################
+SHOW_ACCOUNT_ACTIVATION_CTA = ENV_TOKENS.get('SHOW_ACCOUNT_ACTIVATION_CTA', SHOW_ACCOUNT_ACTIVATION_CTA)

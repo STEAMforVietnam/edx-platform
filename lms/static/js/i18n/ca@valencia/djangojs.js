@@ -1,13 +1,14 @@
 
 
-(function(globals) {
-
-  var django = globals.django || (globals.django = {});
+'use strict';
+{
+  const globals = this;
+  const django = globals.django || (globals.django = {});
 
   
   django.pluralidx = function(n) {
-    var v=(n != 1);
-    if (typeof(v) == 'boolean') {
+    const v = (n != 1);
+    if (typeof v === 'boolean') {
       return v ? 1 : 0;
     } else {
       return v;
@@ -19,8 +20,7 @@
 
   django.catalog = django.catalog || {};
   
-  var newcatalog = {
-    "\n\nThis email is to let you know that the status of your proctoring session review for %(exam_name)s in\n<a href=\"%(course_url)s\">%(course_name)s </a> is %(status)s. If you have any questions about proctoring,\ncontact %(platform)s support at %(contact_email)s.\n\n": "\n\nAquest correu electr\u00f2nic us permet fer-vos saber que l'estat de la revisi\u00f3 de la vostra sessi\u00f3 de supervisi\u00f3 correspon a %(exam_name)s a\n<a href=\"%(course_url)s\">%(course_name)s </a> est\u00e0 %(status)s. Si teniu cap pregunta sobre la supervisi\u00f3,\ncontacteu %(platform)s amb el suport a %(contact_email)s.\n\n",
+  const newcatalog = {
     "\n                    Make sure you are on a computer with a webcam, and that you have valid photo identification\n                    such as a driver's license or passport, before you continue.\n                ": "\n                    Assegureu-vos que sou en una computadora amb una c\u00e0mera web i que tingueu una identificaci\u00f3 amb foto v\u00e0lida\n                    com ara una llic\u00e8ncia de conduir o un passaport, abans de continuar.\n                ",
     "\n                    Your verification attempt failed. Please read our guidelines to make\n                    sure you understand the requirements for successfully completing verification,\n                    then try again.\n                ": "\n                    Ha fallat l'intent de verificaci\u00f3. Llegiu les nostres directrius per\n                    assegurar-vos d'entendre els requisits per completar la verificaci\u00f3 amb \u00e8xit,\n                    torneu-ho a provar.\n                ",
     "\n                    Your verification has expired. You must successfully complete a new identity verification\n                    before you can start the proctored exam.\n                ": "\n                    La teva verificaci\u00f3 ha caducat. Heu de completar amb \u00e8xit una nova verificaci\u00f3 d'identitat\n                    abans de poder iniciar l'examen supervisat.\n                ",
@@ -29,70 +29,29 @@
     "\n                You must successfully complete identity verification before you can start the proctored exam.\n            ": "\n                Cal completar amb \u00e8xit la verificaci\u00f3 d'identitat abans de poder iniciar l'examen supervisat.\n            ",
     "\n            Do not close this window before you finish your exam. if you close this window, your proctoring session ends, and you will not successfully complete the proctored exam.\n          ": "\n            No tanqueu aquesta finestra abans d'acabar l'examen. si tanqueu aquesta finestra, la vostra sessi\u00f3 de processament finalitza i no finalitzar\u00e0 amb \u00e8xit l'examen processat.\n          ",
     "\n            Return to the %(platform_name)s course window to start your exam. When you have finished your exam and\n            have marked it as complete, you can close this window to end the proctoring session\n            and upload your proctoring session data for review.\n          ": "\n            Torneu a la finestra del curs %(platform_name)s per comen\u00e7ar l'examen. Quan hagueu acabat l'examen i\n            ho heu marcat com a complet, podeu tancar aquesta finestra per finalitzar la sessi\u00f3 de processament\n            i carregueu les dades de la sessi\u00f3 de supervisi\u00f3 per a la seva revisi\u00f3.\n          ",
-    "\n          3. When you have finished setting up proctoring, start the exam.\n        ": "\n          3. Quan h\u00e0giu acabat de configurar la supervisi\u00f3 pr\u00e8via, comenceu l'examen.\n        ",
-    "\n          Start my exam\n        ": "\n          Comen\u00e7a el meu examen\n        ",
-    "\n        &#8226; When you start your exam you will have %(total_time)s to complete it. </br>\n        &#8226; You cannot stop the timer once you start. </br>\n        &#8226; If time expires before you finish your exam, your completed answers will be\n                submitted for review. </br>\n      ": "\n        &#8226; Quan inicieu l'examen que tindreu %(total_time)s que completar-ho. </br>\n        &#8226; No podeu parar el rellotge un cop he comen\u00e7at. </br>\n        &#8226; Si el temps caduca abans d'acabar l'examen, les seves respostes completes seran\n                presentades per a la seva revisi\u00f3.</br>\n      ",
-    "\n        1. Copy this unique exam code. You will be prompted to paste this code later before you start the exam.\n      ": "\n        1. Copieu aquest codi d'examen \u00fanic. Se us demanar\u00e0 que enganxeu aquest codi m\u00e9s endavant abans d'iniciar l'examen.\n      ",
-    "\n        2. Follow the link below to set up proctoring.\n      ": "\n        2. Seguiu l'enlla\u00e7 seg\u00fcent per configurar la supervisi\u00f3.\n      ",
-    "\n        A new window will open. You will run a system check before downloading the proctoring application.\n      ": "\n        S'obrir\u00e0 una finestra nova. Realitzar\u00e0s una verificaci\u00f3 del sistema abans de descarregar l'aplicaci\u00f3 de tramitaci\u00f3.\n      ",
     "\n        About Proctored Exams\n        ": "\n        Al voltant de Ex\u00e0mens Supervisats\n        ",
-    "\n        After the due date has passed, you can review the exam, but you cannot change your answers.\n      ": "\n        Despr\u00e9s de la data de venciment, podeu revisar l'examen, per\u00f2 no podeu canviar les vostres respostes.\n      ",
     "\n        Are you sure you want to take this exam without proctoring?\n      ": "\n        Esteu segur que voleu fer aquest examen sense fer proves?\n      ",
     "\n        Due to unsatisfied prerequisites, you can only take this exam without proctoring.\n      ": "\n        A causa de requisits previs insatisfets, nom\u00e9s podeu fer aquest examen sense fer proves.\n      ",
-    "\n        I am not interested in academic credit.\n      ": "\n        No m'interessa el cr\u00e8dit acad\u00e8mic.\n      ",
     "\n        I am ready to start this timed exam.\n      ": "\n        Estic preparat per iniciar aquest examen cronometrat.\n      ",
-    "\n        If you take this exam without proctoring, you will <strong> no longer be eligible for academic credit. </strong>\n      ": "\n        Si feu aquest examen sense processament, no ser\u00e0 <strong> elegible per al cr\u00e8dit acad\u00e8mic.</strong>\n      ",
     "\n        No, I want to continue working.\n      ": "\n        No, vull seguir treballant.\n      ",
     "\n        No, I'd like to continue working\n      ": "\n        No, m'agradaria continuar treballant\n      ",
-    "\n        Select the exam code, then copy it using Command+C (Mac) or Control+C (Windows).\n      ": "\n        Seleccioneu el codi de l'examen i, a continuaci\u00f3, copieu-lo usant Command + C (Mac) o Control + C (Windows).\n      ",
-    "\n        The time allotted for this exam has expired. Your exam has been submitted and any work you completed will be graded.\n      ": "\n        El temps assignat per a aquest examen ha caducat. S'ha enviat el vostre examen i es classificar\u00e0 el treball completat.\n      ",
-    "\n        You have submitted your timed exam.\n      ": "\n        Heu enviat el vostre examen cronometrat.\n      ",
-    "\n        You will be asked to verify your identity as part of the proctoring exam set up.\n        Make sure you are on a computer with a webcam, and that you have valid photo identification\n        such as a driver's license or passport, before you continue.\n      ": "\n        Se us demanar\u00e0 que verifiqueu la vostra identitat com a part de la configuraci\u00f3 de l'examen de supervisi\u00f3.\n        Assegureu-vos que sou en una computadora amb una c\u00e0mera web i que tingueu una identificaci\u00f3 amb foto v\u00e0lida\n        com ara una llic\u00e8ncia de conduir o un passaport, abans de continuar.\n      ",
-    "\n        You will be guided through steps to set up online proctoring software and to perform various checks.\n      ": "\n        Us guiarem pels passos necessaris per configurar el programari de processament en l\u00ednia i realitzar diversos controls.\n      ",
-    "\n        You will be guided through steps to set up online proctoring software and to perform various checks.</br>\n      ": "\n       Us guiarem pels passos necessaris per configurar el programari de processament en l\u00ednia i realitzar diversos controls.</br>\n      ",
-    "\n      &#8226; After you quit the proctoring session, the recorded data is uploaded for review. </br>\n      &#8226; Proctoring results are usually available within 5 business days after you submit your exam.\n    ": "\n      &#8226; Despr\u00e9s d'abandonar la sessi\u00f3 de supervisi\u00f3, es carregaran les dades gravades per a la seva revisi\u00f3. </br>\n      &#8226; Els resultats de la supervisi\u00f3 solen estar disponibles dins dels 5 dies h\u00e0bils posteriors a l'enviament de l'examen.\n    ",
-    "\n      A technical error has occurred with your proctored exam. To resolve this problem, contact\n      <a href=\"mailto:%(tech_support_email)s\">technical support</a>. All exam data, including answers\n      for completed problems, has been lost. When the problem is resolved you will need to restart\n      the exam and complete all problems again.\n    ": "\n      S'ha produ\u00eft un error t\u00e8cnic amb l'examen supervisat. Per resoldre aquest problema, poseu-vos en contacte amb\n      <a href=\"mailto:%(tech_support_email)s\"> el suport t\u00e8cnic</a>. Totes les dades de l'examen, incloses les respostes\n      per problemes complets, s'ha perdut. Quan es resol el problema, haur\u00e0s de reiniciar\n      l'ex\u00e0men icompletar els problemes de nou.\n    ",
-    "\n      After the due date for this exam has passed, you will be able to review your answers on this page.\n    ": "\n      Un cop superada la data de venciment d'aquest examen, podreu revisar les vostres respostes en aquesta p\u00e0gina.\n    ",
     "\n      After you submit your exam, your exam will be graded.\n    ": "\n     Despr\u00e9s d'enviar el vostre examen, el vostre examen es classificar\u00e0.\n    ",
-    "\n      After you submit your exam, your responses are graded and your proctoring session is reviewed.\n      You might be eligible to earn academic credit for this course if you complete all required exams\n      as well as achieve a final grade that meets credit requirements for the course.\n    ": "\n      Despr\u00e9s d'enviar l'examen, les seves respostes es classifiquen i es revisa la seva sessi\u00f3 de supervisi\u00f3.\n      Podria ser elegible per obtenir el cr\u00e8dit acad\u00e8mic d'aquest curs si completa tots els ex\u00e0mens requerits\n      aix\u00ed com aconseguir una nota final que compleixi els requisits de cr\u00e8dit del curs.\n    ",
     "\n      Are you sure that you want to submit your timed exam?\n    ": "\n      Est\u00e0s segur que vols enviar el teu examen cronol\u00f2gic?\n    ",
     "\n      Are you sure you want to end your proctored exam?\n    ": "\n      Esteu segur que voleu finalitzar el vostre examen supervisat?\n    ",
     "\n      Because the due date has passed, you are no longer able to take this exam.\n    ": "\n      Com que ja ha passat la data de venciment, ja no podreu fer aquest examen.\n    ",
     "\n      Error with proctored exam\n    ": "\n      S'ha produ\u00eft un error en l'examen supervisat\n    ",
-    "\n      Follow these instructions\n    ": "\n      Seguiu aquestes instruccions\n    ",
-    "\n      Follow these steps to set up and start your proctored exam.\n    ": "\n     Seguiu aquests passos per configurar i iniciar l'examen supervisat.\n    ",
-    "\n      Get familiar with proctoring for real exams later in the course. This practice exam has no impact\n      on your grade in the course.\n    ": "\n      Familiaritzeu-vos amb la preparaci\u00f3 d'ex\u00e0mens reals m\u00e9s tard en el curs. Aquest examen de pr\u00e0ctica no t\u00e9 cap impacte\n      a la vostra nota del curs.\n    ",
-    "\n      If the proctoring software window is still open, you can close it now. Confirm that you want to quit the application when you are prompted.\n    ": "\n     Si la finestra del programari de processament encara est\u00e0 oberta, ara podeu tancar-la ara. Confirmeu que voleu deixar l'aplicaci\u00f3 quan se us demani.\n    ",
-    "\n      If you have concerns about your proctoring session results, contact your course team.\n    ": "\n      Si teniu dubtes sobre els resultats de la sessi\u00f3 de supervisi\u00f3, contacteu amb l'equip del vostre curs.\n    ",
     "\n      If you have disabilities,\n      you might be eligible for an additional time allowance on timed exams.\n      Ask your course team for information about additional time allowances.\n    ": "\n     Si teniu discapacitats,\n      \u00e9s possible que tingueu dret a una assignaci\u00f3 de temps addicional en ex\u00e0mens temporitzats.\n      Pregunteu a l'equip del vostre curs per obtenir informaci\u00f3 sobre les assignacions de temps addicionals.",
     "\n      If you have questions about the status of your proctored exam results, contact %(platform_name)s Support.\n    ": "\n     Si teniu preguntes sobre l'estat dels resultats dels ex\u00e0mens supervisats, contacteu amb el suport de %(platform_name)s.\n    ",
-    "\n      If you have questions about the status of your requirements for course credit, contact %(platform_name)s Support.\n    ": "\n     Si teniu preguntes sobre l'estat dels vostres requisits per al cr\u00e8dit del curs, contacteu amb el suport de   %(platform_name)s \n    ",
     "\n      Make sure that you have selected \"Submit\" for each problem before you submit your exam.\n    ": "\n      Assegureu-vos que heu seleccionat \"Enviar\" per a cada problema abans d'enviar l'examen.\n    ",
-    "\n      Practice exams do not affect your grade or your credit eligibility.\n      You have completed this practice exam and can continue with your course work.\n    ": "\n      Els ex\u00e0mens pr\u00e0ctics no afecten el vostre grau o la vostra elegibilitat credit\u00edcia.\n      Heu completat aquest examen de pr\u00e0ctica i podeu continuar amb el vostre curs.\n    ",
     "\n      The due date for this exam has passed\n    ": "\n      La data de venciment d'aquest examen ha passat\n    ",
-    "\n      There was a problem with your practice proctoring session\n    ": "\n      Hi ha hagut un problema amb la vostra sessi\u00f3 de supervisi\u00f3 de pr\u00e0ctiques\n    ",
     "\n      This exam is proctored\n    ": "\n      Aquest ex\u00e0men est\u00e0 supervisat\n    ",
-    "\n      To be eligible for course credit or for a MicroMasters credential, you must pass the proctoring review for this exam.\n    ": "\n      Per poder optar al cr\u00e8dit del curs o per obtenir una credencial de MicroMasters, haureu de passar la revisi\u00f3 de supervisi\u00f3 per a aquest examen.\n    ",
     "\n      To view your exam questions and responses, select <strong>View my exam</strong>. The exam's review status is shown in the left navigation pane.\n    ": "\n      Per veure les preguntes i respostes de l'examen, seleccioneu <strong>Veure el meu examen </strong>. L'estat de la revisi\u00f3 de l'examen es mostra al panell de navegaci\u00f3 esquerre.\n    ",
-    "\n      Try a proctored exam\n    ": "\n      Proveu un examen supervisat\n    ",
-    "\n      View your credit eligibility status on your <a href=\"%(progress_page_url)s\">Progress</a> page.\n    ": "\n      Consulteu el vostre estat d'elegibilitat de cr\u00e8dit a la vostre p\u00e0gina de  <a href=\"%(progress_page_url)s\">Progr\u00e9s</a> .\n    ",
-    "\n      Yes, end my proctored exam\n    ": "\n      S\u00ed, finalitzar el meu examen supervisat \n    ",
     "\n      Yes, submit my timed exam.\n    ": "\n      S\u00ed, envieu el meu examen cronometrat.\n    ",
-    "\n      You are eligible to purchase academic credit for this course if you complete all required exams\n      and also achieve a final grade that meets the credit requirements for the course.\n    ": "\n      Podeu adquirir un cr\u00e8dit acad\u00e8mic per a aquest curs si completa els ex\u00e0mens requerits\n     i tamb\u00e9 aconseguir una nota final que compleixi amb els requisits de cr\u00e8dit del curs.\n    ",
-    "\n      You are no longer eligible for academic credit for this course, regardless of your final grade.\n      If you have questions about the status of your proctored exam results, contact %(platform_name)s Support.\n    ": "\n     Ja no podeu obtenir cr\u00e8dits acad\u00e8mics per a aquest curs, independentment de la nota final.\n      Si teniu preguntes sobre l'estat dels resultats dels ex\u00e0mens supervisats, contacteu amb el suport de %(platform_name)s.\n    ",
-    "\n      You have submitted this practice proctored exam\n    ": "\n      Heu enviat aquest examen pr\u00e0ctic tutelat\n    ",
     "\n      You have submitted this proctored exam for review\n    ": "\n      Heu enviat aquest examen tutelat per a la seva revisi\u00f3\n    ",
-    "\n      Your grade for this timed exam will be immediately available on the <a href=\"%(progress_page_url)s\">Progress</a> page.\n    ": "\n      El vostre grau d'aquest examen temporal estar\u00e0 disponible immediatament a la p\u00e0gina de <a href=\"%(progress_page_url)s\">Progr\u00e9s</a>.\n    ",
     "\n      Your practice proctoring results: <b class=\"failure\"> Unsatisfactory </b>\n    ": "\n      Els resultats de la seva pr\u00e0ctica de supervisi\u00f3: <b class=\"failure\"> Insatisfactori </b>\n    ",
-    "\n      Your proctoring session ended before you completed this practice exam.\n      You can retry this practice exam if you had problems setting up the online proctoring software.\n    ": "\n      La sessi\u00f3 de supervisi\u00f3 finalitzava abans de completar aquest examen de pr\u00e0ctica.\n      Podeu tornar a provar aquest examen de pr\u00e0ctica si teniu problemes per configurar el programari de processament en l\u00ednia.\n    ",
-    "\n      Your proctoring session was reviewed and did not pass requirements\n    ": "\n      S'ha revisat la vostra sessi\u00f3 de supervisi\u00f3 i no va passar els requisits\n    ",
-    "\n      Your proctoring session was reviewed and passed all requirements\n    ": "\n      S'ha revisat la vostra sessi\u00f3 de supervisi\u00f3 i es van aprovar tots els requisits\n    ",
     "\n    %(exam_name)s is a Timed Exam (%(total_time)s)\n    ": "\n    %(exam_name)s \u00e9s un examen cronometrat (%(total_time)s)\n    ",
     "\n    The following prerequisites are in a <strong>pending</strong> state and must be successfully completed before you can proceed:\n    ": "\n    Els prerequisits seg\u00fcents es troben en estat <strong>pedent</strong> i s'ha de completar amb \u00e8xit abans de poder continuar:\n    ",
-    "\n    You can take this exam with proctoring only when all prerequisites have been successfully completed. Check your <a href=\"%(progress_page_url)s\">Progress</a>  page to see if prerequisite results have been updated. You can also take this exam now without proctoring, but you will not be eligible for credit.\n    ": "\n    Podeu fer aquest examen amb la supervisi\u00f3 nom\u00e9s quan tots els requisits previs s'han completat correctament. Consulteu la vostra p\u00e0gina de <a href=\"%(progress_page_url)s\">Progr\u00e9s</a>  per veure si s'han actualitzat els resultats previs. Tamb\u00e9 podeu fer aquest examen ara sense procedir, per\u00f2 no podreu obtenir el cr\u00e8dit.\n    ",
     "\n    You did not satisfy the following prerequisites:\n    ": "\n    No heu satisfet els requisits previs seg\u00fcents:\n    ",
-    "\n    You did not satisfy the requirements for taking this exam with proctoring, and are not eligible for credit. See your <a href=\"%(progress_page_url)s\">Progress</a> page for a list of requirements and your status for each.\n    ": "\n    No heu satisfet els requisits per fer aquest examen amb supervisi\u00f3 pr\u00e8via, i no \u00e9s apte per al cr\u00e8dit. Mireu la vostra p\u00e0gina de  <a href=\"%(progress_page_url)s\">Progr\u00e9s</a> per obtenir una llista de requisits i el vostre estat per a cadascun.\n    ",
-    "\n    You have not completed the prerequisites for this exam. All requirements must be satisfied before you can take this proctored exam and be eligible for credit. See your <a href=\"%(progress_page_url)s\">Progress</a> page for a list of requirements in the order that they must be completed.\n    ": "\n    No heu completat els requisits previs per a aquest examen. Tots els requisits han de ser satisfets abans de poder fer aquest examen de prova i ser elegibles per al cr\u00e8dit. Mireu la vostra p\u00e0gina de <a href=\"%(progress_page_url)s\">Progr\u00e9s</a> per obtenir una llista de requisits en l'ordre que s'han de completar.\n    ",
     " ${price} {currency} )": " ${price} {currency} )",
     " From this point in time, you must follow the <a href=\"%(link_urls.online_proctoring_rules)s\" target=\"_blank\">online proctoring rules</a> to pass the proctoring review for your exam. ": " A partir d 'aquest moment, heu de seguir les <a href=\"%(link_urls.online_proctoring_rules)s\" target=\"_blank\">regles de supervisi\u00f3 en l\u00ednia </a> Per aprovar la revisi\u00f3 de supervisi\u00f3 per al vostre examen.",
     " Your Proctoring Session Has Started ": "S'ha iniciat la vostra sessi\u00f3 de supervisi\u00f3",
@@ -102,7 +61,6 @@
     " to complete and submit the exam.": "per completar i enviar l'examen.",
     "${listPrice}": "${listPrice}",
     "%(cohort_name)s (%(user_count)s)": "%(cohort_name)s (%(user_count)s)",
-    "%(download_link_start)sDownload this image (right-click or option-click, save as)%(link_end)s and then %(upload_link_start)supload%(link_end)s it to your backpack.</li>": "%(download_link_start)sBaixeu aquesta imatge (feu clic amb el bot\u00f3 secundari o feu clic a l'opci\u00f3, desa com a)%(link_end)s i aleshores %(upload_link_start)spujar%(link_end)s a la teva motxilla.</li>",
     "%(new_item_message)s": "%(new_item_message)s",
     "%(programName)s Home Page.": "P\u00e0gina d'Inici de %(programName)s",
     "%(sel)s of %(cnt)s selected": [
@@ -120,7 +78,6 @@
     "6 a.m.": "6 a.m.",
     "6 p.m.": "6 p.m.",
     ": video upload complete.": ": c\u00e0rrega de v\u00eddeo completada.",
-    "A driver's license, passport, or government-issued ID with your name and photo.": "Llic\u00e8ncia de conduir, passaport o identificaci\u00f3 emesa pel govern amb el vostre nom i foto.",
     "A driver's license, passport, or other government-issued ID with your name and photo": "Una llic\u00e8ncia de conduir, un passaport o una altra identificaci\u00f3 expedida pel govern amb el vostre nom i foto",
     "A highlight to look forward to this week.": "Un aspecte destacable d'esperar aquesta setmana.",
     "A list of courses you have just enrolled in as a verified student": "Una llista de cursos que acaba d'ingressar com a estudiant verificat",
@@ -187,7 +144,6 @@
     "Already have an {platformName} account?": "Ja teniu un compte a {platformName}?",
     "Always divide content-specific discussion topics": "Sempre divideu els temes de discussi\u00f3 espec\u00edfics del contingut",
     "Always show assessment results": "Mostra els resultats de l'avaluaci\u00f3 sempre",
-    "Amount": "Import",
     "An email has been sent to {userEmail} with a link for you to activate your account.": "S'ha enviat un correu electr\u00f2nic a {userEmail} amb un enlla\u00e7 perqu\u00e8 activeu el vostre compte.",
     "An error has occurred. Wait a few minutes, and then try again.": "S'ha produ\u00eft un error. Espereu uns minuts i torneu-ho a provar.",
     "An error occurred. Please reload the page.": "Hi ha hagut un error. Torna a carregar la p\u00e0gina.",
@@ -219,7 +175,6 @@
     "Be sure your entire face is inside the frame": "Assegureu-vos que tota la cara est\u00e0 dins del marc",
     "Before proceeding, please confirm that your details match": "Abans de continuar, confirmeu que les dades coincideixen",
     "Before you upgrade to a certificate track, you must activate your account.": "Abans d'actualitzar a una pista de certificat, heu d'activar el vostre compte.",
-    "Billed to": "S'ha facturat",
     "Biography": "Biografia",
     "Blockquote": "Cita",
     "Blockquote (Ctrl+Q)": "Cita (Ctrl+Q)",
@@ -236,10 +191,8 @@
     "Cancel": "Cancel\u00b7lar",
     "Cancel team creating.": "Cancel\u00b7la la creaci\u00f3 de l'equip.",
     "Cancel team updating.": "Cancel\u00b7la l'actualitzaci\u00f3 de l'equip.",
-    "Cannot Start Proctored Exam": "No es pot iniciar l'examen supervisat",
     "Cannot delete when in use by a unit": "No es pot eliminar quan est\u00e0 en \u00fas per una unitat",
     "Cannot delete when in use by an experiment": "No es pot esborrar quan s'utilitza una prova",
-    "Cannot drop more <%= types %> assignments than are assigned.": "No es poden deixar caure m\u00e9s <%= types %> assignacions que s'assignen.",
     "Caution: The last published version of this unit is live. By publishing changes you will change the student experience.": "Precauci\u00f3: l'\u00faltima versi\u00f3 publicada d'aquesta unitat \u00e9s en viu. En publicar canvis, canviar\u00e0s l'experi\u00e8ncia dels estudiants.",
     "Certificate Details": "Detalls del certificat",
     "Certificate Generated": "Certificat generat",
@@ -263,7 +216,6 @@
     "Chapter {order}": "Cap\u00edtol {order}",
     "Check Your Email": "Comprova el teu correu",
     "Check this box to receive an email digest once a day notifying you about new, unread activity from posts you are following.": "Marqueu aquesta casella per rebre un correu electr\u00f2nic que digereix una vegada al dia notificant-vos sobre l'activitat nova i no llegida de les publicacions que seguiu.",
-    "Check your email": "Comproveu el vostre correu",
     "Check your email for an activation message.": "Consulteu el vostre correu electr\u00f2nic per obtenir un missatge d'activaci\u00f3.",
     "Choose": "Escollir",
     "Choose File": "Escull arxiu",
@@ -299,7 +251,6 @@
     "Common Problem Types": "Tipus de problemes freq\u00fcents",
     "Complete courses on your schedule to ensure you stand out in your field!": "Completeu els cursos del vostre horari per assegurar-vos que us destaqui al vostre camp!",
     "Completed": "Completat",
-    "Component Location ID": "Identificador d'ubicaci\u00f3 del component",
     "Configure": "Configura",
     "Confirm": "Confirmar",
     "Confirm Timed Transcript": "Confirmeu Transcripci\u00f3 Temporitzada",
@@ -316,7 +267,6 @@
     "Continue Exam Without Proctoring": "Continua l'examen sense supervisi\u00f3",
     "Continue to Verification": "Continueu a la verificaci\u00f3",
     "Continue to my practice exam": "Continueu al meu examen de pr\u00e0ctica",
-    "Continue to my proctored exam. I want to be eligible for credit.": "Continueu al meu examen tutelat. Vull ser elegible per al cr\u00e8dit.",
     "Correct failed component": "Esborra el component fallit",
     "Cost": "Cost",
     "Could not find users associated with the following identifiers:": "No s'han pogut trobar usuaries associats amb el seg\u00fcents identificadors:",
@@ -346,7 +296,6 @@
     "Create": "Crear",
     "Create Account": "Crear compte",
     "Create Re-run": "Crea una reproducci\u00f3 nova",
-    "Create a %(link_start)sMozilla Backpack%(link_end)s account, or log in to your existing account": "Creeu un compte %(link_start)sMotxilla de Mozilla%(link_end)s o inicieu sessi\u00f3 al vostre compte existent",
     "Create a content group": "Crea un grup de contingut",
     "Create account using %(providerName)s.": "Crea un compte amb %(providerName)s.",
     "Create an Account": "Crear un compte",
@@ -355,12 +304,10 @@
     "Create team.": "Crea un equip.",
     "Created": "Creat",
     "Creative Commons licensed content, with terms as follow:": "Contingut amb llic\u00e8ncia de Creative Commons, amb els termes seg\u00fcents:",
-    "Crossed out items have been refunded.": "S'han reembossat els elements creuats.",
     "Current Role:": "Rol actual:",
     "Current enrollment mode:": "Modalitat d'inscripci\u00f3 actual:",
     "Current location": "Localitzaci\u00f3 actual",
     "Currently selected": "Actualment seleccionat",
-    "Date": "Data",
     "Date Added": "Data afegida",
     "Date Joined": "Data d'inscripci\u00f3",
     "Date Placed": "Data de posada",
@@ -368,7 +315,6 @@
     "December": "Desembre",
     "Declined": "Rebutjat",
     "Default Timed Transcript": "Transcripci\u00f3 temporitzada per defecte",
-    "Delete \"<%= signatoryName %>\" from the list of signatories?": "Esborrar \"<%= signatoryName %>\" de la llista de signants?",
     "Delete File Confirmation": "Confirma l'esborrat del fitxer",
     "Delete Team": "Suprimeix l'equip",
     "Delete the user, {username}": "Elimina l'usuari, {username}",
@@ -378,7 +324,6 @@
     "Deleted Group": "Grup eliminat",
     "Deleting this %(item_display_name)s is permanent and cannot be undone.": "Si suprimiu aquest %(item_display_name)s \u00e9s permanent i no es pot desfer.",
     "Deprecated": "Obsolet",
-    "Description": "Descripci\u00f3",
     "Description of the certificate": "Descripci\u00f3 del certificat",
     "Discard Changes": "Descartar els canvis",
     "Discussion Home": "P\u00e0gina inicial del debat",
@@ -387,9 +332,7 @@
     "Divided": "Dividit",
     "Do you want to replace the edX transcript with the YouTube transcript?": "Voleu reempla\u00e7ar la transcripci\u00f3 edX amb la transcripci\u00f3 de YouTube?",
     "Does the name on your ID match your account name: %(fullName)s?": "El nom del vostre Identificador coincideix amb el nom del vostre compte: %(fullName)s",
-    "Does the photo of you match your ID photo?": "La foto de tu coincideix amb la teva foto d'identificaci\u00f3?",
     "Does the photo of you show your whole face?": "La foto de tu mostreu tota la teva cara?",
-    "Doing so means that you are no longer eligible for academic credit.": "Fer-ho significa que ja no \u00e9s apte per al cr\u00e8dit acad\u00e8mic.",
     "Don't see your picture? Make sure to allow your browser to use your camera when it asks for permission.": "No veus la teva foto? Assegureu-vos que el vostre navegador utilitzi la vostra c\u00e0mera quan sol\u00b7liciti perm\u00eds.",
     "Donate": "Fer una donaci\u00f3",
     "Download": "Descarregar",
@@ -426,7 +369,6 @@
     "Enable": "Activa",
     "Enable Cohorts": "Activa les cohorts",
     "Enable Now": "Habilitar ara",
-    "Enable Weekly Highlight Emails": "Activa els correus electr\u00f2nics de resum setmanals",
     "Enabled": "Habilitat",
     "End My Exam": "Finalitza el meu examen",
     "Engage with posts": "Participa amb publicacions",
@@ -472,7 +414,6 @@
     "Files must be in JPEG or PNG format.": "Els fitxers han d'estar en format JPEG o PNG.",
     "Filter": "Filtre",
     "Filter and sort topics": "Filtrar i ordenar temes",
-    "Final Grade": "Nota Final",
     "Financial Assistance Application": "Sol\u00b7licitud d'Assist\u00e8ncia Financera",
     "Find a course": "Trobeu un curs",
     "Find discussions": "Trobi debats",
@@ -487,7 +428,6 @@
     "Generate": "Generar",
     "Generate Exception Certificates": "Genera certificats d'excepci\u00f3",
     "Generate the user's certificate": "Genereu el certificat de l'usuari",
-    "Get Credit": "Obtenir Cr\u00e8dit",
     "Go Back": "Torna",
     "Go to Dashboard": "Aneu al panell",
     "Go to your Dashboard": "Aneu al Panell de control",
@@ -534,8 +474,6 @@
     "If the subsection does not have a due date, learners always see their scores when they submit answers to assessments.": "Si la subsecci\u00f3 no t\u00e9 data de venciment, els estudiants sempre veuen les puntuacions quan envien respostes a les avaluacions.",
     "If the unit was previously published and released to learners, any changes you made to the unit when it was hidden will now be visible to learners.": "Si la unitat es va publicar i es va publicar pr\u00e8viament als estudiants, els canvis que h\u00e0giu fet a la unitat quan estigu\u00e9s oculta ara seran visibles per als estudiants.",
     "If you do not yet have an account, use the button below to register.": "Si encara no teniu un compte, utilitzeu el bot\u00f3 seg\u00fcent per registrar-se.",
-    "If you don't verify your identity now, you can still explore your course from your dashboard. You will receive periodic reminders from %(platformName)s to verify your identity.": "Si encara no comprova la vostra identitat, encara podeu explorar el vostre curs des del tauler. Rebr\u00e0 recordatoris peri\u00f2dics de %(platformName)s per verificar la vostra identitat.",
-    "If you don't verify your identity now, you can still explore your course from your dashboard. You will receive periodic reminders from {platformName} to verify your identity.": "Si encara no comprova la vostra identitat, encara podeu explorar el vostre curs des del tauler. Rebreu els recordatoris peri\u00f2dics de {platformName} per verificar la vostra identitat.",
     "If you make this %(xblockType)s visible to learners, learners will be able to see its content after the release date has passed and you have published the unit. Only units that are explicitly hidden from learners will remain hidden after you clear this option for the %(xblockType)s.": "Si fa que aquest %(xblockType)s sigui visible per als estudiants, els aprenents podran veure el seu contingut despr\u00e9s de la data de llan\u00e7ament i han publicat la unitat. Nom\u00e9s les unitats que estan expl\u00edcitament amagades pels aprenents romandran ocultes despr\u00e9s d'esborrar aquesta opci\u00f3 per a %(xblockType)s.",
     "If you remove this transcript, the transcript will not be available for any components that use this video.": "Si elimineu aquesta transcripci\u00f3, la transcripci\u00f3 no estar\u00e0 disponible per als components que utilitzin aquest v\u00eddeo.",
     "If you select an option other than \"%(hide_label)s\", published units in this subsection become available to learners unless they are explicitly hidden.": "Si seleccioneu una opci\u00f3 diferent \"%(hide_label)s\", les unitats publicades en aquesta subsecci\u00f3 estaran disponibles per als estudiants, tret que estiguin expl\u00edcitament amagades.",
@@ -647,7 +585,6 @@
     "New Address": "Nova adre\u00e7a",
     "New enrollment mode:": "Nou mode d'inscripci\u00f3:",
     "Next": "Seg\u00fcent",
-    "Next Step: Confirm your identity": "Pas seg\u00fcent: confirmeu la vostra identitat",
     "Next: %(nextStepTitle)s": "Seg\u00fcent: %(nextStepTitle)s",
     "No Content Group": "Sense grup de contingut",
     "No EdX Timed Transcript": "No hi ha una transcripci\u00f3 temporitzada Edx",
@@ -655,7 +592,6 @@
     "No content-specific discussion topics exist.": "No hi ha temes de discussi\u00f3 espec\u00edfics del contingut.",
     "No description available": "No hi ha cap descripci\u00f3 disponible",
     "No prerequisite": "Sense requisit previ",
-    "No receipt available": "No hi ha rebut disponible",
     "No results": "Sens resultats",
     "No transcript uploaded.": "No s'ha penjat cap transcripci\u00f3.",
     "No validation is performed on policy keys or value pairs. If you are having difficulties, check your formatting.": "No es realitza cap validaci\u00f3 en claus de pol\u00edtica o en parells de valors. Si teniu dificultats, consulteu el vostre format.",
@@ -685,12 +621,9 @@
     "November": "Novembre",
     "Now": "Ara",
     "Number of Droppable": "N\u00famero de retiraments",
-    "Number of Students": "Nombre d'estudiants",
     "Numbered List (Ctrl+O)": "Llista numerada (Ctrl+O)",
     "OK": "D'acord",
     "October": "Octubre",
-    "Once in position, use the camera button {icon} to capture your ID": "Un cop a la posici\u00f3, utilitzeu el bot\u00f3 de la c\u00e0mera {icon} per capturar la vostra identificaci\u00f3",
-    "Once in position, use the camera button {icon} to capture your photo": "Un cop a la posici\u00f3, utilitzeu el bot\u00f3 de la c\u00e0mera {icon} per capturar la foto",
     "Once you complete one of the program requirements you have a program record. This record is marked complete once you meet all program requirements. A program record can be used to continue your learning journey and demonstrate your learning to others.": "Una vegada que h\u00e0giu completat un dels requisits del programa, teniu un registre del programa. Aquest registre es marca completament una vegada que compleix tots els requisits del programa. Es pot utilitzar un registre del programa per continuar el vostre viatge d'aprenentatge i demostrar el vostre aprenentatge als altres.",
     "Only the parent course staff of a CCX can create content groups.": "Nom\u00e9s el personal de cursos primaris d'un CCX pot crear grups de contingut.",
     "Open the certificate you earned for the %(title)s program.": "Obriu el certificat que heu obtingut per al programa %(title)s",
@@ -700,7 +633,6 @@
     "Options for {license_name}": "Opcions per a {license_name}",
     "Order Details": "Detalls de l'encarrec",
     "Order History": "Historial de Comandes",
-    "Order No.": "N\u00ba de Comanda",
     "Order Number": "N\u00famero d'ordre",
     "Organization": "Organitzaci\u00f3",
     "Organization ": "Organitzaci\u00f3",
@@ -721,7 +653,6 @@
     "Photo of %(fullName)s's ID": "Foto de la Identificaci\u00f3 de %(fullName)s",
     "Photo requirements:": "Requisits fotogr\u00e0fics:",
     "Photos don't meet the requirements?": "Les fotos no compleixen els requisits?",
-    "Please Note": "Tingueu en compte",
     "Please add a photo of the instructor (Note: only JPEG or PNG format supported)": "Afegiu una foto de l'instructor (Nota: nom\u00e9s s'admeten JPEG o PNG)",
     "Please add the institute where the instructor is associated": "Afegiu l'institut on s'associa l'instructor",
     "Please add the instructor's biography": "Afegiu la biografia del instructor",
@@ -736,7 +667,6 @@
     "Please enter an integer greater than 0.": "Si us plau, entra un nombre enter m\u00e9s gran que 0.",
     "Please enter non-negative integer.": "Si us plau, entra un nombre enter no negatiu.",
     "Please follow the instructions here to upload a file elsewhere and link to it: {maxFileSizeRedirectUrl}": "Seguiu les instruccions aqu\u00ed per carregar un fitxer a un altre lloc i enlla\u00e7ar-hi: {maxFileSizeRedirectUrl}",
-    "Please print this page for your records; it serves as your receipt. You will also receive an email with the same information.": "Imprimiu aquesta p\u00e0gina per als vostres registres; serveix com a rebut. Tamb\u00e9 rebr\u00e0 un correu electr\u00f2nic amb la mateixa informaci\u00f3.",
     "Post": "Publicaci\u00f3",
     "Practice Exam Completed": "Examen pr\u00e0ctic completat",
     "Practice Exam Failed": "L'examen de pr\u00e0ctica ha fallat",
@@ -764,8 +694,6 @@
     "Proctored Exam": "Ex\u00e0men supervisat",
     "Proctored Option Available": "Opci\u00f3 Supervisat disponible",
     "Proctored Option No Longer Available": "L'opci\u00f3 Supervisat ja no est\u00e0 disponible",
-    "Proctored exams are timed and they record video of each learner taking the exam. The videos are then reviewed to ensure that learners follow all examination rules.": "Els ex\u00e0mens supervisats s\u00f3n cronometrats i graven el v\u00eddeo de cada alumne que pren l'examen. Els v\u00eddeos es revisen per garantir que els alumnes segueixin totes les regles d'examen.",
-    "Proctoring Session Results Update for {course_name} {exam_name}": "Actualitzaci\u00f3 de resultats de la sessi\u00f3 de supervisi\u00f3 per a {course_name} {exam_name}",
     "Product Name": "nom del producte",
     "Professional Certificate for {courseName}": "Certificat professional per {courseName}",
     "Program Record": "Registre del programa",
@@ -853,8 +781,6 @@
     "Select the course-wide discussion topics that you want to divide.": "Seleccioneu els temes de discussi\u00f3 que vulgueu dividir al llarg del curs.",
     "Select turnaround": "Seleccioneu la tornada",
     "Selected tab": "Pestanya seleccionada",
-    "Send notification to mobile apps": "Envia notificacions a les aplicacions per a m\u00f2bils",
-    "Send push notification to mobile apps": "Envia notificacions d'impressi\u00f3 a les aplicacions m\u00f2bils",
     "September": "Setembre",
     "Session Selection Dropdown for {courseName}": "Selecci\u00f3 de sessi\u00f3 desplegable per {courseName}",
     "Set Access": "Estableix l'acc\u00e9s",
@@ -899,7 +825,6 @@
     "Staff Only": "Nom\u00e9s personal",
     "Staff and Learners": "Personal i aprenents",
     "Start Date": "Data d'inici",
-    "Start Proctored Exam": "Comen\u00e7i l'examen supervisat",
     "Start System Check": "Comen\u00e7a la verificaci\u00f3 del sistema",
     "Start working toward your next learning goal.": "Comenceu a treballar per al vostre proper objectiu d'aprenentatge.",
     "Started": "Ha comen\u00e7at",
@@ -948,15 +873,11 @@
     "Team member profiles": "Perfils dels membres de l'equip",
     "Textbook Name": "Nom del llibre de Text",
     "Textbook information": "Informaci\u00f3 del llibre de text",
-    "Thank you %(full_name)s! We have received your payment for %(course_name)s.": "Gr\u00e0cies %(full_name)s! Hem rebut el vostre pagament per %(course_name)s.",
     "Thank you for submitting your financial assistance application for {course_name}! You can expect a response in 2-4 business days.": "Gr\u00e0cies per enviar la vostra sol\u00b7licitud d'assist\u00e8ncia financera per {course_name}. Podeu esperar una resposta en 2 o 4 dies laborables.",
     "Thank you for submitting your photos. We will review them shortly. You can now sign up for any %(platformName)s course that offers verified certificates. Verification is good for one year. After one year, you must submit photos for verification again.": "Gr\u00e0cies per enviar les vostres fotos. Les revisarem en breu. Ara podeu inscriure's a qualsevol curs de %(platformName)s que ofereixi certificats verificats. La verificaci\u00f3 \u00e9s bona durant un any. Despr\u00e9s d'un any, heu de tornar a enviar les vostres fotos per verificar-les.",
-    "Thank you! We have received your payment for {courseName}.": "Gr\u00e0cies! Hem rebut el vostre pagament per {courseName}.",
     "Thanks for returning to verify your ID in: {courseName}": "Gr\u00e0cies per tornar a verificar la vostra identificaci\u00f3 a: {courseName}",
     "The assignment type must have a name.": "El tipus de tasca ha de tenir un nom.",
     "The certificate available date must be later than the course end date.": "La data disponible del certificat ha de ser posterior a la data de finalitzaci\u00f3 del curs.",
-    "The combined length of the organization and library code fields cannot be more than <%=limit%> characters.": "La longitud combinada dels camps de codi d'organitzaci\u00f3 i biblioteca no pot ser superior al <%=limit%> car\u00e0cters.",
-    "The combined length of the organization, course number, and course run fields cannot be more than <%=limit%> characters.": "La longitud combinada dels camps de l'organitzaci\u00f3, el n\u00famero de curs i el curs no pot ser superior al <%=limit%> car\u00e0cters.",
     "The country that team members primarily identify with.": "El pa\u00eds amb el qual els membres de l'equip s'identifiquen principalment.",
     "The course end date must be later than the course start date.": "La data de finalitzaci\u00f3 del curs ha de ser posterior a la data d'inici del curs.",
     "The course must have an assigned start date.": "El curs ha de tenir assignada una data d'inici.",
@@ -965,7 +886,6 @@
     "The enrollment start date cannot be after the enrollment end date.": "La data d'alta al curs no pot ser posterior la a data de baixa.",
     "The file could not be uploaded.": "No s'ha pogut carregar el fitxer.",
     "The following email addresses and/or usernames are invalid:": "Les seg\u00fcents adreces de correu i/o noms d'usuaris s\u00f3n inv\u00e0lids:",
-    "The following information is already a part of your {platform} profile. We\\'ve included it here for your application.": "La informaci\u00f3 seg\u00fcent ja forma part del vostre perfil {platform}. Ho hem incl\u00f2s aqu\u00ed per a la vostra sol\u00b7licitud.",
     "The following message will be displayed at the bottom of the courseware pages within your course:": "El seg\u00fcent missatge es mostrar\u00e0 a la part inferior de les p\u00e0gines del curs del vostre curs:",
     "The following options are available for the {license_name} license.": "Les seg\u00fcents opcions estan disponibles per a la llic\u00e8ncia {license_name}.",
     "The following users are no longer enrolled in the course:": "Els usuaris seg\u00fcents ja no estan donats d'alta al curs:",
@@ -978,7 +898,6 @@
     "The number of assignments of this type that will be dropped. The lowest scoring assignments are dropped first.": "El nombre de tasques d'aquest tipus que es retiraran. Les assignacions de puntuaci\u00f3 m\u00e9s baixes es deixen caure primer.",
     "The number of subsections in the course that contain problems of this assignment type.": "El nombre de subseccions del curs que contenen problemes d'aquest tipus d'assignaci\u00f3.",
     "The organization that this signatory belongs to, as it should appear on certificates.": "L'organitzaci\u00f3 a la qual pertany aquest signant, ja que hauria d'apar\u00e8ixer en els certificats.",
-    "The photo of your face matches the photo on your ID.": "La foto de la teva cara coincideix amb la foto de la teva identificaci\u00f3.",
     "The published branch version, {published}, was reset to the draft branch version, {draft}.": "La versi\u00f3 de branca publicada, {published}, es va restablir a la versi\u00f3 del projecte de branca, {draft}.",
     "The raw error message is:": "El missatge d'error en brut \u00e9s:",
     "The selected image must be larger than {minFileSizeInKB}.": "La imatge seleccionada ha de ser m\u00e9s gran que {minFileSizeInKB}.",
@@ -1015,7 +934,6 @@
     "This configuration is currently used in content experiments. If you make changes to the groups, you may need to edit those experiments.": "Actualment, aquesta configuraci\u00f3 s'utilitza en experiments de contingut. Si feu canvis als grups, \u00e9s possible que h\u00e0giu d'editar aquests experiments.",
     "This content group is used in one or more units.": "Aquest grup de contingut s'utilitza en una o m\u00e9s unitats.",
     "This exam has a time limit associated with it.": "Aquest examen t\u00e9 un l\u00edmit de temps associat.",
-    "This feature is currently in testing. Course teams can enter highlights, but learners will not receive email messages.": "Actualment aquesta funci\u00f3 est\u00e0 en proves. Els equips de cursos poden entrar a destacar, per\u00f2 els alumnes no rebran missatges de correu electr\u00f2nic.",
     "This file type is not supported. Supported file type is {supportedFileFormat}.": "Aquest tipus de fitxer no \u00e9s compatible. El tipus de fitxer compatible \u00e9s {supportedFileFormat}.",
     "This group controls access to:": "Aquest grup controla l'acc\u00e9s a:",
     "This group no longer exists. Choose another group or do not restrict access to this unit.": "Aquest grup ja no existeix. Trieu un altre grup o no restringiu l'acc\u00e9s a aquesta unitat.",
@@ -1045,7 +963,6 @@
     "To be sure all students can access the video, we recommend providing both an .mp4 and a .webm version of your video. Click below to add a URL for another version. These URLs cannot be YouTube URLs. The first listed video that's compatible with the student's computer will play.": "Per assegurar-vos que tots els estudiants poden accedir al v\u00eddeo, us recomanem que proporcioneu una versi\u00f3 .mp4 i una versi\u00f3 de .webm del vostre v\u00eddeo. Feu clic a sota per afegir un URL a una altra versi\u00f3. Aquestes URL no poden ser URL de YouTube. Es reproduir\u00e0 el primer v\u00eddeo que sigui compatible amb l'ordinador de l'alumne.",
     "To complete the program, you must earn a verified certificate for each course.": "Per completar el programa, heu de guanyar un certificat verificat per a cada curs.",
     "To continue learning with this account, sign in below.": "Per continuar aprenent amb aquest compte, inicieu la sessi\u00f3 a continuaci\u00f3.",
-    "To finalize course credit, %(display_name)s requires %(platform_name)s learners to submit a credit request.": "Per finalitzar el cr\u00e8dit del curs, %(display_name)s requereix que els aprenents %(platform_name)s envi\u00efn una sol\u00b7licitud de cr\u00e8dit.",
     "To invalidate a certificate for a particular learner, add the username or email address below.": "Per invalidar un certificat per a un alumne en particular, afegiu el nom d'usuari o l'adre\u00e7a de correu electr\u00f2nic a continuaci\u00f3.",
     "To pass this exam, you must complete the problems in the time allowed.": "Per aprovar aquest examen, heu de completar els problemes en el temps perm\u00e8s.",
     "To receive a certificate, you must also verify your identity before {date}.": "Per rebre un certificat, tamb\u00e9 heu de verificar la vostra identitat abans de {date}.",
@@ -1054,7 +971,6 @@
     "To review learner cohort assignments or see the results of uploading a CSV file, download course profile information or cohort results on the {link_start}Data Download{link_end} page.": "Per revisar les assignacions de cohort dels alumnes o veure els resultats de la c\u00e0rrega d'un fitxer CSV, descarregueu la informaci\u00f3 del perfil del curs o els resultats de la cohort a la p\u00e0gina {link_start} Descarrega Dades {link_end}.",
     "To share your certificate on Mozilla Backpack, you must first have a Backpack account. Complete the following steps to add your certificate to Backpack.": "Per compartir el certificat a Mozilla Backpack, primer heu de tenir un compte de Backpack. Completeu els passos seg\u00fcents per afegir el vostre certificat a Motxilla.",
     "To take a successful photo, make sure that:": "Per fer una foto reeixida, assegureu-vos que:",
-    "To use the current photo, select the camera button {icon}. To take another photo, select the retake button {icon}.": "Per utilitzar la foto actual, seleccioneu el bot\u00f3 de la c\u00e0mera {icon}. Per fer una altra foto, seleccioneu el bot\u00f3 de represa {icon}.",
     "To verify your identity, you need a webcam and a government-issued photo ID.": "Per verificar la vostra identitat, necessiteu una c\u00e0mera web i un identificador de fotografia em\u00e8s pel govern.",
     "Today": "Avui",
     "Toggle Notifications Setting": "Commuta la configuraci\u00f3 de notificacions",
@@ -1066,7 +982,6 @@
     "Transcript Provider": "Prove\u00efdor de la transcripci\u00f3",
     "Transcript Turnaround": "Alternatives de transcripci\u00f3",
     "Transcripts": "Transcripcions",
-    "Try this practice exam again": "Torneu a provar aquest examen de pr\u00e0ctica",
     "Type": "Tipus",
     "Type into this box to filter down the list of available %s.": "Escriviu en aquesta caixa per a filtrar la llista de %s disponibles.",
     "URL": "URL",
@@ -1116,8 +1031,6 @@
     "Use bookmarks to help you easily return to courseware pages. To bookmark a page, click \"Bookmark this page\" under the page title.": "Utilitzeu marcadors per ajudar-vos a tornar f\u00e0cilment a les p\u00e0gines de curs. Per marcar una p\u00e0gina d'inter\u00e8s, feu clic a \"Marca aquesta p\u00e0gina\" al t\u00edtol de la p\u00e0gina.",
     "Use my institution/campus credentials": "Utilitzeu les meves credencials de la instituci\u00f3/campus",
     "Use the All Topics menu to find specific topics.": "Utilitzeu el men\u00fa Tots els temes per trobar temes espec\u00edfics.",
-    "Use the retake photo button if you are not pleased with your photo": "Utilitzeu el bot\u00f3 de represa de fotos si no us agrada la vostra foto",
-    "Use your webcam to take a photo of your ID. We will match this photo with the photo of your face and the name on your account.": "Utilitzeu la vostra c\u00e0mera web per fer una foto de la vostra identificaci\u00f3. Confrontarem aquesta foto amb la foto de la vostra cara i el nom del vostre compte.",
     "Use your webcam to take a photo of your face. We will match this photo with the photo on your ID.": "Utilitzeu la vostra c\u00e0mera web per fer una foto de la vostra cara. Confrontarem aquesta foto amb la foto a la vostra identificaci\u00f3.",
     "Used": "Emprat",
     "Used in {count} location": [
@@ -1137,7 +1050,6 @@
     "Verified Certificate for {courseName}": "Certificat verificat per {courseName}",
     "Verified Status": "Estat verificat",
     "Verified mode price": "Preu en mode verificat",
-    "Verify Now": "verificar ara",
     "Video ID": "Identificador de video",
     "Video Source Language": "Llengua d'origen del v\u00eddeo",
     "Video Status": "Estat del v\u00eddeo",
@@ -1155,20 +1067,16 @@
     "Visibility": "Visibilitat",
     "Visible to Staff Only": "Visible nom\u00e9s al personal",
     "Vote for good posts and responses": "Votar per a publicacions i respostes correctes",
-    "Want to confirm your identity later?": "Voleu confirmar la vostra identitat m\u00e9s tard?",
     "We ask you to activate your account to ensure it is really you creating the account and to prevent fraud.": "Us demanem que activeu el vostre compte per garantir que realment esteu creant el compte i per evitar el frau.",
-    "We have received your information and are verifying your identity. You will see a message on your dashboard when the verification process is complete (usually within 1-2 days). In the meantime, you can still access all available course content.": "Hem rebut la vostra informaci\u00f3 i verifiquem la vostra identitat. Veureu un missatge al tauler quan el proc\u00e9s de verificaci\u00f3 estigui complet (generalment en 1-2 dies). Mentrestant, encara podeu accedir a tots els continguts del curs disponibles.",
     "We use the highest levels of security available to encrypt your photo and send it to our authorization service for review. Your photo and information are not saved or visible anywhere on %(platformName)s after the verification process is complete.": "Utilitzem els nivells m\u00e9s alts de seguretat disponibles per xifrar la vostra foto i enviar-la al nostre servei d'autoritzaci\u00f3 per a la seva revisi\u00f3. La vostra foto i la vostra informaci\u00f3 no es guarden ni es poden visualitzar a cap part de %(platformName)s despr\u00e9s de completar el proc\u00e9s de verificaci\u00f3.",
     "Web:": "Web:",
     "Webcam": "C\u00e0mera web",
-    "Weekly Highlight Emails": "Correus electr\u00f2nics destacats setmanals",
     "Weight of Total Grade": "Pes total de la Nota",
     "What You Need for Verification": "El que necessiteu per a la verificaci\u00f3",
     "What does %(platformName)s do with this photo?": "Qu\u00e8 fa amb %(platformName)s amb aquesta foto?",
     "What does this mean?": "Qu\u00e8 vol dir aix\u00f2?",
     "What's Your Next Accomplishment?": "Quin \u00e9s el vostre seguiment?",
     "When learners submit an answer to an assessment, they immediately see whether the answer is correct or incorrect, and the score received.": "Quan els aprenents presenten una resposta a una avaluaci\u00f3, immediatament veuen si la resposta \u00e9s correcta o incorrecta, i la puntuaci\u00f3 rebuda.",
-    "When your face is in position, use the camera button {icon} below to take your photo.": "Quan la teva cara estigui en posici\u00f3, fes servir el bot\u00f3 de la c\u00e0mera {icon} a continuaci\u00f3 per fer la teva foto.",
     "Which timed transcript would you like to use?": "Quina transcripci\u00f3 temporitzada us agradaria utilitzar?",
     "Why activate?": "Per qu\u00e8 activar?",
     "Why does %(platformName)s need my photo?": "Per qu\u00e8 necessita la %(platformName)s la meva foto?",
@@ -1184,7 +1092,6 @@
     "You are not enrolled in any programs yet.": "Encara no esteu inscrit en cap programa.",
     "You are now enrolled as a verified student for:": "Ara est\u00e0 inscrit com a estudiant verificat per:",
     "You are upgrading your enrollment for: {courseName}": "Esteu actualitzant la vostra inscripci\u00f3 per: {courseName}",
-    "You can also retry this practice exam": "Tamb\u00e9 podeu tornar a provar aquest examen de pr\u00e0ctica",
     "You can change sessions until {expiration_date}.": "Podeu canviar les sessions fins a {expiration_date}.",
     "You can no longer change sessions.": "Ja no pots canviar les sessions.",
     "You can now enter your payment information and complete your enrollment.": "Ara podeu introduir la vostra informaci\u00f3 de pagament i completar la vostra inscripci\u00f3.",
@@ -1209,12 +1116,7 @@
     "You haven't added any textbooks to this course yet.": "Encara no heu afegit cap llibre de text a aquest curs.",
     "You must enter a valid email address in order to add a new team member": "Heu d'introduir una adre\u00e7a electr\u00f2nica v\u00e0lida per afegir un membre nou de l'equip",
     "You must select a session by {expiration_date} to access the course.": "Heu de seleccionar una sessi\u00f3 abans de {expiration_date} per accedir al curs.",
-    "You need a computer that has a webcam. When you receive a browser prompt, make sure that you allow access to the camera.": "Necessiteu una computadora que tingui una c\u00e0mera web. Quan rebeu un indicador del navegador, assegureu-vos que permeti l'acc\u00e9s a la c\u00e0mera.",
-    "You need a driver's license, passport, or other government-issued ID that has your name and photo.": "Necessites una llic\u00e8ncia de conduir, un passaport o una altra identificaci\u00f3 expedida pel govern que tingui el teu nom i la teva foto.",
-    "You need an ID with your name and photo. A driver's license, passport, or other government-issued IDs are all acceptable.": "Necessites una identificaci\u00f3 amb el teu nom i la teva foto. Es pot acceptar una llic\u00e8ncia de conduir, passaport o altres identificaci\u00f3 emesa pel govern.",
-    "You need to activate your account before you can enroll in courses. Check your inbox for an activation email.": "Cal que activeu el compte abans de poder inscriure's a cursos. Comproveu la vostra safata d'entrada d'un correu electr\u00f2nic d'activaci\u00f3.",
     "You need to activate your account before you can enroll in courses. Check your inbox for an activation email. After you complete activation you can return and refresh this page.": "Cal que activeu el compte abans de poder inscriure's a cursos. Comproveu la vostra safata d'entrada d'un correu electr\u00f2nic d'activaci\u00f3. Despr\u00e9s de completar l'activaci\u00f3, podeu tornar i actualitzar aquesta p\u00e0gina.",
-    "You still need to visit the %(display_name)s website to complete the credit process.": "Encara haureu de visitar el lloc web %(display_name)s per completar el proc\u00e9s de cr\u00e8dit.",
     "You will not receive notification for emails that bounce, so double-check your spelling.": "No rebr\u00e0s la notificaci\u00f3 dels correus electr\u00f2nics que reboten, aix\u00ed que comprova la teva ortografia.",
     "You will use your webcam to take a picture of your face and of your government-issued photo ID.": "Utilitzar\u00e0s la teva c\u00e0mera web per fer una foto de la teva cara i l'identificador de fotografia em\u00e8s pel govern.",
     "You!": "Tu!",
@@ -1258,7 +1160,6 @@
     "enter code here": "entra el codi aqu\u00ed",
     "enter link description here": "entra aqu\u00ed la descripci\u00f3 de l'enlla\u00e7",
     "for": "per",
-    "for {courseName}": "per {courseName}",
     "group configuration": "configuraci\u00f3 del grup",
     "internally reviewed": "Revisat internament",
     "minute": "minut",
@@ -1274,24 +1175,18 @@
     "or create a new one here": "o creeu-ne un de nou aqu\u00ed",
     "or sign in with": "o inicieu la sessi\u00f3",
     "path/to/introductionToCookieBaking-CH{order}.pdf": "cami/a/introduccioalaCuinaGaletes-CAP{order}.pdf",
-    "pending": "pendent",
-    "practice": "practica",
     "price": "preu",
-    "proctored": "supervisat",
     "provide the title/name of the chapter that will be used in navigating": "Indiqueu el t\u00edtol / nom del cap\u00edtol que s'utilitzar\u00e0 a la navegaci\u00f3",
     "provide the title/name of the text book as you would like your students to see it": "Indiqueu el t\u00edtol / nom del llibre de text com vulgueu que els vostres estudiants el vegin",
     "remove": "eliminar",
     "remove all": "esborra-ho tot",
-    "satisfactory": "satisfactori",
     "second": "segon",
     "seconds": "segons",
     "send an email message to {email}": "envieu un missatge de correu electr\u00f2nic a {email}",
     "strong text": "text en negreta",
-    "timed": "cronometrat",
     "toggle chapter %(displayName)s": "canvia el cap\u00edtol %(displayName)s",
     "toggle subsection %(displayName)s": "canvia la subsecci\u00f3 %(displayName)s",
     "unit": "unitat",
-    "unsatisfactory": "insatisfactori",
     "upload a PDF file or provide the path to a Studio asset file": "Carregueu un fitxer PDF o proporcioneu la ruta d'acc\u00e9s a un fitxer d'actius de Studio",
     "username or email": "Nom d'usuari o correu electr\u00f2nic",
     "with %(release_date_from)s": "amb %(release_date_from)s",
@@ -1325,24 +1220,24 @@
     "{transcriptClientTitle}_{transcriptLanguageCode}.{fileExtension}": "{transcriptClientTitle} _ {transcriptLanguageCode}. {fileExtension}",
     "\u2026": "..."
   };
-  for (var key in newcatalog) {
+  for (const key in newcatalog) {
     django.catalog[key] = newcatalog[key];
   }
   
 
   if (!django.jsi18n_initialized) {
     django.gettext = function(msgid) {
-      var value = django.catalog[msgid];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[msgid];
+      if (typeof value === 'undefined') {
         return msgid;
       } else {
-        return (typeof(value) == 'string') ? value : value[0];
+        return (typeof value === 'string') ? value : value[0];
       }
     };
 
     django.ngettext = function(singular, plural, count) {
-      var value = django.catalog[singular];
-      if (typeof(value) == 'undefined') {
+      const value = django.catalog[singular];
+      if (typeof value === 'undefined') {
         return (count == 1) ? singular : plural;
       } else {
         return value.constructor === Array ? value[django.pluralidx(count)] : value;
@@ -1352,16 +1247,16 @@
     django.gettext_noop = function(msgid) { return msgid; };
 
     django.pgettext = function(context, msgid) {
-      var value = django.gettext(context + '\x04' + msgid);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.gettext(context + '\x04' + msgid);
+      if (value.includes('\x04')) {
         value = msgid;
       }
       return value;
     };
 
     django.npgettext = function(context, singular, plural, count) {
-      var value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
-      if (value.indexOf('\x04') != -1) {
+      let value = django.ngettext(context + '\x04' + singular, context + '\x04' + plural, count);
+      if (value.includes('\x04')) {
         value = django.ngettext(singular, plural, count);
       }
       return value;
@@ -1384,15 +1279,12 @@
       "%Y-%m-%d %H:%M:%S",
       "%Y-%m-%d %H:%M:%S.%f",
       "%Y-%m-%d %H:%M",
-      "%Y-%m-%d",
       "%m/%d/%Y %H:%M:%S",
       "%m/%d/%Y %H:%M:%S.%f",
       "%m/%d/%Y %H:%M",
-      "%m/%d/%Y",
       "%m/%d/%y %H:%M:%S",
       "%m/%d/%y %H:%M:%S.%f",
-      "%m/%d/%y %H:%M",
-      "%m/%d/%y"
+      "%m/%d/%y %H:%M"
     ],
     "DATE_FORMAT": "N j, Y",
     "DATE_INPUT_FORMATS": [
@@ -1425,8 +1317,8 @@
   };
 
     django.get_format = function(format_type) {
-      var value = django.formats[format_type];
-      if (typeof(value) == 'undefined') {
+      const value = django.formats[format_type];
+      if (typeof value === 'undefined') {
         return format_type;
       } else {
         return value;
@@ -1445,6 +1337,5 @@
 
     django.jsi18n_initialized = true;
   }
-
-}(this));
+};
 

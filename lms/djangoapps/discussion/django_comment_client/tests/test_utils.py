@@ -1,39 +1,47 @@
 # pylint: skip-file
-# -*- coding: utf-8 -*-
 
 
 import datetime
 import json
-import sys
+import unittest
+from unittest import mock
+from unittest.mock import Mock, patch
 
 import ddt
-import mock
 import pytest
-import six
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from edx_django_utils.cache import RequestCache
-from mock import Mock, patch
+from edx_toggles.toggles.testutils import override_waffle_flag
 from opaque_keys.edx.keys import CourseKey
 from pytz import UTC
-from six import text_type
 
 import lms.djangoapps.discussion.django_comment_client.utils as utils
-from course_modes.models import CourseMode
-from course_modes.tests.factories import CourseModeFactory
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.course_modes.tests.factories import CourseModeFactory
+from common.djangoapps.student.roles import CourseStaffRole
+from common.djangoapps.student.tests.factories import AdminFactory, CourseEnrollmentFactory, UserFactory
+from common.djangoapps.student.tests.factories import InstructorFactory
 from lms.djangoapps.courseware.tabs import get_course_tab_list
-from lms.djangoapps.courseware.tests.factories import InstructorFactory
 from lms.djangoapps.discussion.django_comment_client.constants import TYPE_ENTRY, TYPE_SUBCATEGORY
 from lms.djangoapps.discussion.django_comment_client.tests.factories import RoleFactory
 from lms.djangoapps.discussion.django_comment_client.tests.unicode import UnicodeTestMixin
 from lms.djangoapps.discussion.django_comment_client.tests.utils import config_course_discussions, topic_name_to_id
+from lms.djangoapps.discussion.toggles import ENABLE_DISCUSSIONS_MFE
 from lms.djangoapps.teams.tests.factories import CourseTeamFactory
 from openedx.core.djangoapps.course_groups import cohorts
 from openedx.core.djangoapps.course_groups.cohorts import set_course_cohorted
 from openedx.core.djangoapps.course_groups.tests.helpers import CohortFactory, config_course_cohorts
+from openedx.core.djangoapps.discussions.utils import (
+    available_division_schemes,
+    get_accessible_discussion_xblocks,
+    get_discussion_categories_ids,
+    get_group_names_by_id,
+    has_required_keys,
+)
 from openedx.core.djangoapps.django_comment_common.comment_client.utils import (
     CommentClientMaintenanceError,
-    perform_request
+    perform_request,
 )
 from openedx.core.djangoapps.django_comment_common.models import (
     CourseDiscussionSettings,
@@ -41,18 +49,13 @@ from openedx.core.djangoapps.django_comment_common.models import (
     ForumsConfig,
     assign_role
 )
-from openedx.core.djangoapps.django_comment_common.utils import (
-    get_course_discussion_settings,
-    seed_permissions_roles,
-    set_course_discussion_settings
-)
+from openedx.core.djangoapps.django_comment_common.utils import seed_permissions_roles
 from openedx.core.djangoapps.util.testing import ContentGroupTestCase
-from student.roles import CourseStaffRole
-from student.tests.factories import AdminFactory, CourseEnrollmentFactory, UserFactory
 from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.tests.django_utils import TEST_DATA_MIXED_MODULESTORE, ModuleStoreTestCase
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory, ToyCourseFactory
+from xmodule.tabs import CourseTabList
 
 
 class DictionaryTestCase(TestCase):
@@ -60,17 +63,17 @@ class DictionaryTestCase(TestCase):
         d = {'cats': 'meow', 'dogs': 'woof'}
         k = ['cats', 'dogs', 'hamsters']
         expected = {'cats': 'meow', 'dogs': 'woof', 'hamsters': None}
-        self.assertEqual(utils.extract(d, k), expected)
+        assert utils.extract(d, k) == expected
 
     def test_strip_none(self):
         d = {'cats': 'meow', 'dogs': 'woof', 'hamsters': None}
         expected = {'cats': 'meow', 'dogs': 'woof'}
-        self.assertEqual(utils.strip_none(d), expected)
+        assert utils.strip_none(d) == expected
 
     def test_strip_blank(self):
         d = {'cats': 'meow', 'dogs': 'woof', 'hamsters': ' ', 'yetis': ''}
         expected = {'cats': 'meow', 'dogs': 'woof'}
-        self.assertEqual(utils.strip_blank(d), expected)
+        assert utils.strip_blank(d) == expected
 
 
 class AccessUtilsTestCase(ModuleStoreTestCase):
@@ -81,7 +84,7 @@ class AccessUtilsTestCase(ModuleStoreTestCase):
     CREATE_USER = False
 
     def setUp(self):
-        super(AccessUtilsTestCase, self).setUp()
+        super().setUp()
 
         self.course = CourseFactory.create()
         self.course_id = self.course.id
@@ -105,26 +108,26 @@ class AccessUtilsTestCase(ModuleStoreTestCase):
 
     def test_get_role_ids(self):
         ret = utils.get_role_ids(self.course_id)
-        expected = {u'Moderator': [3], u'Community TA': [4, 5]}
-        self.assertEqual(ret, expected)
+        expected = {'Moderator': [3], 'Community TA': [4, 5]}
+        assert ret == expected
 
     def test_has_discussion_privileges(self):
-        self.assertFalse(utils.has_discussion_privileges(self.student1, self.course_id))
-        self.assertFalse(utils.has_discussion_privileges(self.student2, self.course_id))
-        self.assertFalse(utils.has_discussion_privileges(self.course_staff, self.course_id))
-        self.assertTrue(utils.has_discussion_privileges(self.moderator, self.course_id))
-        self.assertTrue(utils.has_discussion_privileges(self.community_ta1, self.course_id))
-        self.assertTrue(utils.has_discussion_privileges(self.community_ta2, self.course_id))
+        assert not utils.has_discussion_privileges(self.student1, self.course_id)
+        assert not utils.has_discussion_privileges(self.student2, self.course_id)
+        assert not utils.has_discussion_privileges(self.course_staff, self.course_id)
+        assert utils.has_discussion_privileges(self.moderator, self.course_id)
+        assert utils.has_discussion_privileges(self.community_ta1, self.course_id)
+        assert utils.has_discussion_privileges(self.community_ta2, self.course_id)
 
     def test_has_forum_access(self):
         ret = utils.has_forum_access('student', self.course_id, 'Student')
-        self.assertTrue(ret)
+        assert ret
 
         ret = utils.has_forum_access('not_a_student', self.course_id, 'Student')
-        self.assertFalse(ret)
+        assert not ret
 
         ret = utils.has_forum_access('student', self.course_id, 'NotARole')
-        self.assertFalse(ret)
+        assert not ret
 
 
 @ddt.ddt
@@ -134,7 +137,7 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
     comment client service integration
     """
     def setUp(self):
-        super(CoursewareContextTestCase, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create(org="TestX", number="101", display_name="Test Course")
         self.discussion1 = ItemFactory.create(
             parent_location=self.course.location,
@@ -158,7 +161,7 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
         orig = {"commentable_id": "non-inline"}
         modified = dict(orig)
         utils.add_courseware_context([modified], self.course, self.user)
-        self.assertEqual(modified, orig)
+        assert modified == orig
 
     def test_basic(self):
         threads = [
@@ -169,21 +172,9 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
 
         def assertThreadCorrect(thread, discussion, expected_title):  # pylint: disable=invalid-name
             """Asserts that the given thread has the expected set of properties"""
-            self.assertEqual(
-                set(thread.keys()),
-                set(["commentable_id", "courseware_url", "courseware_title"])
-            )
-            self.assertEqual(
-                thread.get("courseware_url"),
-                reverse(
-                    "jump_to",
-                    kwargs={
-                        "course_id": text_type(self.course.id),
-                        "location": text_type(discussion.location)
-                    }
-                )
-            )
-            self.assertEqual(thread.get("courseware_title"), expected_title)
+            assert set(thread.keys()) == {'commentable_id', 'courseware_url', 'courseware_title'}
+            assert thread.get('courseware_url') == reverse('jump_to', kwargs={'course_id': str(self.course.id), 'location': str(discussion.location)})
+            assert thread.get('courseware_title') == expected_title
 
         assertThreadCorrect(threads[0], self.discussion1, "Chapter / Discussion 1")
         assertThreadCorrect(threads[1], self.discussion2, "Subsection / Discussion 2")
@@ -202,7 +193,7 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
         )
         thread = {"commentable_id": discussion.discussion_id}
         utils.add_courseware_context([thread], self.course, self.user)
-        self.assertNotIn('/', thread.get("courseware_title"))
+        assert '/' not in thread.get('courseware_title')
 
     @ddt.data((ModuleStoreEnum.Type.mongo, 2), (ModuleStoreEnum.Type.split, 1))
     @ddt.unpack
@@ -216,10 +207,10 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
         test_discussion = self.store.create_child(self.user.id, course.location, 'discussion', 'test_discussion')
 
         # Assert that created discussion xblock is not an orphan.
-        self.assertNotIn(test_discussion.location, self.store.get_orphans(course.id))
+        assert test_discussion.location not in self.store.get_orphans(course.id)
 
         # Assert that there is only one discussion xblock in the course at the moment.
-        self.assertEqual(len(utils.get_accessible_discussion_xblocks(course, self.user)), 1)
+        assert len(get_accessible_discussion_xblocks(course, self.user)) == 1
 
         # The above call is request cached, so we need to clear it for this test.
         RequestCache.clear_all_namespaces()
@@ -228,9 +219,9 @@ class CoursewareContextTestCase(ModuleStoreTestCase):
         self.store.create_item(self.user.id, orphan.course_key, orphan.block_type, block_id=orphan.block_id)
 
         # Assert that the discussion xblock is an orphan.
-        self.assertIn(orphan, self.store.get_orphans(course.id))
+        assert orphan in self.store.get_orphans(course.id)
 
-        self.assertEqual(len(utils.get_accessible_discussion_xblocks(course, self.user)), expected_discussion_xblocks)
+        assert len(get_accessible_discussion_xblocks(course, self.user)) == expected_discussion_xblocks
 
 
 class CachedDiscussionIdMapTestCase(ModuleStoreTestCase):
@@ -240,7 +231,7 @@ class CachedDiscussionIdMapTestCase(ModuleStoreTestCase):
     ENABLED_SIGNALS = ['course_published']
 
     def setUp(self):
-        super(CachedDiscussionIdMapTestCase, self).setUp()
+        super().setUp()
 
         self.course = CourseFactory.create(org='TestX', number='101', display_name='Test Course')
         self.discussion = ItemFactory.create(
@@ -276,15 +267,15 @@ class CachedDiscussionIdMapTestCase(ModuleStoreTestCase):
 
     def test_cache_returns_correct_key(self):
         usage_key = utils.get_cached_discussion_key(self.course.id, 'test_discussion_id')
-        self.assertEqual(usage_key, self.discussion.location)
+        assert usage_key == self.discussion.location
 
     def test_cache_returns_none_if_id_is_not_present(self):
         usage_key = utils.get_cached_discussion_key(self.course.id, 'bogus_id')
-        self.assertIsNone(usage_key)
+        assert usage_key is None
 
     def test_cache_raises_exception_if_discussion_id_map_not_cached(self):
         DiscussionsIdMapping.objects.all().delete()
-        with self.assertRaises(utils.DiscussionIdMapIsNotCached):
+        with pytest.raises(utils.DiscussionIdMapIsNotCached):
             utils.get_cached_discussion_key(self.course.id, 'test_discussion_id')
 
     def test_cache_raises_exception_if_discussion_id_not_cached(self):
@@ -292,12 +283,12 @@ class CachedDiscussionIdMapTestCase(ModuleStoreTestCase):
         cache.mapping = None
         cache.save()
 
-        with self.assertRaises(utils.DiscussionIdMapIsNotCached):
+        with pytest.raises(utils.DiscussionIdMapIsNotCached):
             utils.get_cached_discussion_key(self.course.id, 'test_discussion_id')
 
     def test_xblock_does_not_have_required_keys(self):
-        self.assertTrue(utils.has_required_keys(self.discussion))
-        self.assertFalse(utils.has_required_keys(self.bad_discussion))
+        assert has_required_keys(self.discussion)
+        assert not has_required_keys(self.bad_discussion)
 
     def verify_discussion_metadata(self):
         """Retrieves the metadata for self.discussion and self.discussion2 and verifies that it is correct"""
@@ -308,10 +299,10 @@ class CachedDiscussionIdMapTestCase(ModuleStoreTestCase):
         )
         discussion1 = metadata[self.discussion.discussion_id]
         discussion2 = metadata[self.discussion2.discussion_id]
-        self.assertEqual(discussion1['location'], self.discussion.location)
-        self.assertEqual(discussion1['title'], 'Chapter / Discussion 1')
-        self.assertEqual(discussion2['location'], self.discussion2.location)
-        self.assertEqual(discussion2['title'], 'Chapter 2 / Discussion 2')
+        assert discussion1['location'] == self.discussion.location
+        assert discussion1['title'] == 'Chapter / Discussion 1'
+        assert discussion2['location'] == self.discussion2.location
+        assert discussion2['title'] == 'Chapter 2 / Discussion 2'
 
     def test_get_discussion_id_map_from_cache(self):
         self.verify_discussion_metadata()
@@ -322,37 +313,37 @@ class CachedDiscussionIdMapTestCase(ModuleStoreTestCase):
 
     def test_get_missing_discussion_id_map_from_cache(self):
         metadata = utils.get_cached_discussion_id_map(self.course, ['bogus_id'], self.user)
-        self.assertEqual(metadata, {})
+        assert metadata == {}
 
     def test_get_discussion_id_map_from_cache_without_access(self):
         user = UserFactory.create()
 
         metadata = utils.get_cached_discussion_id_map(self.course, ['private_discussion_id'], self.user)
-        self.assertEqual(metadata['private_discussion_id']['title'], 'Chapter 3 / Beta Testing')
+        assert metadata['private_discussion_id']['title'] == 'Chapter 3 / Beta Testing'
 
         metadata = utils.get_cached_discussion_id_map(self.course, ['private_discussion_id'], user)
-        self.assertEqual(metadata, {})
+        assert metadata == {}
 
     def test_get_bad_discussion_id(self):
         metadata = utils.get_cached_discussion_id_map(self.course, ['bad_discussion_id'], self.user)
-        self.assertEqual(metadata, {})
+        assert metadata == {}
 
     def test_discussion_id_accessible(self):
-        self.assertTrue(utils.discussion_category_id_access(self.course, self.user, 'test_discussion_id'))
+        assert utils.discussion_category_id_access(self.course, self.user, 'test_discussion_id')
 
     def test_bad_discussion_id_not_accessible(self):
-        self.assertFalse(utils.discussion_category_id_access(self.course, self.user, 'bad_discussion_id'))
+        assert not utils.discussion_category_id_access(self.course, self.user, 'bad_discussion_id')
 
     def test_missing_discussion_id_not_accessible(self):
-        self.assertFalse(utils.discussion_category_id_access(self.course, self.user, 'bogus_id'))
+        assert not utils.discussion_category_id_access(self.course, self.user, 'bogus_id')
 
     def test_discussion_id_not_accessible_without_access(self):
         user = UserFactory.create()
-        self.assertTrue(utils.discussion_category_id_access(self.course, self.user, 'private_discussion_id'))
-        self.assertFalse(utils.discussion_category_id_access(self.course, user, 'private_discussion_id'))
+        assert utils.discussion_category_id_access(self.course, self.user, 'private_discussion_id')
+        assert not utils.discussion_category_id_access(self.course, user, 'private_discussion_id')
 
 
-class CategoryMapTestMixin(object):
+class CategoryMapTestMixin:
     """
     Provides functionality for classes that test
     `get_discussion_category_map`.
@@ -364,7 +355,7 @@ class CategoryMapTestMixin(object):
         """
         actual = utils.get_discussion_category_map(self.course, requesting_user or self.user)
         actual['subcategories']['Week 1']['children'].sort()
-        self.assertEqual(actual, expected)
+        assert actual == expected
 
 
 class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
@@ -373,7 +364,7 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
     comment client service integration
     """
     def setUp(self):
-        super(CategoryMapTestCase, self).setUp()
+        super().setUp()
 
         self.course = CourseFactory.create(
             org="TestX", number="101", display_name="Test Course",
@@ -394,7 +385,7 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
         return ItemFactory.create(
             parent_location=self.course.location,
             category="discussion",
-            discussion_id="discussion{}".format(self.discussion_num),
+            discussion_id=f"discussion{self.discussion_num}",
             discussion_category=discussion_category,
             discussion_target=discussion_target,
             **kwargs
@@ -404,12 +395,7 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
         """
         Asserts the expected map with the map returned by get_discussion_category_map method.
         """
-        self.assertEqual(
-            utils.get_discussion_category_map(
-                self.course, self.instructor, divided_only_if_explicit, exclude_unstarted
-            ),
-            expected
-        )
+        assert utils.get_discussion_category_map(self.course, self.instructor, divided_only_if_explicit, exclude_unstarted) == expected
 
     def test_empty(self):
         self.assert_category_map_equals({"entries": {}, "subcategories": {}, "children": []})
@@ -677,29 +663,29 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
         category_map = utils.get_discussion_category_map(self.course, self.user)
 
         chapter1 = category_map["subcategories"]["Chapter 1"]
-        chapter1_discussions = set(["Discussion A", "Discussion B", "Discussion A (1)", "Discussion A (2)"])
-        chapter1_discussions_with_types = set([("Discussion A", TYPE_ENTRY), ("Discussion B", TYPE_ENTRY),
-                                               ("Discussion A (1)", TYPE_ENTRY), ("Discussion A (2)", TYPE_ENTRY)])
-        self.assertEqual(set(chapter1["children"]), chapter1_discussions_with_types)
-        self.assertEqual(set(chapter1["entries"].keys()), chapter1_discussions)
+        chapter1_discussions = {"Discussion A", "Discussion B", "Discussion A (1)", "Discussion A (2)"}
+        chapter1_discussions_with_types = {("Discussion A", TYPE_ENTRY), ("Discussion B", TYPE_ENTRY),
+                                           ("Discussion A (1)", TYPE_ENTRY), ("Discussion A (2)", TYPE_ENTRY)}
+        assert set(chapter1['children']) == chapter1_discussions_with_types
+        assert set(chapter1['entries'].keys()) == chapter1_discussions
 
         chapter2 = category_map["subcategories"]["Chapter 2"]
         subsection1 = chapter2["subcategories"]["Section 1"]["subcategories"]["Subsection 1"]
-        subsection1_discussions = set(["Discussion", "Discussion (1)"])
-        subsection1_discussions_with_types = set([("Discussion", TYPE_ENTRY), ("Discussion (1)", TYPE_ENTRY)])
-        self.assertEqual(set(subsection1["children"]), subsection1_discussions_with_types)
-        self.assertEqual(set(subsection1["entries"].keys()), subsection1_discussions)
+        subsection1_discussions = {"Discussion", "Discussion (1)"}
+        subsection1_discussions_with_types = {("Discussion", TYPE_ENTRY), ("Discussion (1)", TYPE_ENTRY)}
+        assert set(subsection1['children']) == subsection1_discussions_with_types
+        assert set(subsection1['entries'].keys()) == subsection1_discussions
 
     def test_start_date_filter(self):
         now = datetime.datetime.now()
         self.create_discussion("Chapter 1", "Discussion 1", start=now)
-        self.create_discussion("Chapter 1", u"Discussion 2 обсуждение", start=self.later)
+        self.create_discussion("Chapter 1", "Discussion 2 обсуждение", start=self.later)
         self.create_discussion("Chapter 2", "Discussion", start=now)
         self.create_discussion("Chapter 2 / Section 1 / Subsection 1", "Discussion", start=self.later)
         self.create_discussion("Chapter 2 / Section 1 / Subsection 2", "Discussion", start=self.later)
         self.create_discussion("Chapter 3 / Section 1", "Discussion", start=self.later)
 
-        self.assertFalse(self.course.self_paced)
+        assert not self.course.self_paced
         self.assert_category_map_equals(
             {
                 "entries": {},
@@ -742,7 +728,7 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
         self.create_discussion("Chapter 2 / Section 1 / Subsection 2", "Discussion", start=self.later)
         self.create_discussion("Chapter 3 / Section 1", "Discussion", start=self.later)
 
-        self.assertTrue(self.course.self_paced)
+        assert self.course.self_paced
         self.assert_category_map_equals(
             {
                 "entries": {},
@@ -951,10 +937,6 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
             }
         )
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 7),
-        reason="Python 3.7 sorted dict insertion is considered"
-    )
     def test_sort_intermediates(self):
         self.create_discussion("Chapter B", "Discussion 2")
         self.create_discussion("Chapter C", "Discussion")
@@ -1015,72 +997,8 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
             }
         )
 
-    @pytest.mark.skipif(
-        sys.version_info >= (3, 7),
-        reason="Python 3.7 sorted dict insertion is not considered"
-    )
-    def test_sort_intermediates(self):
-        self.create_discussion("Chapter B", "Discussion 2")
-        self.create_discussion("Chapter C", "Discussion")
-        self.create_discussion("Chapter A", "Discussion 1")
-        self.create_discussion("Chapter B", "Discussion 1")
-        self.create_discussion("Chapter A", "Discussion 2")
-
-        self.assert_category_map_equals(
-            {
-                "entries": {},
-                "subcategories": {
-                    "Chapter A": {
-                        "entries": {
-                            "Discussion 1": {
-                                "id": "discussion3",
-                                "sort_key": None,
-                                "is_divided": False,
-                            },
-                            "Discussion 2": {
-                                "id": "discussion5",
-                                "sort_key": None,
-                                "is_divided": False,
-                            }
-                        },
-                        "subcategories": {},
-                        "children": [("Discussion 1", TYPE_ENTRY), ("Discussion 2", TYPE_ENTRY)]
-                    },
-                    "Chapter B": {
-                        "entries": {
-                            "Discussion 1": {
-                                "id": "discussion4",
-                                "sort_key": None,
-                                "is_divided": False,
-                            },
-                            "Discussion 2": {
-                                "id": "discussion1",
-                                "sort_key": None,
-                                "is_divided": False,
-                            }
-                        },
-                        "subcategories": {},
-                        "children": [("Discussion 1", TYPE_ENTRY), ("Discussion 2", TYPE_ENTRY)]
-                    },
-                    "Chapter C": {
-                        "entries": {
-                            "Discussion": {
-                                "id": "discussion2",
-                                "sort_key": None,
-                                "is_divided": False,
-                            }
-                        },
-                        "subcategories": {},
-                        "children": [("Discussion", TYPE_ENTRY)]
-                    }
-                },
-                "children": [("Chapter A", TYPE_SUBCATEGORY), ("Chapter B", TYPE_SUBCATEGORY),
-                             ("Chapter C", TYPE_SUBCATEGORY)]
-            }
-        )
-
     def test_ids_empty(self):
-        self.assertEqual(utils.get_discussion_categories_ids(self.course, self.user), [])
+        assert get_discussion_categories_ids(self.course, self.user) == []
 
     def test_ids_configured_topics(self):
         self.course.discussion_topics = {
@@ -1088,11 +1006,7 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
             "Topic B": {"id": "Topic_B"},
             "Topic C": {"id": "Topic_C"}
         }
-        six.assertCountEqual(
-            self,
-            utils.get_discussion_categories_ids(self.course, self.user),
-            ["Topic_A", "Topic_B", "Topic_C"]
-        )
+        assert len(get_discussion_categories_ids(self.course, self.user)) == len(["Topic_A", "Topic_B", "Topic_C"])
 
     def test_ids_inline(self):
         self.create_discussion("Chapter 1", "Discussion 1")
@@ -1101,11 +1015,8 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
         self.create_discussion("Chapter 2 / Section 1 / Subsection 1", "Discussion")
         self.create_discussion("Chapter 2 / Section 1 / Subsection 2", "Discussion")
         self.create_discussion("Chapter 3 / Section 1", "Discussion")
-        six.assertCountEqual(
-            self,
-            utils.get_discussion_categories_ids(self.course, self.user),
-            ["discussion1", "discussion2", "discussion3", "discussion4", "discussion5", "discussion6"]
-        )
+        assert len(get_discussion_categories_ids(self.course, self.user)) == \
+               len(["discussion1", "discussion2", "discussion3", "discussion4", "discussion5", "discussion6"])
 
     def test_ids_mixed(self):
         self.course.discussion_topics = {
@@ -1116,11 +1027,8 @@ class CategoryMapTestCase(CategoryMapTestMixin, ModuleStoreTestCase):
         self.create_discussion("Chapter 1", "Discussion 1")
         self.create_discussion("Chapter 2", "Discussion")
         self.create_discussion("Chapter 2 / Section 1 / Subsection 1", "Discussion")
-        six.assertCountEqual(
-            self,
-            utils.get_discussion_categories_ids(self.course, self.user),
-            ["Topic_A", "Topic_B", "Topic_C", "discussion1", "discussion2", "discussion3"]
-        )
+        assert len(get_discussion_categories_ids(self.course, self.user)) == \
+               len(["Topic_A", "Topic_B", "Topic_C", "discussion1", "discussion2", "discussion3"])
 
 
 class ContentGroupCategoryMapTestCase(CategoryMapTestMixin, ContentGroupTestCase):
@@ -1290,14 +1198,15 @@ class JsonResponseTestCase(TestCase, UnicodeTestMixin):
     def _test_unicode_data(self, text):
         response = utils.JsonResponse(text)
         reparsed = json.loads(response.content.decode('utf-8'))
-        self.assertEqual(reparsed, text)
+        assert reparsed == text
 
 
+@ddt.ddt
 class DiscussionTabTestCase(ModuleStoreTestCase):
     """ Test visibility of the discussion tab. """
 
     def setUp(self):
-        super(DiscussionTabTestCase, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create()
         self.enrolled_user = UserFactory.create()
         self.staff_user = AdminFactory.create()
@@ -1312,18 +1221,32 @@ class DiscussionTabTestCase(ModuleStoreTestCase):
 
     def test_tab_access(self):
         with self.settings(FEATURES={'ENABLE_DISCUSSION_SERVICE': True}):
-            self.assertTrue(self.discussion_tab_present(self.staff_user))
-            self.assertTrue(self.discussion_tab_present(self.enrolled_user))
-            self.assertFalse(self.discussion_tab_present(self.unenrolled_user))
+            assert self.discussion_tab_present(self.staff_user)
+            assert self.discussion_tab_present(self.enrolled_user)
+            assert not self.discussion_tab_present(self.unenrolled_user)
 
-    @mock.patch('ccx.overrides.get_current_ccx')
+    @mock.patch('lms.djangoapps.ccx.overrides.get_current_ccx')
     def test_tab_settings(self, mock_get_ccx):
         mock_get_ccx.return_value = True
         with self.settings(FEATURES={'ENABLE_DISCUSSION_SERVICE': False}):
-            self.assertFalse(self.discussion_tab_present(self.enrolled_user))
+            assert not self.discussion_tab_present(self.enrolled_user)
 
         with self.settings(FEATURES={'CUSTOM_COURSES_EDX': True}):
-            self.assertFalse(self.discussion_tab_present(self.enrolled_user))
+            assert not self.discussion_tab_present(self.enrolled_user)
+
+    @override_settings(DISCUSSIONS_MICROFRONTEND_URL="http://test.url")
+    @ddt.data(
+        (True, 'http://test.url/{}/'),
+        (False, '/courses/{}/discussion/forum/'),
+    )
+    @ddt.unpack
+    def test_tab_with_mfe_flag(self, mfe_enabled, tab_link):
+        """
+        Tests that the correct link is used for the MFE tab
+        """
+        discussion_tab = CourseTabList.get_tab_by_type(self.course.tabs, 'discussion')
+        with override_waffle_flag(ENABLE_DISCUSSIONS_MFE, mfe_enabled):
+            assert discussion_tab.link_func(self.course, reverse) == tab_link.format(self.course.id)
 
 
 class IsCommentableDividedTestCase(ModuleStoreTestCase):
@@ -1337,40 +1260,31 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
         """
         Make sure that course is reloaded every time--clear out the modulestore.
         """
-        super(IsCommentableDividedTestCase, self).setUp()
+        super().setUp()
         self.toy_course_key = ToyCourseFactory.create().id
 
     def test_is_commentable_divided(self):
         course = modulestore().get_course(self.toy_course_key)
-        self.assertFalse(cohorts.is_course_cohorted(course.id))
+        assert not cohorts.is_course_cohorted(course.id)
 
         def to_id(name):
             """Helper for topic_name_to_id that uses course."""
             return topic_name_to_id(course, name)
 
         # no topics
-        self.assertFalse(
-            utils.is_commentable_divided(course.id, to_id("General")),
-            "Course doesn't even have a 'General' topic"
-        )
+        assert not utils.is_commentable_divided(course.id, to_id('General')), "Course doesn't even have a 'General' topic"
 
         # not cohorted
         config_course_cohorts(course, is_cohorted=False)
         config_course_discussions(course, discussion_topics=["General", "Feedback"])
-        self.assertFalse(
-            utils.is_commentable_divided(course.id, to_id("General")),
-            "Course isn't cohorted"
-        )
+        assert not utils.is_commentable_divided(course.id, to_id('General')), "Course isn't cohorted"
 
         # cohorted, but top level topics aren't
         config_course_cohorts(course, is_cohorted=True)
         config_course_discussions(course, discussion_topics=["General", "Feedback"])
 
-        self.assertTrue(cohorts.is_course_cohorted(course.id))
-        self.assertFalse(
-            utils.is_commentable_divided(course.id, to_id("General")),
-            "Course is cohorted, but 'General' isn't."
-        )
+        assert cohorts.is_course_cohorted(course.id)
+        assert not utils.is_commentable_divided(course.id, to_id('General')), "Course is cohorted, but 'General' isn't."
 
         # cohorted, including "Feedback" top-level topics aren't
         config_course_cohorts(
@@ -1379,19 +1293,13 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
         )
         config_course_discussions(course, discussion_topics=["General", "Feedback"], divided_discussions=["Feedback"])
 
-        self.assertTrue(cohorts.is_course_cohorted(course.id))
-        self.assertFalse(
-            utils.is_commentable_divided(course.id, to_id("General")),
-            "Course is cohorted, but 'General' isn't."
-        )
-        self.assertTrue(
-            utils.is_commentable_divided(course.id, to_id("Feedback")),
-            "Feedback was listed as cohorted.  Should be."
-        )
+        assert cohorts.is_course_cohorted(course.id)
+        assert not utils.is_commentable_divided(course.id, to_id('General')), "Course is cohorted, but 'General' isn't."
+        assert utils.is_commentable_divided(course.id, to_id('Feedback')), 'Feedback was listed as cohorted.  Should be.'
 
     def test_is_commentable_divided_inline_discussion(self):
         course = modulestore().get_course(self.toy_course_key)
-        self.assertFalse(cohorts.is_course_cohorted(course.id))
+        assert not cohorts.is_course_cohorted(course.id)
 
         def to_id(name):
             return topic_name_to_id(course, name)
@@ -1406,10 +1314,7 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
             divided_discussions=["Feedback", "random_inline"]
         )
 
-        self.assertFalse(
-            utils.is_commentable_divided(course.id, to_id("random")),
-            "By default, Non-top-level discussions are not cohorted in a cohorted courses."
-        )
+        assert not utils.is_commentable_divided(course.id, to_id('random')), 'By default, Non-top-level discussions are not cohorted in a cohorted courses.'
 
         # if always_divide_inline_discussions is set to False, non-top-level discussion are always
         # not divided unless they are explicitly set in divided_discussions
@@ -1424,23 +1329,13 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
             always_divide_inline_discussions=False
         )
 
-        self.assertFalse(
-            utils.is_commentable_divided(course.id, to_id("random")),
-            "Non-top-level discussion is not cohorted if always_divide_inline_discussions is False."
-        )
-        self.assertTrue(
-            utils.is_commentable_divided(course.id, to_id("random_inline")),
-            "If always_divide_inline_discussions set to False, Non-top-level discussion is "
-            "cohorted if explicitly set in cohorted_discussions."
-        )
-        self.assertTrue(
-            utils.is_commentable_divided(course.id, to_id("Feedback")),
-            "If always_divide_inline_discussions set to False, top-level discussion are not affected."
-        )
+        assert not utils.is_commentable_divided(course.id, to_id('random')), 'Non-top-level discussion is not cohorted if always_divide_inline_discussions is False.'
+        assert utils.is_commentable_divided(course.id, to_id('random_inline')), 'If always_divide_inline_discussions set to False, Non-top-level discussion is cohorted if explicitly set in cohorted_discussions.'
+        assert utils.is_commentable_divided(course.id, to_id('Feedback')), 'If always_divide_inline_discussions set to False, top-level discussion are not affected.'
 
     def test_is_commentable_divided_team(self):
         course = modulestore().get_course(self.toy_course_key)
-        self.assertFalse(cohorts.is_course_cohorted(course.id))
+        assert not cohorts.is_course_cohorted(course.id)
 
         config_course_cohorts(course, is_cohorted=True)
         config_course_discussions(course, always_divide_inline_discussions=True)
@@ -1449,8 +1344,8 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
 
         # Verify that team discussions are not cohorted, but other discussions are
         # if "always cohort inline discussions" is set to true.
-        self.assertFalse(utils.is_commentable_divided(course.id, team.discussion_topic_id))
-        self.assertTrue(utils.is_commentable_divided(course.id, "random"))
+        assert not utils.is_commentable_divided(course.id, team.discussion_topic_id)
+        assert utils.is_commentable_divided(course.id, 'random')
 
     def test_is_commentable_divided_cohorts(self):
         course = modulestore().get_course(self.toy_course_key)
@@ -1463,7 +1358,7 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
         )
 
         # Although Cohorts are enabled, discussion division is explicitly disabled.
-        self.assertFalse(utils.is_commentable_divided(course.id, "random"))
+        assert not utils.is_commentable_divided(course.id, 'random')
 
         # Now set the discussion division scheme.
         set_discussion_division_settings(
@@ -1473,7 +1368,7 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
             always_divide_inline_discussions=True,
             division_scheme=CourseDiscussionSettings.COHORT,
         )
-        self.assertTrue(utils.is_commentable_divided(course.id, "random"))
+        assert utils.is_commentable_divided(course.id, 'random')
 
     def test_is_commentable_divided_enrollment_track(self):
         course = modulestore().get_course(self.toy_course_key)
@@ -1486,19 +1381,19 @@ class IsCommentableDividedTestCase(ModuleStoreTestCase):
 
         # Although division scheme is set to ENROLLMENT_TRACK, divided returns
         # False because there is only a single enrollment mode.
-        self.assertFalse(utils.is_commentable_divided(course.id, "random"))
+        assert not utils.is_commentable_divided(course.id, 'random')
 
         # Now create 2 explicit course modes.
         CourseModeFactory.create(course_id=course.id, mode_slug=CourseMode.AUDIT)
         CourseModeFactory.create(course_id=course.id, mode_slug=CourseMode.VERIFIED)
-        self.assertTrue(utils.is_commentable_divided(course.id, "random"))
+        assert utils.is_commentable_divided(course.id, 'random')
 
 
 class GroupIdForUserTestCase(ModuleStoreTestCase):
     """ Test the get_group_id_for_user method. """
 
     def setUp(self):
-        super(GroupIdForUserTestCase, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create()
         CourseModeFactory.create(course_id=self.course.id, mode_slug=CourseMode.AUDIT)
         CourseModeFactory.create(course_id=self.course.id, mode_slug=CourseMode.VERIFIED)
@@ -1513,38 +1408,32 @@ class GroupIdForUserTestCase(ModuleStoreTestCase):
         )
 
     def test_discussion_division_disabled(self):
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertEqual(CourseDiscussionSettings.NONE, course_discussion_settings.division_scheme)
-        self.assertIsNone(utils.get_group_id_for_user(self.test_user, course_discussion_settings))
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert CourseDiscussionSettings.NONE == course_discussion_settings.division_scheme
+        assert utils.get_group_id_for_user(self.test_user, course_discussion_settings) is None
 
     def test_discussion_division_by_cohort(self):
         set_discussion_division_settings(
             self.course.id, enable_cohorts=True, division_scheme=CourseDiscussionSettings.COHORT
         )
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertEqual(CourseDiscussionSettings.COHORT, course_discussion_settings.division_scheme)
-        self.assertEqual(
-            self.test_cohort.id,
-            utils.get_group_id_for_user(self.test_user, course_discussion_settings)
-        )
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert CourseDiscussionSettings.COHORT == course_discussion_settings.division_scheme
+        assert self.test_cohort.id == utils.get_group_id_for_user(self.test_user, course_discussion_settings)
 
     def test_discussion_division_by_enrollment_track(self):
         set_discussion_division_settings(
             self.course.id, division_scheme=CourseDiscussionSettings.ENROLLMENT_TRACK
         )
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertEqual(CourseDiscussionSettings.ENROLLMENT_TRACK, course_discussion_settings.division_scheme)
-        self.assertEqual(
-            -2,  # Verified has group ID 2, and we negate that value to ensure unique IDs
-            utils.get_group_id_for_user(self.test_user, course_discussion_settings)
-        )
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert CourseDiscussionSettings.ENROLLMENT_TRACK == course_discussion_settings.division_scheme
+        assert (- 2) == utils.get_group_id_for_user(self.test_user, course_discussion_settings)
 
 
 class CourseDiscussionDivisionEnabledTestCase(ModuleStoreTestCase):
     """ Test the course_discussion_division_enabled and available_division_schemes methods. """
 
     def setUp(self):
-        super(CourseDiscussionDivisionEnabledTestCase, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create()
         CourseModeFactory.create(course_id=self.course.id, mode_slug=CourseMode.AUDIT)
         self.test_cohort = CohortFactory(
@@ -1554,43 +1443,43 @@ class CourseDiscussionDivisionEnabledTestCase(ModuleStoreTestCase):
         )
 
     def test_discussion_division_disabled(self):
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertFalse(utils.course_discussion_division_enabled(course_discussion_settings))
-        self.assertEqual([], utils.available_division_schemes(self.course.id))
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert not utils.course_discussion_division_enabled(course_discussion_settings)
+        assert [] == available_division_schemes(self.course.id)
 
     def test_discussion_division_by_cohort(self):
         set_discussion_division_settings(
             self.course.id, enable_cohorts=False, division_scheme=CourseDiscussionSettings.COHORT
         )
         # Because cohorts are disabled, discussion division is not enabled.
-        self.assertFalse(utils.course_discussion_division_enabled(get_course_discussion_settings(self.course.id)))
-        self.assertEqual([], utils.available_division_schemes(self.course.id))
+        assert not utils.course_discussion_division_enabled(CourseDiscussionSettings.get(self.course.id))
+        assert [] == available_division_schemes(self.course.id)
         # Now enable cohorts, which will cause discussions to be divided.
         set_discussion_division_settings(
             self.course.id, enable_cohorts=True, division_scheme=CourseDiscussionSettings.COHORT
         )
-        self.assertTrue(utils.course_discussion_division_enabled(get_course_discussion_settings(self.course.id)))
-        self.assertEqual([CourseDiscussionSettings.COHORT], utils.available_division_schemes(self.course.id))
+        assert utils.course_discussion_division_enabled(CourseDiscussionSettings.get(self.course.id))
+        assert [CourseDiscussionSettings.COHORT] == available_division_schemes(self.course.id)
 
     def test_discussion_division_by_enrollment_track(self):
         set_discussion_division_settings(
             self.course.id, division_scheme=CourseDiscussionSettings.ENROLLMENT_TRACK
         )
         # Only a single enrollment track exists, so discussion division is not enabled.
-        self.assertFalse(utils.course_discussion_division_enabled(get_course_discussion_settings(self.course.id)))
-        self.assertEqual([], utils.available_division_schemes(self.course.id))
+        assert not utils.course_discussion_division_enabled(CourseDiscussionSettings.get(self.course.id))
+        assert [] == available_division_schemes(self.course.id)
 
         # Now create a second CourseMode, which will cause discussions to be divided.
         CourseModeFactory.create(course_id=self.course.id, mode_slug=CourseMode.VERIFIED)
-        self.assertTrue(utils.course_discussion_division_enabled(get_course_discussion_settings(self.course.id)))
-        self.assertEqual([CourseDiscussionSettings.ENROLLMENT_TRACK], utils.available_division_schemes(self.course.id))
+        assert utils.course_discussion_division_enabled(CourseDiscussionSettings.get(self.course.id))
+        assert [CourseDiscussionSettings.ENROLLMENT_TRACK] == available_division_schemes(self.course.id)
 
 
 class GroupNameTestCase(ModuleStoreTestCase):
     """ Test the get_group_name and get_group_names_by_id methods. """
 
     def setUp(self):
-        super(GroupNameTestCase, self).setUp()
+        super().setUp()
         self.course = CourseFactory.create()
         CourseModeFactory.create(course_id=self.course.id, mode_slug=CourseMode.AUDIT)
         CourseModeFactory.create(course_id=self.course.id, mode_slug=CourseMode.VERIFIED)
@@ -1606,52 +1495,30 @@ class GroupNameTestCase(ModuleStoreTestCase):
         )
 
     def test_discussion_division_disabled(self):
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertEqual({}, utils.get_group_names_by_id(course_discussion_settings))
-        self.assertIsNone(utils.get_group_name(-1000, course_discussion_settings))
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert {} == get_group_names_by_id(course_discussion_settings)
+        assert utils.get_group_name((- 1000), course_discussion_settings) is None
 
     def test_discussion_division_by_cohort(self):
         set_discussion_division_settings(
             self.course.id, enable_cohorts=True, division_scheme=CourseDiscussionSettings.COHORT
         )
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertEqual(
-            {
-                self.test_cohort_1.id: self.test_cohort_1.name,
-                self.test_cohort_2.id: self.test_cohort_2.name
-            },
-            utils.get_group_names_by_id(course_discussion_settings)
-        )
-        self.assertEqual(
-            self.test_cohort_2.name,
-            utils.get_group_name(self.test_cohort_2.id, course_discussion_settings)
-        )
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert {self.test_cohort_1.id: self.test_cohort_1.name, self.test_cohort_2.id: self.test_cohort_2.name} == get_group_names_by_id(course_discussion_settings)
+        assert self.test_cohort_2.name == utils.get_group_name(self.test_cohort_2.id, course_discussion_settings)
         # Test also with a group_id that doesn't exist.
-        self.assertIsNone(
-            utils.get_group_name(-1000, course_discussion_settings)
-        )
+        assert utils.get_group_name((- 1000), course_discussion_settings) is None
 
     def test_discussion_division_by_enrollment_track(self):
         set_discussion_division_settings(
             self.course.id, division_scheme=CourseDiscussionSettings.ENROLLMENT_TRACK
         )
-        course_discussion_settings = get_course_discussion_settings(self.course.id)
-        self.assertEqual(
-            {
-                -1: "audit course",
-                -2: "verified course"
-            },
-            utils.get_group_names_by_id(course_discussion_settings)
-        )
+        course_discussion_settings = CourseDiscussionSettings.get(self.course.id)
+        assert {(- 1): 'audit course', (- 2): 'verified course'} == get_group_names_by_id(course_discussion_settings)
 
-        self.assertEqual(
-            "verified course",
-            utils.get_group_name(-2, course_discussion_settings)
-        )
+        assert 'verified course' == utils.get_group_name((- 2), course_discussion_settings)
         # Test also with a group_id that doesn't exist.
-        self.assertIsNone(
-            utils.get_group_name(-1000, course_discussion_settings)
-        )
+        assert utils.get_group_name((- 1000), course_discussion_settings) is None
 
 
 class PermissionsTestCase(ModuleStoreTestCase):
@@ -1669,24 +1536,10 @@ class PermissionsTestCase(ModuleStoreTestCase):
             'lms.djangoapps.discussion.django_comment_client.utils.check_permissions_by_view'
         ) as check_perm:
             check_perm.return_value = True
-            self.assertEqual(utils.get_ability(None, content, user), {
-                'editable': True,
-                'can_reply': True,
-                'can_delete': True,
-                'can_openclose': True,
-                'can_vote': False,
-                'can_report': False
-            })
+            assert utils.get_ability(None, content, user) == {'editable': True, 'can_reply': True, 'can_delete': True, 'can_openclose': True, 'can_vote': False, 'can_report': False}
 
             content['user_id'] = '2'
-            self.assertEqual(utils.get_ability(None, content, user), {
-                'editable': True,
-                'can_reply': True,
-                'can_delete': True,
-                'can_openclose': True,
-                'can_vote': True,
-                'can_report': True
-            })
+            assert utils.get_ability(None, content, user) == {'editable': True, 'can_reply': True, 'can_delete': True, 'can_openclose': True, 'can_vote': True, 'can_report': True}
 
     def test_get_ability_with_global_staff(self):
         """
@@ -1701,14 +1554,7 @@ class PermissionsTestCase(ModuleStoreTestCase):
             # check_permissions_by_view returns false because user is not enrolled in the course.
             check_perm.return_value = False
             global_staff = UserFactory(username='global_staff', email='global_staff@edx.org', is_staff=True)
-            self.assertEqual(utils.get_ability(None, content, global_staff), {
-                'editable': False,
-                'can_reply': False,
-                'can_delete': False,
-                'can_openclose': False,
-                'can_vote': False,
-                'can_report': True
-            })
+            assert utils.get_ability(None, content, global_staff) == {'editable': False, 'can_reply': False, 'can_delete': False, 'can_openclose': False, 'can_vote': False, 'can_report': True}
 
     def test_is_content_authored_by(self):
         content = {}
@@ -1717,23 +1563,23 @@ class PermissionsTestCase(ModuleStoreTestCase):
 
         # strict equality checking
         content['user_id'] = 1
-        self.assertTrue(utils.is_content_authored_by(content, user))
+        assert utils.is_content_authored_by(content, user)
 
         # cast from string to int
         content['user_id'] = '1'
-        self.assertTrue(utils.is_content_authored_by(content, user))
+        assert utils.is_content_authored_by(content, user)
 
         # strict equality checking, fails
         content['user_id'] = 2
-        self.assertFalse(utils.is_content_authored_by(content, user))
+        assert not utils.is_content_authored_by(content, user)
 
         # cast from string to int, fails
         content['user_id'] = 'string'
-        self.assertFalse(utils.is_content_authored_by(content, user))
+        assert not utils.is_content_authored_by(content, user)
 
         # content has no known author
         del content['user_id']
-        self.assertFalse(utils.is_content_authored_by(content, user))
+        assert not utils.is_content_authored_by(content, user)
 
 
 class GroupModeratorPermissionsTestCase(ModuleStoreTestCase):
@@ -1747,7 +1593,7 @@ class GroupModeratorPermissionsTestCase(ModuleStoreTestCase):
         return True if condition == 'is_open' or condition == 'is_team_member_if_applicable' else False
 
     def setUp(self):
-        super(GroupModeratorPermissionsTestCase, self).setUp()
+        super().setUp()
 
         # Create course, seed permissions roles, and create team
         self.course = CourseFactory.create()
@@ -1801,32 +1647,11 @@ class GroupModeratorPermissionsTestCase(ModuleStoreTestCase):
         Group moderator should not have moderator permissions if the discussions are not divided.
         """
         content = {'user_id': self.plain_user.id, 'type': 'thread', 'username': self.plain_user.username}
-        self.assertEqual(utils.get_ability(self.course.id, content, self.group_moderator), {
-            'editable': False,
-            'can_reply': True,
-            'can_delete': False,
-            'can_openclose': False,
-            'can_vote': True,
-            'can_report': True
-        })
+        assert utils.get_ability(self.course.id, content, self.group_moderator) == {'editable': False, 'can_reply': True, 'can_delete': False, 'can_openclose': False, 'can_vote': True, 'can_report': True}
         content = {'user_id': self.cohorted_user.id, 'type': 'thread'}
-        self.assertEqual(utils.get_ability(self.course.id, content, self.group_moderator), {
-            'editable': False,
-            'can_reply': True,
-            'can_delete': False,
-            'can_openclose': False,
-            'can_vote': True,
-            'can_report': True
-        })
+        assert utils.get_ability(self.course.id, content, self.group_moderator) == {'editable': False, 'can_reply': True, 'can_delete': False, 'can_openclose': False, 'can_vote': True, 'can_report': True}
         content = {'user_id': self.verified_user.id, 'type': 'thread'}
-        self.assertEqual(utils.get_ability(self.course.id, content, self.group_moderator), {
-            'editable': False,
-            'can_reply': True,
-            'can_delete': False,
-            'can_openclose': False,
-            'can_vote': True,
-            'can_report': True
-        })
+        assert utils.get_ability(self.course.id, content, self.group_moderator) == {'editable': False, 'can_reply': True, 'can_delete': False, 'can_openclose': False, 'can_vote': True, 'can_report': True}
 
     @mock.patch(
         'lms.djangoapps.discussion.django_comment_client.permissions._check_condition',
@@ -1839,14 +1664,7 @@ class GroupModeratorPermissionsTestCase(ModuleStoreTestCase):
         set_discussion_division_settings(self.course.id, enable_cohorts=True,
                                          division_scheme=CourseDiscussionSettings.COHORT)
         content = {'user_id': self.cohorted_user.id, 'type': 'thread', 'username': self.cohorted_user.username}
-        self.assertEqual(utils.get_ability(self.course.id, content, self.group_moderator), {
-            'editable': True,
-            'can_reply': True,
-            'can_delete': True,
-            'can_openclose': True,
-            'can_vote': True,
-            'can_report': True
-        })
+        assert utils.get_ability(self.course.id, content, self.group_moderator) == {'editable': True, 'can_reply': True, 'can_delete': True, 'can_openclose': True, 'can_vote': True, 'can_report': True}
 
     @mock.patch(
         'lms.djangoapps.discussion.django_comment_client.permissions._check_condition',
@@ -1859,14 +1677,7 @@ class GroupModeratorPermissionsTestCase(ModuleStoreTestCase):
         content = {'user_id': self.plain_user.id, 'type': 'thread', 'username': self.plain_user.username}
         set_discussion_division_settings(self.course.id, division_scheme=CourseDiscussionSettings.NONE)
 
-        self.assertEqual(utils.get_ability(self.course.id, content, self.group_moderator), {
-            'editable': False,
-            'can_reply': True,
-            'can_delete': False,
-            'can_openclose': False,
-            'can_vote': True,
-            'can_report': True
-        })
+        assert utils.get_ability(self.course.id, content, self.group_moderator) == {'editable': False, 'can_reply': True, 'can_delete': False, 'can_openclose': False, 'can_vote': True, 'can_report': True}
 
 
 class ClientConfigurationTestCase(TestCase):
@@ -1878,7 +1689,7 @@ class ClientConfigurationTestCase(TestCase):
         config.enabled = False
         config.save()
 
-        with self.assertRaises(CommentClientMaintenanceError):
+        with pytest.raises(CommentClientMaintenanceError):
             perform_request('GET', 'http://www.google.com')
 
     @patch('requests.request')
@@ -1895,7 +1706,7 @@ class ClientConfigurationTestCase(TestCase):
         mock_request.return_value = response
 
         result = perform_request('GET', 'http://www.google.com')
-        self.assertEqual(result, {})
+        assert result == {}
 
 
 def set_discussion_division_settings(
@@ -1907,12 +1718,12 @@ def set_discussion_division_settings(
     COHORT is the default division_scheme, as no other schemes were supported at
     the time that the unit tests were originally written.
     """
-    set_course_discussion_settings(
-        course_key=course_key,
-        divided_discussions=divided_discussions,
-        division_scheme=division_scheme,
-        always_divide_inline_discussions=always_divide_inline_discussions,
-    )
+    discussion_settings = CourseDiscussionSettings.get(course_key)
+    discussion_settings.update({
+        'divided_discussions': divided_discussions,
+        'division_scheme': division_scheme,
+        'always_divide_inline_discussions': always_divide_inline_discussions,
+    })
     set_course_cohorted(course_key, enable_cohorts)
 
 
@@ -1933,10 +1744,10 @@ class MiscUtilsTests(TestCase):
         thread_data = {'id': content_id, 'course_id': course_id, 'commentable_id': discussion_id, 'type': 'thread'}
         expected_url = reverse('single_thread', kwargs=url_kwargs)
 
-        self.assertEqual(utils.permalink(thread_data), expected_url)
+        assert utils.permalink(thread_data) == expected_url
 
         thread_data['course_id'] = CourseKey.from_string(course_id)
-        self.assertEqual(utils.permalink(thread_data), expected_url)
+        assert utils.permalink(thread_data) == expected_url
 
     @ddt.data(
         ('course-v1:edX+foo101+bar_t2', '99', '99'),
@@ -1955,7 +1766,41 @@ class MiscUtilsTests(TestCase):
         }
         expected_url = reverse('single_thread', kwargs=url_kwargs) + '#' + thread_data['id']
 
-        self.assertEqual(utils.permalink(thread_data), expected_url)
+        assert utils.permalink(thread_data) == expected_url
 
         thread_data['course_id'] = CourseKey.from_string(course_id)
-        self.assertEqual(utils.permalink(thread_data), expected_url)
+        assert utils.permalink(thread_data) == expected_url
+
+
+@ddt.ddt
+class SanitizeTests(unittest.TestCase):
+    """Pure functional tests around sanitizing Markdown"""
+
+    @ddt.data(
+        (None, None),
+        ("", ""),
+        (
+            "No substitutions, even if there's data: ",
+            "No substitutions, even if there's data: ",
+        ),
+        (
+            """
+            [Click here](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==) Some Text
+
+            [This link is fine](https://www.openedx.org)
+
+            More Text [Click here](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0P)
+            """,
+            """
+            [Click here]() Some Text
+
+            [This link is fine](https://www.openedx.org)
+
+            More Text [Click here]()
+            """,
+        ),
+    )
+    @ddt.unpack
+    def test_input_output(self, input_str, expected_output):
+        """Test a range of inputs for cleanup."""
+        assert utils.sanitize_body(input_str) == expected_output

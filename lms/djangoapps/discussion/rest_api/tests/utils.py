@@ -10,7 +10,6 @@ from contextlib import closing
 from datetime import datetime
 
 import httpretty
-import six
 from PIL import Image
 from pytz import UTC
 
@@ -68,7 +67,7 @@ def _get_comment_callback(comment_data, thread_id, parent_id):
     return callback
 
 
-class CommentsServiceMockMixin(object):
+class CommentsServiceMockMixin:
     """Mixin with utility methods for mocking the comments service"""
     def register_get_threads_response(self, threads, page, num_pages):
         """Register a mock response for GET on the CS thread list endpoint"""
@@ -83,6 +82,17 @@ class CommentsServiceMockMixin(object):
                 "num_pages": num_pages,
                 "thread_count": len(threads),
             }),
+            status=200
+        )
+
+    def register_get_course_commentable_counts_response(self, course_id, thread_counts):
+        """Register a mock response for GET on the CS thread list endpoint"""
+        assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
+
+        httpretty.register_uri(
+            httpretty.GET,
+            f"http://localhost:4567/api/v1/commentables/{course_id}/counts",
+            body=json.dumps(thread_counts),
             status=200
         )
 
@@ -128,7 +138,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.GET,
-            "http://localhost:4567/api/v1/threads/{id}".format(id=thread_id),
+            f"http://localhost:4567/api/v1/threads/{thread_id}",
             body="",
             status=status_code
         )
@@ -145,6 +155,22 @@ class CommentsServiceMockMixin(object):
             status=200
         )
 
+    def register_get_comments_response(self, comments, page, num_pages):
+        """Register a mock response for GET on the CS comments list endpoint"""
+        assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
+
+        httpretty.register_uri(
+            httpretty.GET,
+            "http://localhost:4567/api/v1/comments",
+            body=json.dumps({
+                "collection": comments,
+                "page": page,
+                "num_pages": num_pages,
+                "comment_count": len(comments),
+            }),
+            status=200
+        )
+
     def register_post_comment_response(self, comment_data, thread_id, parent_id=None):
         """
         Register a mock response for POST on the CS comments endpoint for the
@@ -152,9 +178,9 @@ class CommentsServiceMockMixin(object):
         specified.
         """
         if parent_id:
-            url = "http://localhost:4567/api/v1/comments/{}".format(parent_id)
+            url = f"http://localhost:4567/api/v1/comments/{parent_id}"
         else:
-            url = "http://localhost:4567/api/v1/threads/{}/comments".format(thread_id)
+            url = f"http://localhost:4567/api/v1/threads/{thread_id}/comments"
 
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
@@ -185,7 +211,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.GET,
-            "http://localhost:4567/api/v1/comments/{id}".format(id=comment_id),
+            f"http://localhost:4567/api/v1/comments/{comment_id}",
             body="",
             status=status_code
         )
@@ -208,7 +234,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.GET,
-            "http://localhost:4567/api/v1/users/{id}".format(id=user.id),
+            f"http://localhost:4567/api/v1/users/{user.id}",
             body=json.dumps({
                 "id": str(user.id),
                 "subscribed_thread_ids": subscribed_thread_ids or [],
@@ -222,7 +248,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.POST,
-            "http://localhost:4567/api/v1/users/{id}/retire".format(id=user.id),
+            f"http://localhost:4567/api/v1/users/{user.id}/retire",
             body=body,
             status=status
         )
@@ -231,7 +257,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.POST,
-            "http://localhost:4567/api/v1/users/{id}/replace_username".format(id=user.id),
+            f"http://localhost:4567/api/v1/users/{user.id}/replace_username",
             body=body,
             status=status
         )
@@ -241,7 +267,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.GET,
-            "http://localhost:4567/api/v1/users/{}/subscribed_threads".format(user.id),
+            f"http://localhost:4567/api/v1/users/{user.id}/subscribed_threads",
             body=json.dumps({
                 "collection": threads,
                 "page": page,
@@ -260,7 +286,7 @@ class CommentsServiceMockMixin(object):
         for method in [httpretty.POST, httpretty.DELETE]:
             httpretty.register_uri(
                 method,
-                "http://localhost:4567/api/v1/users/{id}/subscriptions".format(id=user.id),
+                f"http://localhost:4567/api/v1/users/{user.id}/subscriptions",
                 body=json.dumps({}),  # body is unused
                 status=200
             )
@@ -274,7 +300,7 @@ class CommentsServiceMockMixin(object):
         for method in [httpretty.PUT, httpretty.DELETE]:
             httpretty.register_uri(
                 method,
-                "http://localhost:4567/api/v1/threads/{}/votes".format(thread_id),
+                f"http://localhost:4567/api/v1/threads/{thread_id}/votes",
                 body=json.dumps({}),  # body is unused
                 status=200
             )
@@ -288,7 +314,7 @@ class CommentsServiceMockMixin(object):
         for method in [httpretty.PUT, httpretty.DELETE]:
             httpretty.register_uri(
                 method,
-                "http://localhost:4567/api/v1/comments/{}/votes".format(comment_id),
+                f"http://localhost:4567/api/v1/comments/{comment_id}/votes",
                 body=json.dumps({}),  # body is unused
                 status=200
             )
@@ -315,7 +341,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.POST,
-            "http://localhost:4567/api/v1/users/{id}/read".format(id=user.id),
+            f"http://localhost:4567/api/v1/users/{user.id}/read",
             params={'source_type': content_type, 'source_id': content_id},
             body=json.dumps({}),  # body is unused
             status=200
@@ -336,7 +362,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.DELETE,
-            "http://localhost:4567/api/v1/threads/{id}".format(id=thread_id),
+            f"http://localhost:4567/api/v1/threads/{thread_id}",
             body=json.dumps({}),  # body is unused
             status=200
         )
@@ -348,7 +374,7 @@ class CommentsServiceMockMixin(object):
         assert httpretty.is_enabled(), 'httpretty must be enabled to mock calls.'
         httpretty.register_uri(
             httpretty.DELETE,
-            "http://localhost:4567/api/v1/comments/{id}".format(id=comment_id),
+            f"http://localhost:4567/api/v1/comments/{comment_id}",
             body=json.dumps({}),  # body is unused
             status=200
         )
@@ -359,7 +385,7 @@ class CommentsServiceMockMixin(object):
         """
         actual_params = dict(httpretty_request.querystring)
         actual_params.pop("request_id")  # request_id is random
-        self.assertEqual(actual_params, expected_params)
+        assert actual_params == expected_params
 
     def assert_last_query_params(self, expected_params):
         """
@@ -382,23 +408,31 @@ class CommentsServiceMockMixin(object):
         Returns expected thread data in API response
         """
         response_data = {
+            "anonymous": False,
+            "anonymous_to_peers": False,
             "author": self.user.username,
             "author_label": None,
             "created_at": "1970-01-01T00:00:00Z",
             "updated_at": "1970-01-01T00:00:00Z",
             "raw_body": "Test body",
             "rendered_body": "<p>Test body</p>",
+            "preview_body": "Test body",
             "abuse_flagged": False,
+            "abuse_flagged_count": None,
             "voted": False,
             "vote_count": 0,
-            "editable_fields": ["abuse_flagged", "following", "raw_body", "read", "title", "topic_id", "type", "voted"],
-            "course_id": six.text_type(self.course.id),
+            "editable_fields": [
+                "abuse_flagged", "anonymous", "following", "raw_body", "read",
+                "title", "topic_id", "type", "voted"
+            ],
+            "course_id": str(self.course.id),
             "topic_id": "test_topic",
             "group_id": None,
             "group_name": None,
             "title": "Test Title",
             "pinned": False,
             "closed": False,
+            "can_delete": True,
             "following": False,
             "comment_count": 1,
             "unread_comment_count": 0,
@@ -439,6 +473,7 @@ def make_minimal_cs_thread(overrides=None):
         "pinned": False,
         "closed": False,
         "abuse_flaggers": [],
+        "abuse_flagged_count": None,
         "votes": {"up_count": 0},
         "comments_count": 0,
         "unread_comments_count": 0,
@@ -494,7 +529,7 @@ def make_paginated_api_response(results=None, count=0, num_pages=0, next_link=No
     }
 
 
-class ProfileImageTestMixin(object):
+class ProfileImageTestMixin:
     """
     Mixin with utility methods for user profile image
     """
@@ -519,12 +554,12 @@ class ProfileImageTestMixin(object):
         """
         for size, name in get_profile_image_names(user.username).items():
             if exist:
-                self.assertTrue(storage.exists(name))
+                assert storage.exists(name)
                 with closing(Image.open(storage.path(name))) as img:
-                    self.assertEqual(img.size, (size, size))
-                    self.assertEqual(img.format, 'JPEG')
+                    assert img.size == (size, size)
+                    assert img.format == 'JPEG'
             else:
-                self.assertFalse(storage.exists(name))
+                assert not storage.exists(name)
 
     def get_expected_user_profile(self, username):
         """

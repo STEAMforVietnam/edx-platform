@@ -1,15 +1,13 @@
 """Tests of openedx.features.discounts.views"""
-# -*- coding: utf-8 -*-
 
 
 import jwt
-import six
 from django.test.client import Client
 from django.urls import reverse
 
-from student.tests.factories import TEST_PASSWORD, UserFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from common.djangoapps.student.tests.factories import TEST_PASSWORD, UserFactory
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class TestCourseUserDiscount(ModuleStoreTestCase):
@@ -19,20 +17,20 @@ class TestCourseUserDiscount(ModuleStoreTestCase):
     """
 
     def setUp(self):
-        super(TestCourseUserDiscount, self).setUp()
+        super().setUp()
         self.user = UserFactory.create()
         self.course = CourseFactory.create(run='test', display_name='test')
         self.client = Client()
         self.url = reverse(
             'api_discounts:course_user_discount',
-            kwargs={'course_key_string': six.text_type(self.course.id)}
+            kwargs={'course_key_string': str(self.course.id)}
         )
 
     def test_url(self):
         """
         Test that the url hasn't changed
         """
-        assert self.url == ('/api/discounts/course/' + six.text_type(self.course.id))
+        assert self.url == ('/api/discounts/course/' + str(self.course.id))
 
     def test_course_user_discount(self):
         """
@@ -48,7 +46,7 @@ class TestCourseUserDiscount(ModuleStoreTestCase):
         assert expected_payload['discount_applicable'] == response.data['discount_applicable']
 
         # make sure that the response matches the expected response
-        response_payload = jwt.decode(response.data['jwt'], verify=False)
+        response_payload = jwt.decode(response.data['jwt'], options={"verify_signature": False})
         assert all(item in list(response_payload.items()) for item in expected_payload.items())
 
     def test_course_user_discount_no_user(self):

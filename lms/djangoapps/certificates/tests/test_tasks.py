@@ -1,76 +1,101 @@
 """
-Test module for user certificate generation.
+Tests for course certificate tasks.
 """
 
 
+from unittest import mock
+from unittest.mock import patch
+
 import ddt
 from django.test import TestCase
-from mock import call, patch
 from opaque_keys.edx.keys import CourseKey
 
+from common.djangoapps.course_modes.models import CourseMode
+from common.djangoapps.student.tests.factories import UserFactory
+from lms.djangoapps.certificates.data import CertificateStatuses
 from lms.djangoapps.certificates.tasks import generate_certificate
-from lms.djangoapps.verify_student.models import IDVerificationAttempt
-from student.tests.factories import UserFactory
 
 
 @ddt.ddt
 class GenerateUserCertificateTest(TestCase):
+    """
+    Tests for course certificate tasks
+    """
+    def setUp(self):
+        super().setUp()
 
-    @patch('lms.djangoapps.certificates.tasks.generate_user_certificates')
-    @patch('lms.djangoapps.certificates.tasks.User.objects.get')
-    def test_generate_user_certs(self, user_get_mock, generate_user_certs_mock):
-        course_key = 'course-v1:edX+CS101+2017_T2'
-        kwargs = {
-            'student': 'student-id',
-            'course_key': course_key,
-            'otherarg': 'c',
-            'otherotherarg': 'd'
-        }
-        generate_certificate.apply_async(kwargs=kwargs).get()
+        self.user = UserFactory()
+        self.course_key = 'course-v1:edX+DemoX+Demo_Course'
 
-        expected_student = user_get_mock.return_value
-        generate_user_certs_mock.assert_called_with(
-            student=expected_student,
-            course_key=CourseKey.from_string(course_key),
-            otherarg='c',
-            otherotherarg='d'
-        )
-        user_get_mock.assert_called_once_with(id='student-id')
-
-    @ddt.data('student', 'course_key')
+    @ddt.data('student', 'course_key', 'enrollment_mode')
     def test_missing_args(self, missing_arg):
-        kwargs = {'student': 'a', 'course_key': 'b', 'otherarg': 'c'}
+        kwargs = {
+            'student': self.user.id,
+            'course_key': self.course_key,
+            'other_arg': 'shiny',
+            'enrollment_mode': CourseMode.MASTERS
+        }
         del kwargs[missing_arg]
 
         with patch('lms.djangoapps.certificates.tasks.User.objects.get'):
             with self.assertRaisesRegex(KeyError, missing_arg):
                 generate_certificate.apply_async(kwargs=kwargs).get()
 
-    @patch('lms.djangoapps.certificates.tasks.generate_user_certificates')
-    @patch('lms.djangoapps.verify_student.services.IDVerificationService.user_status')
-    def test_retry_until_verification_status_updates(self, user_status_mock, generate_user_certs_mock):
-        course_key = 'course-v1:edX+CS101+2017_T2'
-        student = UserFactory()
+    def test_generation(self):
+        """
+        Verify the task handles certificate generation
+        """
+        enrollment_mode = CourseMode.VERIFIED
 
-        kwargs = {
-            'student': student.id,
-            'course_key': course_key,
-            'expected_verification_status': IDVerificationAttempt.STATUS.approved
-        }
+        with mock.patch(
+            'lms.djangoapps.certificates.tasks.generate_course_certificate',
+            return_value=None
+        ) as mock_generate_cert:
+            kwargs = {
+                'student': self.user.id,
+                'course_key': self.course_key,
+                'enrollment_mode': enrollment_mode
+            }
 
-        user_status_mock.side_effect = [
-            {'status': 'pending', 'error': '', 'should_display': True},
-            {'status': 'approved', 'error': '', 'should_display': True}
-        ]
+            generate_certificate.apply_async(kwargs=kwargs)
+            mock_generate_cert.assert_called_with(
+                user=self.user,
+                course_key=CourseKey.from_string(self.course_key),
+                status=CertificateStatuses.downloadable,
+                enrollment_mode=enrollment_mode,
+                course_grade='',
+                generation_mode='batch'
+            )
 
-        generate_certificate.apply_async(kwargs=kwargs).get()
+    def test_generation_custom(self):
+        """
+        Verify the task handles certificate generation custom params
+        """
+        gen_mode = 'self'
+        status = CertificateStatuses.notpassing
+        enrollment_mode = CourseMode.AUDIT
+        course_grade = '0.89'
 
-        user_status_mock.assert_has_calls([
-            call(student),
-            call(student)
-        ])
+        with mock.patch(
+            'lms.djangoapps.certificates.tasks.generate_course_certificate',
+            return_value=None
+        ) as mock_generate_cert:
+            kwargs = {
+                'status': status,
+                'student': self.user.id,
+                'course_key': self.course_key,
+                'course_grade': course_grade,
+                'enrollment_mode': enrollment_mode,
+                'generation_mode': gen_mode,
+                'what_about': 'dinosaurs'
+            }
 
-        generate_user_certs_mock.assert_called_once_with(
-            student=student,
-            course_key=CourseKey.from_string(course_key)
-        )
+            generate_certificate.apply_async(kwargs=kwargs)
+            mock_generate_cert.assert_called_with(
+                user=self.user,
+                course_key=CourseKey.from_string(self.course_key),
+                status=status,
+                enrollment_mode=enrollment_mode,
+                course_grade=course_grade,
+                generation_mode=gen_mode
+            )

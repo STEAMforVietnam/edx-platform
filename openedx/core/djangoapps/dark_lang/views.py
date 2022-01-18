@@ -9,7 +9,7 @@ from django.shortcuts import redirect
 from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
 from django.utils.translation import LANGUAGE_SESSION_KEY
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from web_fragments.fragment import Fragment
 
 from openedx.core.djangoapps.dark_lang import DARK_LANGUAGE_KEY
@@ -30,7 +30,7 @@ class PreviewLanguageFragmentView(EdxFragmentView):
     POST - updates or clears the setting to the given dark language
     """
 
-    def render_to_fragment(self, request, course_id=None, **kwargs):
+    def render_to_fragment(self, request, course_id=None, **kwargs):  # lint-amnesty, pylint: disable=arguments-differ, unused-argument
         """
         Renders the language preview view as a fragment.
         """
@@ -58,10 +58,10 @@ class PreviewLanguageFragmentView(EdxFragmentView):
         """
         if not self._user_can_preview_languages(request.user):
             raise Http404
-        return super(PreviewLanguageFragmentView, self).get(request, *args, **kwargs)
+        return super().get(request, *args, **kwargs)
 
     @method_decorator(login_required)
-    def post(self, request, **kwargs):
+    def post(self, request, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
         """
         Accept requests to update the preview language.
         """
@@ -94,7 +94,7 @@ class PreviewLanguageFragmentView(EdxFragmentView):
         set_user_preference(request.user, DARK_LANGUAGE_KEY, preview_language)
         PageLevelMessages.register_success_message(
             request,
-            _(u'Language set to {preview_language}').format(
+            _('Language set to {preview_language}').format(
                 preview_language=preview_language
             )
         )

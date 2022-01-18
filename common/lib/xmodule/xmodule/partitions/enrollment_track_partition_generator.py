@@ -4,9 +4,8 @@ openedx.dynamic_partition plugin.
 """
 import logging
 
-import six
 from django.conf import settings
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from xmodule.partitions.partitions import (
     get_partition_from_id,
@@ -20,9 +19,9 @@ log = logging.getLogger(__name__)
 FEATURES = getattr(settings, 'FEATURES', {})
 
 
-def create_enrollment_track_partition(course):
+def create_enrollment_track_partition_with_course_id(course_id):
     """
-    Create and return the dynamic enrollment track user partition.
+    Create and return the dynamic enrollment track user partition based only on course_id.
     If it cannot be created, None is returned.
     """
     if not FEATURES.get('ENABLE_ENROLLMENT_TRACK_USER_PARTITION'):
@@ -34,21 +33,30 @@ def create_enrollment_track_partition(course):
         log.warning("No 'enrollment_track' scheme registered, EnrollmentTrackUserPartition will not be created.")
         return None
 
-    used_ids = set(p.id for p in course.user_partitions)
+    partition = enrollment_track_scheme.create_user_partition(
+        id=ENROLLMENT_TRACK_PARTITION_ID,
+        name=_("Enrollment Track Groups"),
+        description=_("Partition for segmenting users by enrollment track"),
+        parameters={"course_id": str(course_id)}
+    )
+    return partition
+
+
+def create_enrollment_track_partition(course):
+    """
+    Create and return the dynamic enrollment track user partition.
+    If it cannot be created, None is returned.
+    """
+
+    used_ids = {p.id for p in course.user_partitions}
     if ENROLLMENT_TRACK_PARTITION_ID in used_ids:
         log.warning(
             "Can't add 'enrollment_track' partition, as ID {id} is assigned to {partition} in course {course}.".format(
                 id=ENROLLMENT_TRACK_PARTITION_ID,
                 partition=get_partition_from_id(course.user_partitions, ENROLLMENT_TRACK_PARTITION_ID).name,
-                course=six.text_type(course.id)
+                course=str(course.id)
             )
         )
         return None
 
-    partition = enrollment_track_scheme.create_user_partition(
-        id=ENROLLMENT_TRACK_PARTITION_ID,
-        name=_(u"Enrollment Track Groups"),
-        description=_(u"Partition for segmenting users by enrollment track"),
-        parameters={"course_id": six.text_type(course.id)}
-    )
-    return partition
+    return create_enrollment_track_partition_with_course_id(course.id)

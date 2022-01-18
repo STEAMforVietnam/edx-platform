@@ -4,17 +4,19 @@ Tests of DarkLangMiddleware
 
 
 import unittest
+from unittest.mock import Mock
 
 import ddt
+from django.conf import settings
 from django.http import HttpRequest
 from django.test.client import Client
 from django.utils.translation import LANGUAGE_SESSION_KEY
-from mock import Mock
 
 from openedx.core.djangoapps.dark_lang.middleware import DarkLangMiddleware
 from openedx.core.djangoapps.dark_lang.models import DarkLangConfig
+from openedx.core.djangoapps.site_configuration.tests.test_util import with_site_configuration
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
-from student.tests.factories import UserFactory
+from common.djangoapps.student.tests.factories import UserFactory
 
 UNSET = object()
 
@@ -34,7 +36,7 @@ class DarkLangMiddlewareTests(CacheIsolationTestCase):
     Tests of DarkLangMiddleware
     """
     def setUp(self):
-        super(DarkLangMiddlewareTests, self).setUp()
+        super().setUp()
         self.user = UserFactory.build(username='test', email='test@edx.org', password='test_password')
         self.user.save()
         self.client = Client()
@@ -69,7 +71,7 @@ class DarkLangMiddlewareTests(CacheIsolationTestCase):
         )
 
         # Process it through the Middleware to ensure the language is available as expected.
-        self.assertIsNone(DarkLangMiddleware().process_request(request))
+        assert DarkLangMiddleware().process_request(request) is None
         return request
 
     def assertAcceptEquals(self, value, request):
@@ -77,10 +79,7 @@ class DarkLangMiddlewareTests(CacheIsolationTestCase):
         Assert that the HTML_ACCEPT_LANGUAGE header in request
         is equal to value
         """
-        self.assertEqual(
-            value,
-            request.META.get('HTTP_ACCEPT_LANGUAGE', UNSET)
-        )
+        assert value == request.META.get('HTTP_ACCEPT_LANGUAGE', UNSET)
 
     def test_empty_accept(self):
         self.assertAcceptEquals(UNSET, self.process_middleware_request())
@@ -230,23 +229,20 @@ class DarkLangMiddlewareTests(CacheIsolationTestCase):
 
         self.assertAcceptEquals(
             'es-419;q=1.0',
-            self.process_middleware_request(accept=b'{};q=1.0, pt;q=0.5'.format(latin_america_code))
+            self.process_middleware_request(accept=b'{};q=1.0, pt;q=0.5'.format(latin_america_code))  # pylint:disable=no-member
         )
 
     def assert_session_lang_equals(self, value, session):
         """
         Assert that the LANGUAGE_SESSION_KEY set in session is equal to value
         """
-        self.assertEqual(
-            value,
-            session.get(LANGUAGE_SESSION_KEY, UNSET)
-        )
+        assert value == session.get(LANGUAGE_SESSION_KEY, UNSET)
 
     def _post_set_preview_lang(self, preview_language):
         """
         Sends a post request to set the preview language
         """
-        return self.client.post('/update_lang/', {'preview_language': preview_language, 'action': 'set_preview_language'})
+        return self.client.post('/update_lang/', {'preview_language': preview_language, 'action': 'set_preview_language'})  # lint-amnesty, pylint: disable=line-too-long
 
     def _post_clear_preview_lang(self):
         """
@@ -261,6 +257,16 @@ class DarkLangMiddlewareTests(CacheIsolationTestCase):
         session = self.client.session
         session[LANGUAGE_SESSION_KEY] = session_language
         session.save()
+
+    @with_site_configuration(configuration={'LANGUAGE_CODE': 'rel'})
+    def test_site_configuration_language(self):
+        # `LANGUAGE_CODE` in site configuration should override session lang
+        self._set_client_session_language('notrel')
+        self.client.get('/home')
+        self.assert_session_lang_equals(
+            'rel',
+            self.client.session
+        )
 
     def test_preview_lang_with_released_language(self):
         # Preview lang should always override selection
@@ -363,3 +369,38 @@ class DarkLangMiddlewareTests(CacheIsolationTestCase):
             'zh-cn;q=1.0, zh-tw;q=0.5, zh-hk;q=0.3',
             self.process_middleware_request(accept='zh-Hans;q=1.0, zh-Hant-TW;q=0.5, zh-HK;q=0.3')
         )
+
+    def test_language_cookie_is_set(self):
+        site_lang = settings.LANGUAGE_CODE
+        url = '/dashboard'
+
+        response = self.client.get(url)
+        assert response.cookies.get(settings.LANGUAGE_COOKIE_NAME).value == ''
+        assert response['Content-Language'] == site_lang
+
+        # Set preview language
+        self._post_set_preview_lang("es-419")
+
+        # Check if view has cookies and language set to desired preview language
+        response = self.client.get(url)
+        assert settings.LANGUAGE_COOKIE_NAME in response.cookies
+        assert response.cookies.get(settings.LANGUAGE_COOKIE_NAME).value == 'es-419'
+        assert response['Content-Language'] == 'es-419'
+
+        # Change preview language
+        self._post_set_preview_lang("eo")
+
+        # Check if view has cookies and language set to desired preview language
+        response = self.client.get(url)
+        assert settings.LANGUAGE_COOKIE_NAME in response.cookies
+        assert response.cookies.get(settings.LANGUAGE_COOKIE_NAME).value == 'eo'
+        assert response['Content-Language'] == 'eo'
+
+        # Reset preview language
+        self._post_clear_preview_lang()
+
+        # Check if view has cookies and language set to default language
+        response = self.client.get(url)
+        assert settings.LANGUAGE_COOKIE_NAME in response.cookies
+        assert response.cookies.get(settings.LANGUAGE_COOKIE_NAME).value == ''
+        assert response['Content-Language'] == site_lang

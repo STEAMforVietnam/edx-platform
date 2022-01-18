@@ -6,7 +6,7 @@ Support for using the CodeMirror code editor as a wiki content editor.
 from django import forms
 from django.forms.utils import flatatt
 from django.template.loader import render_to_string
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 from wiki.editors.base import BaseEditor
@@ -27,7 +27,7 @@ class CodeMirrorWidget(forms.Widget):
         }
         if attrs:
             default_attrs.update(attrs)
-        super(CodeMirrorWidget, self).__init__(default_attrs)
+        super().__init__(default_attrs)
 
     def render(self, name, value, attrs=None, renderer=None):
         if value is None:
@@ -41,7 +41,7 @@ class CodeMirrorWidget(forms.Widget):
 
         return render_to_string('wiki/includes/editor_widget.html',
                                 {'attrs': mark_safe(flatatt(final_attrs)),
-                                 'content': conditional_escape(force_text(value)),
+                                 'content': conditional_escape(force_str(value)),
                                  })
 
 
@@ -51,13 +51,13 @@ class CodeMirror(BaseEditor):
     """
     editor_id = 'codemirror'
 
-    def get_admin_widget(self, instance=None):
+    def get_admin_widget(self, instance=None):  # lint-amnesty, pylint: disable=arguments-differ, unused-argument
         return MarkItUpAdminWidget()
 
-    def get_widget(self, instance=None):
+    def get_widget(self, instance=None):  # lint-amnesty, pylint: disable=unused-argument
         return CodeMirrorWidget()
 
-    class AdminMedia(object):  # pylint: disable=missing-class-docstring
+    class AdminMedia:  # pylint: disable=missing-class-docstring
         css = {
             'all': ("wiki/markitup/skins/simple/style.css",
                     "wiki/markitup/sets/admin/style.css",)
@@ -67,7 +67,7 @@ class CodeMirror(BaseEditor):
               "wiki/markitup/sets/admin/set.js",
               )
 
-    class Media(object):
+    class Media:
         css = {
             'all': ("js/vendor/CodeMirror/codemirror.css",)
         }

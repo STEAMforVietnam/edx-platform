@@ -2,7 +2,7 @@
 <%page expression_filter="h"/>
 <%inherit file="../main.html"/>
 <%!
-  from django.utils.translation import ugettext as _
+  from django.utils.translation import gettext as _
 %>
 
 <%block name="pagetitle">${_("API Access Request")}</%block>
@@ -16,7 +16,7 @@
     <div class="api-form-container">
       <form action="" method="post" class="api-form">
         <input type="hidden" id="csrf_token" name="csrfmiddlewaretoken" value="${csrf_token}">
-        ${form.as_p() | n}
+        ${form.as_p() | n, decode.utf8}
         <input id="api-access-submit" type="submit" value="${_('Request API Access')}"/>
       </form>
     </div>

@@ -12,12 +12,15 @@ TO DO sync instructor and staff flags
 
 import logging
 
+from common.djangoapps.student.roles import (
+    CourseBetaTesterRole,
+    CourseCcxCoachRole,
+    CourseDataResearcherRole,
+    CourseInstructorRole,
+    CourseStaffRole
+)
 from lms.djangoapps.instructor.enrollment import enroll_email, get_email_params
 from openedx.core.djangoapps.django_comment_common.models import Role
-from student.roles import (
-    CourseBetaTesterRole, CourseCcxCoachRole, CourseDataResearcherRole,
-    CourseInstructorRole, CourseStaffRole
-)
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ ROLES = {
 }
 
 
-def list_with_level(course, level):
+def list_with_level(course_id, level):
     """
     List users who have 'level' access.
 
@@ -38,7 +41,7 @@ def list_with_level(course, level):
     There could be other levels specific to the course.
     If there is no Group for that course-level, returns an empty list
     """
-    return ROLES[level](course.id).users_with_role()
+    return ROLES[level](course_id).users_with_role()
 
 
 def allow_access(course, user, level, send_email=True):
@@ -72,7 +75,7 @@ def _change_access(course, user, level, action, send_email=True):
     try:
         role = ROLES[level](course.id)
     except KeyError:
-        raise ValueError(u"unrecognized level '{}'".format(level))
+        raise ValueError(f"unrecognized level '{level}'")  # lint-amnesty, pylint: disable=raise-missing-from
 
     if action == 'allow':
         if level == 'ccx_coach':
@@ -88,7 +91,7 @@ def _change_access(course, user, level, action, send_email=True):
     elif action == 'revoke':
         role.remove_users(user)
     else:
-        raise ValueError(u"unrecognized action '{}'".format(action))
+        raise ValueError(f"unrecognized action '{action}'")
 
 
 def update_forum_role(course_id, user, rolename, action):
@@ -108,4 +111,12 @@ def update_forum_role(course_id, user, rolename, action):
     elif action == 'revoke':
         role.users.remove(user)
     else:
-        raise ValueError(u"unrecognized action '{}'".format(action))
+        raise ValueError(f"unrecognized action '{action}'")
+
+
+def is_beta_tester(user, course_id):
+    """
+    Returns True if the user is a beta tester in this course, and False if not
+    """
+    beta_testers_queryset = list_with_level(course_id, 'beta')
+    return beta_testers_queryset.filter(username=user.username).exists()

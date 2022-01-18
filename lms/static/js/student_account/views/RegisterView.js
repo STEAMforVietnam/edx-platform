@@ -38,6 +38,7 @@
                     'terms_of_service'
                 ],
                 formType: 'register',
+                formFields: '.form-fields',
                 formStatusTpl: formStatusTpl,
                 authWarningJsHook: 'js-auth-warning',
                 defaultFormErrorsTitle: gettext('We couldn\'t create your account.'),
@@ -63,6 +64,8 @@
                     this.autoRegisterWelcomeMessage = data.thirdPartyAuth.autoRegisterWelcomeMessage || '';
                     this.registerFormSubmitButtonText =
                         data.thirdPartyAuth.registerFormSubmitButtonText || _('Create Account');
+                    this.is_require_third_party_auth_enabled = data.is_require_third_party_auth_enabled;
+                    this.enableCoppaCompliance = data.enableCoppaCompliance;
 
                     this.listenTo(this.model, 'sync', this.saveSuccess);
                     this.listenTo(this.model, 'validation', this.renderLiveValidations);
@@ -83,7 +86,7 @@
                         html.push(HtmlUtils.template(fieldTpl)($.extend(fields[i], {
                             form: this.formType,
                             requiredStr: this.requiredStr,
-                            optionalStr: this.optionalStr,
+                            optionalStr: fields[i].name === 'marketing_emails_opt_in' ? '' : this.optionalStr,
                             supplementalText: fields[i].supplementalText || '',
                             supplementalLink: fields[i].supplementalLink || ''
                         })));
@@ -98,7 +101,8 @@
                         field,
                         len = data.length,
                         requiredFields = [],
-                        optionalFields = [];
+                        optionalFields = [],
+                        exposedOptionalFields = [];
 
                     this.fields = data;
 
@@ -120,13 +124,21 @@
                                 // input elements that are visible on the page.
                                 this.hasOptionalFields = true;
                             }
-                            optionalFields.push(field);
+
+                            if (field.exposed) {
+                                exposedOptionalFields.push(field);
+                            } else {
+                                optionalFields.push(field);
+                            }
                         }
                     }
 
                     html = this.renderFields(requiredFields, 'required-fields');
 
-                    html.push.apply(html, this.renderFields(optionalFields, 'optional-fields'));
+                    html.push.apply(html, this.renderFields(exposedOptionalFields, 'exposed-optional-fields'));
+                    html.push.apply(html, this.renderFields(
+                      optionalFields, `optional-fields ${!this.enableCoppaCompliance ? '' : 'full-length-fields'}`
+                    ));
 
                     this.render(html.join(''));
                 },
@@ -146,7 +158,8 @@
                                 hasSecondaryProviders: this.hasSecondaryProviders,
                                 platformName: this.platformName,
                                 autoRegisterWelcomeMessage: this.autoRegisterWelcomeMessage,
-                                registerFormSubmitButtonText: this.registerFormSubmitButtonText
+                                registerFormSubmitButtonText: this.registerFormSubmitButtonText,
+                                is_require_third_party_auth_enabled: this.is_require_third_party_auth_enabled
                             }
                         });
 
@@ -244,6 +257,14 @@
                         window.analytics.track('edx.bi.user.register.optional_fields_selected');
                         $('.optional-fields').toggleClass('hidden');
                     });
+
+                    // Since the honor TOS text has a composed css selector, it is more future proof
+                    // to insert the not toggled optional fields before .honor_tos_combined's parent
+                    // that is the container for the honor TOS text and checkbox.
+                    // xss-lint: disable=javascript-jquery-insert-into-target
+                    $('.exposed-optional-fields').insertBefore(
+                        $('.honor_tos_combined').parent()
+                    );
 
                     // We are swapping the order of these elements here because the honor code agreement
                     // is a required checkbox field and the optional fields toggle is a cosmetic
@@ -420,6 +441,9 @@
                     $label.addClass(indicator);
                     $req.addClass(indicator);
                     $icon.addClass(indicator + ' ' + icon);
+                    if (['username', 'email'].indexOf($el.attr('name')) > -1) {
+                        $tip.addClass(' data-hj-suppress');
+                    }
                     $tip.text(msg);
                 },
 
@@ -448,15 +472,22 @@
                         _.map(
                             // Something is passing this 'undefined'. Protect against this.
                             JSON.parse(error.responseText || '[]'),
-                            function(errorList) {
-                                return _.map(
-                                    errorList,
-                                    function(errorItem) {
-                                        return StringUtils.interpolate('<li>{error}</li>', {
-                                            error: errorItem.user_message
-                                        });
-                                    }
-                                );
+                            function(errorList, key) {
+                                if (key === 'error_code') {
+                                    return null;
+                                } else {
+                                    return _.map(
+                                        errorList,
+                                        function(errorItem) {
+                                            return StringUtils.interpolate('<li {suppressAttr} >{error}</li>', {
+                                                error: errorItem.user_message,
+                                                suppressAttr: (
+                                                  key === 'email' || key === 'username'
+                                                ) ? 'data-hj-suppress' : ''
+                                            });
+                                        }
+                                  );
+                                }
                             }
                         )
                     );
@@ -491,6 +522,7 @@
                         jsHook: this.authWarningJsHook,
                         message: fullMsg
                     });
+                    $(this.formFields).removeClass('hidden');
                 },
 
                 submitForm: function(event) { // eslint-disable-line no-unused-vars

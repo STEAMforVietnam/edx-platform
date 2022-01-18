@@ -61,11 +61,11 @@ def compare_with_tolerance(student_complex, instructor_complex, tolerance=defaul
         if tolerance == default_tolerance:
             relative_tolerance = True
         if tolerance.endswith('%'):
-            tolerance = evaluator(dict(), dict(), tolerance[:-1]) * 0.01
+            tolerance = evaluator({}, {}, tolerance[:-1]) * 0.01
             if not relative_tolerance:
                 tolerance = tolerance * abs(instructor_complex)
         else:
-            tolerance = evaluator(dict(), dict(), tolerance)
+            tolerance = evaluator({}, {}, tolerance)
 
     if relative_tolerance:
         tolerance = tolerance * max(abs(student_complex), abs(instructor_complex))
@@ -133,7 +133,7 @@ def convert_files_to_filenames(answers):
     Check for File objects in the dict of submitted answers,
         convert File objects to their filename (string)
     """
-    new_answers = dict()
+    new_answers = {}
     for answer_id in answers.keys():
         answer = answers[answer_id]
         # Files are stored as a list, even if one file
@@ -216,8 +216,39 @@ def remove_markup(html):
     Return html with markup stripped and text HTML-escaped.
 
     >>> bleach.clean("<b>Rock & Roll</b>", tags=[], strip=True)
-    u'Rock &amp; Roll'
+    'Rock &amp; Roll'
     >>> bleach.clean("<b>Rock &amp; Roll</b>", tags=[], strip=True)
-    u'Rock &amp; Roll'
+    'Rock &amp; Roll'
     """
     return HTML(bleach.clean(html, tags=[], strip=True))
+
+
+def get_course_id_from_capa_module(capa_module):
+    """
+    Extract a stringified course run key from a CAPA module (aka ProblemBlock).
+
+    This is a bit of a hack. Its intended use is to allow us to pass the course id
+    (if available) to `safe_exec`, enabling course-run-specific resource limits
+    in the safe execution environment (codejail).
+
+    Arguments:
+        capa_module (ProblemBlock|None)
+
+    Returns: str|None
+        The stringified course run key of the module.
+        If not available, fall back to None.
+    """
+    if not capa_module:
+        return None
+    try:
+        return str(capa_module.scope_ids.usage_id.course_key)
+    except (AttributeError, TypeError):
+        # AttributeError:
+        #     If the capa module lacks scope ids or has unexpected scope ids, we
+        #     would rather fall back to `None` than let an AttributeError be raised
+        #     here.
+        # TypeError:
+        #     Old Mongo usage keys lack a 'run' specifier, and may
+        #     raise a type error when we try to serialize them into a course
+        #     run key. This is tolerable because such course runs are deprecated.
+        return None

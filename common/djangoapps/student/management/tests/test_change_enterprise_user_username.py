@@ -1,17 +1,18 @@
-# -*- coding: utf-8 -*-
 """
 Tests for the django management command `change_enterprise_user_username`.
 """
 
 
-import mock
-from django.contrib.auth.models import User
+from unittest import mock
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.contrib.sites.models import Site
 from django.core.management import call_command
 from django.db.models.signals import post_save
 from django.test import TestCase
 from enterprise.models import EnterpriseCustomer, EnterpriseCustomerUser
 from pytest import mark
+
+from common.djangoapps.student.tests.factories import UserFactory
 
 
 @mark.django_db
@@ -21,12 +22,12 @@ class ChangeEnterpriseUserUsernameCommandTests(TestCase):
     """
     command = 'change_enterprise_user_username'
 
-    @mock.patch('student.management.commands.change_enterprise_user_username.LOGGER')
+    @mock.patch('common.djangoapps.student.management.commands.change_enterprise_user_username.LOGGER')
     def test_user_not_enterprise(self, logger_mock):
         """
         Test that the command does not update a user's username if it is not linked to an Enterprise.
         """
-        user = User.objects.create(is_active=True, username='old_username', email='test@example.com')
+        user = UserFactory.create(is_active=True, username='old_username', email='test@example.com')
         new_username = 'new_username'
 
         post_save_handler = mock.MagicMock()
@@ -34,15 +35,15 @@ class ChangeEnterpriseUserUsernameCommandTests(TestCase):
 
         call_command(self.command, user_id=user.id, new_username=new_username)
 
-        logger_mock.info.assert_called_with('User {} must be an Enterprise User.'.format(user.id))
+        logger_mock.info.assert_called_with(f'User {user.id} must be an Enterprise User.')
         post_save_handler.assert_not_called()
 
-    @mock.patch('student.management.commands.change_enterprise_user_username.LOGGER')
+    @mock.patch('common.djangoapps.student.management.commands.change_enterprise_user_username.LOGGER')
     def test_username_updated_successfully(self, logger_mock):
         """
         Test that the command updates the user's username when the user is linked to an Enterprise.
         """
-        user = User.objects.create(is_active=True, username='old_username', email='test@example.com')
+        user = UserFactory.create(is_active=True, username='old_username', email='test@example.com')
         site, _ = Site.objects.get_or_create(domain='example.com')
         enterprise_customer = EnterpriseCustomer.objects.create(
             name='Test EnterpriseCustomer',
@@ -59,7 +60,7 @@ class ChangeEnterpriseUserUsernameCommandTests(TestCase):
 
         call_command(self.command, user_id=user.id, new_username=new_username)
 
-        logger_mock.info.assert_called_with('User {} has been updated with username {}.'.format(user.id, new_username))
+        logger_mock.info.assert_called_with(f'User {user.id} has been updated with username {new_username}.')
         post_save_handler.assert_called()
 
         updated_user = User.objects.get(id=user.id)

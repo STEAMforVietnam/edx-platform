@@ -18,7 +18,7 @@ from django.contrib.sites.requests import RequestSite
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.site_configuration.models import SiteConfiguration
@@ -50,7 +50,7 @@ class StackedConfigurationModel(ConfigurationModel):
     A ConfigurationModel that stacks Global, Site, Org, Course, and Course Run level
     configuration values.
     """
-    class Meta(object):
+    class Meta:
         abstract = True
         indexes = [
             # This index optimizes the .object.current_set() query
@@ -62,7 +62,7 @@ class StackedConfigurationModel(ConfigurationModel):
     KEY_FIELDS = ('site', 'org', 'org_course', 'course')
     STACKABLE_FIELDS = ('enabled',)
 
-    enabled = models.NullBooleanField(default=None, verbose_name=_("Enabled"))
+    enabled = models.BooleanField(default=None, verbose_name=_("Enabled"), null=True)
     site = models.ForeignKey(
         Site,
         on_delete=models.CASCADE,
@@ -314,7 +314,7 @@ class StackedConfigurationModel(ConfigurationModel):
         else:
             site_id = site.id
 
-        return super(StackedConfigurationModel, cls).cache_key_name(site_id, org, org_course, course_key)
+        return super().cache_key_name(site_id, org, org_course, course_key)
 
     @classmethod
     def _org_from_org_course(cls, org_course):
@@ -322,11 +322,11 @@ class StackedConfigurationModel(ConfigurationModel):
 
     @classmethod
     def _org_course_from_course_key(cls, course_key):
-        return u"{}+{}".format(course_key.org, course_key.course)
+        return f"{course_key.org}+{course_key.course}"
 
     @classmethod
     @request_cached()
-    def _site_from_org(cls, org):
+    def _site_from_org(cls, org):  # lint-amnesty, pylint: disable=missing-function-docstring
 
         configuration = SiteConfiguration.get_configuration_for_org(org, select_related=['site'])
         if configuration is None:

@@ -2,20 +2,20 @@
 
 
 import logging
+import urllib
 from datetime import datetime
 
-import six
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 from django_countries import countries
 
-import third_party_auth
-from edxmako.shortcuts import render_to_response
+from common.djangoapps import third_party_auth
+from common.djangoapps.edxmako.shortcuts import render_to_response
 from lms.djangoapps.commerce.models import CommerceConfiguration
 from lms.djangoapps.commerce.utils import EcommerceService
 from openedx.core.djangoapps.commerce.utils import ecommerce_api_client
@@ -32,9 +32,9 @@ from openedx.core.lib.edx_api_utils import get_edx_api_data
 from openedx.core.lib.time_zone_utils import TIME_ZONE_CHOICES
 from openedx.features.enterprise_support.api import enterprise_customer_for_request
 from openedx.features.enterprise_support.utils import update_account_settings_context_for_enterprise
-from student.models import UserProfile
-from third_party_auth import pipeline
-from util.date_utils import strftime_localized
+from common.djangoapps.student.models import UserProfile
+from common.djangoapps.third_party_auth import pipeline
+from common.djangoapps.util.date_utils import strftime_localized
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def account_settings(request):
         if duplicate_provider:
             url = '{url}?{params}'.format(
                 url=url,
-                params=six.moves.urllib.parse.urlencode({
+                params=urllib.parse.urlencode({
                     'duplicate_provider': duplicate_provider,
                 }),
             )
@@ -87,7 +87,7 @@ def account_settings_context(request):
     """
     user = request.user
 
-    year_of_birth_options = [(six.text_type(year), six.text_type(year)) for year in UserProfile.VALID_YEARS]
+    year_of_birth_options = [(str(year), str(year)) for year in UserProfile.VALID_YEARS]
     try:
         user_orders = get_user_orders(user)
     except:  # pylint: disable=bare-except
@@ -113,11 +113,11 @@ def account_settings_context(request):
             'country': {
                 'options': list(countries),
             }, 'gender': {
-                'options': [(choice[0], _(choice[1])) for choice in UserProfile.GENDER_CHOICES],
+                'options': [(choice[0], _(choice[1])) for choice in UserProfile.GENDER_CHOICES],  # lint-amnesty, pylint: disable=translation-of-non-string
             }, 'language': {
                 'options': released_languages(),
             }, 'level_of_education': {
-                'options': [(choice[0], _(choice[1])) for choice in UserProfile.LEVEL_OF_EDUCATION_CHOICES],
+                'options': [(choice[0], _(choice[1])) for choice in UserProfile.LEVEL_OF_EDUCATION_CHOICES],  # lint-amnesty, pylint: disable=translation-of-non-string
             }, 'password': {
                 'url': reverse('password_reset'),
             }, 'year_of_birth': {
@@ -144,6 +144,7 @@ def account_settings_context(request):
         ),
         'extended_profile_fields': _get_extended_profile_fields(),
         'beta_language': beta_language,
+        'enable_coppa_compliance': settings.ENABLE_COPPA_COMPLIANCE,
     }
 
     enterprise_customer = enterprise_customer_for_request(request)
@@ -231,19 +232,19 @@ def _get_extended_profile_fields():
                               'gender', 'year_of_birth', 'language_proficiencies', 'social_links']
 
     field_labels_map = {
-        "first_name": _(u"First Name"),
-        "last_name": _(u"Last Name"),
-        "city": _(u"City"),
-        "state": _(u"State/Province/Region"),
-        "company": _(u"Company"),
-        "title": _(u"Title"),
-        "job_title": _(u"Job Title"),
-        "mailing_address": _(u"Mailing address"),
-        "goals": _(u"Tell us why you're interested in {platform_name}").format(
+        "first_name": _("First Name"),
+        "last_name": _("Last Name"),
+        "city": _("City"),
+        "state": _("State/Province/Region"),
+        "company": _("Company"),
+        "title": _("Title"),
+        "job_title": _("Job Title"),
+        "mailing_address": _("Mailing address"),
+        "goals": _("Tell us why you're interested in {platform_name}").format(
             platform_name=configuration_helpers.get_value("PLATFORM_NAME", settings.PLATFORM_NAME)
         ),
-        "profession": _(u"Profession"),
-        "specialty": _(u"Specialty")
+        "profession": _("Profession"),
+        "specialty": _("Specialty")
     }
 
     extended_profile_field_names = configuration_helpers.get_value('extended_profile_fields', [])

@@ -9,7 +9,7 @@ from django.http import Http404
 from django.shortcuts import redirect
 from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from web_fragments.fragment import Fragment
 
 from openedx.core.djangoapps.plugin_api.views import EdxFragmentView
@@ -19,9 +19,10 @@ from openedx.core.djangoapps.user_api.preferences.api import (
     set_user_preference
 )
 from openedx.core.djangoapps.util.user_messages import PageLevelMessages
-from student.roles import GlobalStaff
+from common.djangoapps.student.roles import GlobalStaff
 
 from .helpers import theme_exists
+from .helpers_static import get_static_file_url
 from .models import SiteTheme
 
 PREVIEW_SITE_THEME_PREFERENCE_KEY = 'preview-site-theme'
@@ -74,12 +75,12 @@ def set_user_preview_site_theme(request, preview_site_theme):
             set_user_preference(request.user, PREVIEW_SITE_THEME_PREFERENCE_KEY, preview_site_theme_name)
             PageLevelMessages.register_success_message(
                 request,
-                _(u'Site theme changed to {site_theme}').format(site_theme=preview_site_theme_name)
+                _('Site theme changed to {site_theme}').format(site_theme=preview_site_theme_name)
             )
         else:
             PageLevelMessages.register_error_message(
                 request,
-                _(u'Theme {site_theme} does not exist').format(site_theme=preview_site_theme_name)
+                _('Theme {site_theme} does not exist').format(site_theme=preview_site_theme_name)
             )
     else:
         delete_user_preference(request.user, PREVIEW_SITE_THEME_PREFERENCE_KEY)
@@ -91,7 +92,7 @@ class ThemingAdministrationFragmentView(EdxFragmentView):
     Fragment view to allow a user to administer theming.
     """
 
-    def render_to_fragment(self, request, course_id=None, **kwargs):
+    def render_to_fragment(self, request, course_id=None, **kwargs):  # lint-amnesty, pylint: disable=arguments-differ, unused-argument
         """
         Renders the theming administration view as a fragment.
         """
@@ -105,10 +106,10 @@ class ThemingAdministrationFragmentView(EdxFragmentView):
         """
         if not user_can_preview_themes(request.user):
             raise Http404
-        return super(ThemingAdministrationFragmentView, self).get(request, *args, **kwargs)
+        return super().get(request, *args, **kwargs)
 
     @method_decorator(login_required)
-    def post(self, request, **kwargs):
+    def post(self, request, **kwargs):  # lint-amnesty, pylint: disable=unused-argument
         """
         Accept requests to update the theme preview.
         """
@@ -135,3 +136,18 @@ class ThemingAdministrationFragmentView(EdxFragmentView):
         Returns the page title for the standalone update page.
         """
         return _('Theming Administration')
+
+
+def themed_asset(request, path):
+    """
+    Redirect to themed asset.
+
+    This view makes it easy to link to theme assets without knowing what is the
+    currently enabled theme. For instance, applications outside of the LMS may
+    want to link to the LMS logo.
+
+    Note that the redirect is not permanent because the theme may change from
+    one run to the next.
+    """
+    themed_url = get_static_file_url(path)
+    return redirect(themed_url, permanent=False)

@@ -3,18 +3,18 @@ Tests for course verification sock
 """
 
 
-import mock
+from unittest import mock
 
 import ddt
+from edx_toggles.toggles.testutils import override_waffle_flag
 
-from course_modes.models import CourseMode
+from common.djangoapps.course_modes.models import CourseMode
 from lms.djangoapps.commerce.models import CommerceConfiguration
-from openedx.core.djangoapps.waffle_utils.testutils import override_waffle_flag
 from openedx.core.djangolib.markup import HTML
 from openedx.features.course_experience import DISPLAY_COURSE_SOCK_FLAG
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 from .helpers import add_course_mode
 from .test_course_home import course_home_url
@@ -30,7 +30,7 @@ class TestCourseSockView(SharedModuleStoreTestCase):
     """
     @classmethod
     def setUpClass(cls):
-        super(TestCourseSockView, cls).setUpClass()
+        super().setUpClass()
 
         # Create four courses
         cls.standard_course = CourseFactory.create()
@@ -44,7 +44,7 @@ class TestCourseSockView(SharedModuleStoreTestCase):
         add_course_mode(cls.verified_course_already_enrolled, upgrade_deadline_expired=False)
 
     def setUp(self):
-        super(TestCourseSockView, self).setUp()
+        super().setUp()
         self.user = UserFactory.create()
 
         # Enroll the user in the four courses
@@ -105,8 +105,8 @@ class TestCourseSockView(SharedModuleStoreTestCase):
         response = self.client.get(course_home_url(self.verified_course))
         self.assertContains(response, "<span>DISCOUNT_PRICE</span>")
 
-    def assert_verified_sock_is_visible(self, course, response):
+    def assert_verified_sock_is_visible(self, course, response):  # lint-amnesty, pylint: disable=unused-argument
         return self.assertContains(response, TEST_VERIFICATION_SOCK_LOCATOR, html=False)
 
-    def assert_verified_sock_is_not_visible(self, course, response):
+    def assert_verified_sock_is_not_visible(self, course, response):  # lint-amnesty, pylint: disable=unused-argument
         return self.assertNotContains(response, TEST_VERIFICATION_SOCK_LOCATOR, html=False)

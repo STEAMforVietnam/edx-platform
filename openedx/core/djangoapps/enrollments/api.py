@@ -12,12 +12,66 @@ from django.conf import settings
 from django.core.cache import cache
 from opaque_keys.edx.keys import CourseKey
 
-from course_modes.models import CourseMode
+from common.djangoapps.course_modes.models import CourseMode
 from openedx.core.djangoapps.enrollments import errors
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 log = logging.getLogger(__name__)
 
 DEFAULT_DATA_API = 'openedx.core.djangoapps.enrollments.data'
+
+
+def get_verified_enrollments(username, include_inactive=False):
+    """Retrieves all the courses in which user is enrolled in a verified mode.
+
+    Takes a user and retrieves all relative enrollments in which the learner is enrolled in a verified mode.
+    Includes information regarding how the user is enrolled
+    in the the course.
+
+    Args:
+        username: The username of the user we want to retrieve course enrollment information for.
+        include_inactive (bool): Determines whether inactive enrollments will be included
+
+    Returns:
+        A list of enrollment information for the given user.
+
+    Examples:
+        >>> get_verified_enrollments("Bob")
+        [
+            {
+                "created": "2014-10-25T20:18:00Z",
+                "mode": "verified",
+                "is_active": True,
+                "user": "Bob",
+                "course_details": {
+                    "course_id": "edX/edX-Insider/2014T2",
+                    "course_name": "edX Insider Course",
+                    "enrollment_end": "2014-12-20T20:18:00Z",
+                    "enrollment_start": "2014-10-15T20:18:00Z",
+                    "course_start": "2015-02-03T00:00:00Z",
+                    "course_end": "2015-05-06T00:00:00Z",
+                    "course_modes": [
+                        {
+                            "slug": "honor",
+                            "name": "Honor Code Certificate",
+                            "min_price": 0,
+                            "suggested_prices": "",
+                            "currency": "usd",
+                            "expiration_datetime": null,
+                            "description": null,
+                            "sku": null,
+                            "bulk_sku": null
+                        }
+                    ],
+                    "invite_only": True
+                }
+            }
+        ]
+
+    """
+    enrollments = get_enrollments(username, include_inactive)
+    enrollments = filter(lambda enrollment: CourseMode.is_verified_slug(enrollment['mode']), enrollments)
+    return list(enrollments)
 
 
 def get_enrollments(username, include_inactive=False):
@@ -145,7 +199,7 @@ def get_enrollment(username, course_id):
     return _data_api().get_course_enrollment(username, course_id)
 
 
-def add_enrollment(username, course_id, mode=None, is_active=True, enrollment_attributes=None):
+def add_enrollment(username, course_id, mode=None, is_active=True, enrollment_attributes=None, enterprise_uuid=None):
     """Enrolls a user in a course.
 
     Enrolls a user in a course. If the mode is not specified, this will default to `CourseMode.DEFAULT_MODE_SLUG`.
@@ -158,6 +212,7 @@ def add_enrollment(username, course_id, mode=None, is_active=True, enrollment_at
         is_active (boolean): Optional argument for making the new enrollment inactive. If not specified, is_active
             defaults to True.
         enrollment_attributes (list): Attributes to be set the enrollment.
+        enterprise_uuid (str): Add course enterprise uuid
 
     Returns:
         A serializable dictionary of the new course enrollment.
@@ -196,7 +251,7 @@ def add_enrollment(username, course_id, mode=None, is_active=True, enrollment_at
     if mode is None:
         mode = _default_course_mode(course_id)
     validate_course_mode(course_id, mode, is_active=is_active)
-    enrollment = _data_api().create_course_enrollment(username, course_id, mode, is_active)
+    enrollment = _data_api().create_course_enrollment(username, course_id, mode, is_active, enterprise_uuid)
 
     if enrollment_attributes is not None:
         set_enrollment_attributes(username, course_id, enrollment_attributes)
@@ -256,7 +311,7 @@ def update_enrollment(
         }
 
     """
-    log.info(u'Starting Update Enrollment process for user {user} in course {course} to mode {mode}'.format(
+    log.info('Starting Update Enrollment process for user {user} in course {course} to mode {mode}'.format(
         user=username,
         course=course_id,
         mode=mode,
@@ -264,14 +319,14 @@ def update_enrollment(
     if mode is not None:
         validate_course_mode(course_id, mode, is_active=is_active, include_expired=include_expired)
     enrollment = _data_api().update_course_enrollment(username, course_id, mode=mode, is_active=is_active)
-    if enrollment is None:
-        msg = u"Course Enrollment not found for user {user} in course {course}".format(user=username, course=course_id)
+    if enrollment is None:  # lint-amnesty, pylint: disable=no-else-raise
+        msg = f"Course Enrollment not found for user {username} in course {course_id}"
         log.warning(msg)
         raise errors.EnrollmentNotFoundError(msg)
     else:
         if enrollment_attributes is not None:
             set_enrollment_attributes(username, course_id, enrollment_attributes)
-    log.info(u'Course Enrollment updated for user {user} in course {course} to mode {mode}'.format(
+    log.info('Course Enrollment updated for user {user} in course {course} to mode {mode}'.format(
         user=username,
         course=course_id,
         mode=mode
@@ -319,16 +374,13 @@ def get_course_enrollment_details(course_id, include_expired=False):
         }
 
     """
-    cache_key = u'enrollment.course.details.{course_id}.{include_expired}'.format(
-        course_id=course_id,
-        include_expired=include_expired
-    )
+    cache_key = f'enrollment.course.details.{course_id}.{include_expired}'
     cached_enrollment_data = None
     try:
         cached_enrollment_data = cache.get(cache_key)
     except Exception:  # pylint: disable=broad-except
         # The cache backend could raise an exception (for example, memcache keys that contain spaces)
-        log.exception(u"Error occurred while retrieving course enrollment details from the cache")
+        log.exception("Error occurred while retrieving course enrollment details from the cache")
 
     if cached_enrollment_data:
         return cached_enrollment_data
@@ -340,8 +392,8 @@ def get_course_enrollment_details(course_id, include_expired=False):
         cache.set(cache_key, course_enrollment_details, cache_time_out)
     except Exception:
         # Catch any unexpected errors during caching.
-        log.exception(u"Error occurred while caching course enrollment details for course %s", course_id)
-        raise errors.CourseEnrollmentError(u"An unexpected error occurred while retrieving course enrollment details.")
+        log.exception("Error occurred while caching course enrollment details for course %s", course_id)
+        raise errors.CourseEnrollmentError("An unexpected error occurred while retrieving course enrollment details.")  # lint-amnesty, pylint: disable=raise-missing-from
 
     return course_enrollment_details
 
@@ -448,8 +500,8 @@ def validate_course_mode(course_id, mode, is_active=None, include_expired=False)
     available_modes = [m['slug'] for m in course_modes]
     if mode not in available_modes:
         msg = (
-            u"Specified course mode '{mode}' unavailable for course {course_id}.  "
-            u"Available modes were: {available}"
+            "Specified course mode '{mode}' unavailable for course {course_id}.  "
+            "Available modes were: {available}"
         ).format(
             mode=mode,
             course_id=course_id,
@@ -494,6 +546,48 @@ def serialize_enrollments(enrollments):
     return _data_api().serialize_enrollments(enrollments)
 
 
+def is_enrollment_valid_for_proctoring(username, course_id):
+    """
+    Returns a boolean value regarding whether user's course enrollment is eligible for proctoring.
+
+    Returns false if:
+        * special exams aren't enabled
+        * the enrollment is not active
+        * proctored exams aren't enabled for the course
+        * the course mode is audit
+
+    Arguments:
+        * username (str): The user associated with the enrollment.
+        * course_id (str): The course id associated with the enrollment.
+    """
+    if not settings.FEATURES.get('ENABLE_SPECIAL_EXAMS'):
+        return False
+
+    # Verify that the learner's enrollment is active
+    enrollment = _data_api().get_course_enrollment(username, str(course_id))
+    if not enrollment or not enrollment['is_active']:
+        return False
+
+    # Check that the course has proctored exams enabled
+    course_module = modulestore().get_course(course_id)
+    if not course_module or not course_module.enable_proctored_exams:
+        return False
+
+    # Only allow verified modes
+    appropriate_modes = [
+        CourseMode.VERIFIED, CourseMode.MASTERS, CourseMode.PROFESSIONAL, CourseMode.EXECUTIVE_EDUCATION
+    ]
+
+    # If the proctoring provider allows learners in honor mode to take exams, include it
+    if settings.PROCTORING_BACKENDS.get(course_module.proctoring_provider, {}).get('allow_honor_mode'):
+        appropriate_modes.append(CourseMode.HONOR)
+
+    if enrollment['mode'] not in appropriate_modes:
+        return False
+
+    return True
+
+
 def _data_api():
     """Returns a Data API.
     This relies on Django settings to find the appropriate data API.
@@ -507,5 +601,5 @@ def _data_api():
     try:
         return importlib.import_module(api_path)
     except (ImportError, ValueError):
-        log.exception(u"Could not load module at '{path}'".format(path=api_path))
-        raise errors.EnrollmentApiLoadError(api_path)
+        log.exception(f"Could not load module at '{api_path}'")
+        raise errors.EnrollmentApiLoadError(api_path)  # lint-amnesty, pylint: disable=raise-missing-from

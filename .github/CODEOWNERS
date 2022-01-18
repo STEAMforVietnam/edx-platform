@@ -10,7 +10,6 @@ lms/djangoapps/grades/
 lms/djangoapps/instructor/
 lms/djangoapps/instructor_task/
 lms/djangoapps/mobile_api/
-openedx/core/djangoapps/contentserver/
 openedx/core/djangoapps/heartbeat/
 openedx/core/djangoapps/oauth_dispatch
 openedx/core/djangoapps/user_api/

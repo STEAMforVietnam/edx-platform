@@ -1,8 +1,8 @@
-############################
-Contributing to Open edX
-############################
+########################
+Contributing to the Open edX Platform
+########################
 
-Contributions to Open edX are very welcome, and strongly encouraged! We've
+Contributions to the Open edX Platform are very welcome, and strongly encouraged! We've
 put together `some documentation that describes our contribution process`_,
 but here's a step-by-step guide that should help you get started.
 
@@ -17,6 +17,13 @@ it's a good idea to discuss your idea with other interested developers and/or th
 edX product team. You may get some valuable feedback that changes how you think
 about your idea, or you may find other developers who have the same idea and want
 to work together.
+
+Documentation
+-------------
+
+The Open edX documentation is at `https://docs.edx.org
+<https://docs.edx.org>`_.  A number of topics are covered there, from
+operations to development.
 
 JIRA
 ----
@@ -67,7 +74,7 @@ between 13:00 and 21:00 UTC (9am to 5pm US Eastern time),
 but interesting conversations can happen at any time.
 There are many different channels available for different topics, including:
 
-* ``#events`` for upcoming events related to Open edX
+* ``#events`` for upcoming events related to Open edX project
 * ``#content`` for discussions about course content and creating the best courses
 
 And lots more! You can also make your own channels to discuss new topics.
@@ -99,19 +106,23 @@ to ask clarifying questions on the ticket as needed, too, if anything is unclear
 Step 1: Sign a Contribution Agreement
 =====================================
 
-Before edX can accept any code contributions from you, you'll need to sign
-the `individual contributor agreement`_ and send it in. This confirms
-that you have the authority to contribute the code in the pull request and
-ensures that edX can relicense it.
+Before edX can accept any code contributions from you, you'll need to sign the
+`Individual Contributor Agreement`_. This confirms that you have the authority
+to contribute the code in the pull request and ensures that edX can re-license
+it.
 
-You should print out the agreement and sign it. Then scan (or photograph) the
-signed agreement and email it to the email address indicated on the agreement.
-Alternatively, you're also free to physically mail the agreement to the street
-address on the agreement. Once we have your agreement in hand, we can begin
-reviewing and merging your work.
+.. _Individual Contributor Agreement: https://openedx.org/cla
+
+If you will be contributing code on behalf of your employer or another
+institution you are affiliated with, please reach out by email to openedx@edx.org
+to request the Entity Contributor Agreement.
+
+Once we have received and processed your agreement, we will reach out to you by
+email to confirm. After that we can begin reviewing and merging your work.
 
 Step 2: Fork, Commit, and Pull Request
 ======================================
+
 GitHub has some great documentation on `how to fork a git repository`_. Once
 you've done that, make your changes and `send us a pull request`_! Be sure to
 include a detailed description for your pull request, so that a community
@@ -151,7 +162,7 @@ Step 4: Approval by Community Manager and Product Owner
 A community manager will read the description of your pull request. If the
 description is understandable, the community manager will send the pull request
 to a product owner. The product owner will evaluate if the pull request is a
-good idea for Open edX, and if not, your pull request will be rejected. This
+good idea for the Open edX platform, and if not, your pull request will be rejected. This
 is another good reason why you should discuss your ideas with other members
 of the community before working on a pull request!
 
@@ -214,5 +225,3 @@ Expectations You Have of Us
 
 3. Once we have determined through visual review that your code is not
    malicious, we will run a Jenkins build on your branch.
-
-.. _individual contributor agreement: https://open.edx.org/wp-content/uploads/2019/01/individual-contributor-agreement.pdf

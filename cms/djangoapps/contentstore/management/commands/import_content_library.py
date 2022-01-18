@@ -8,21 +8,20 @@ import os
 import tarfile
 
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User  # lint-amnesty, pylint: disable=imported-auth-user
 from django.core.exceptions import SuspiciousOperation
 from django.core.management.base import BaseCommand, CommandError
 from lxml import etree
 from opaque_keys.edx.locator import LibraryLocator
 from path import Path
-from six.moves import input
 
 from cms.djangoapps.contentstore.utils import add_instructor
 from openedx.core.lib.extract_tar import safetar_extractall
-from xmodule.contentstore.django import contentstore
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.exceptions import DuplicateCourseError
-from xmodule.modulestore.xml_importer import import_library_from_xml
+from xmodule.contentstore.django import contentstore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.exceptions import DuplicateCourseError  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.xml_importer import import_library_from_xml  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class Command(BaseCommand):
@@ -44,15 +43,15 @@ class Command(BaseCommand):
         username = options['owner_username']
 
         data_root = Path(settings.GITHUB_REPO_ROOT)
-        subdir = base64.urlsafe_b64encode(os.path.basename(archive_path))
+        subdir = base64.urlsafe_b64encode(os.path.basename(archive_path).encode('utf-8')).decode('utf-8')
         course_dir = data_root / subdir
 
         # Extract library archive
-        tar_file = tarfile.open(archive_path)
+        tar_file = tarfile.open(archive_path)  # lint-amnesty, pylint: disable=consider-using-with
         try:
-            safetar_extractall(tar_file, course_dir.encode('utf-8'))
+            safetar_extractall(tar_file, course_dir)
         except SuspiciousOperation as exc:
-            raise CommandError(u'\n=== Course import {0}: Unsafe tar file - {1}\n'.format(archive_path, exc.args[0]))
+            raise CommandError(f'\n=== Course import {archive_path}: Unsafe tar file - {exc.args[0]}\n')  # lint-amnesty, pylint: disable=raise-missing-from
         finally:
             tar_file.close()
 
@@ -63,7 +62,7 @@ class Command(BaseCommand):
         # Gather library metadata from XML file
         xml_root = etree.parse(abs_xml_path / 'library.xml').getroot()
         if xml_root.tag != 'library':
-            raise CommandError(u'Failed to import {0}: Not a library archive'.format(archive_path))
+            raise CommandError(f'Failed to import {archive_path}: Not a library archive')
 
         metadata = xml_root.attrib
         org = metadata['org']
@@ -77,10 +76,10 @@ class Command(BaseCommand):
         # Check if data would be overwritten
         ans = ''
         while not created and ans not in ['y', 'yes', 'n', 'no']:
-            inp = input(u'Library "{0}" already exists, overwrite it? [y/n] '.format(courselike_key))
+            inp = input(f'Library "{courselike_key}" already exists, overwrite it? [y/n] ')
             ans = inp.lower()
         if ans.startswith('n'):
-            print(u'Aborting import of "{0}"'.format(courselike_key))
+            print(f'Aborting import of "{courselike_key}"')
             return
 
         # At last, import the library
@@ -93,10 +92,10 @@ class Command(BaseCommand):
                 target_id=courselike_key
             )
         except Exception:
-            print(u'\n=== Failed to import library-v1:{0}+{1}'.format(org, library))
+            print(f'\n=== Failed to import library-v1:{org}+{library}')
             raise
 
-        print(u'Library "{0}" imported to "{1}"'.format(archive_path, courselike_key))
+        print(f'Library "{archive_path}" imported to "{courselike_key}"')
 
 
 def _get_or_create_library(org, number, display_name, user):

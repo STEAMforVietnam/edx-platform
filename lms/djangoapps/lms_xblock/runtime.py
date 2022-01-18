@@ -3,25 +3,25 @@ Module implementing `xblock.runtime.Runtime` functionality for the LMS
 """
 
 
-import six
 import xblock.reference.plugins
 from completion.services import CompletionService
 from django.conf import settings
 from django.urls import reverse
 from edx_django_utils.cache import DEFAULT_REQUEST_CACHE
 
-from badges.service import BadgingService
-from badges.utils import badges_enabled
+from lms.djangoapps.badges.service import BadgingService
+from lms.djangoapps.badges.utils import badges_enabled
 from lms.djangoapps.lms_xblock.models import XBlockAsidesConfig
 from lms.djangoapps.teams.services import TeamsService
 from openedx.core.djangoapps.user_api.course_tag import api as user_course_tag_api
 from openedx.core.lib.url_utils import quote_slashes
+from openedx.core.lib.xblock_services.call_to_action import CallToActionService
 from openedx.core.lib.xblock_utils import wrap_xblock_aside, xblock_local_resource_url
-from xmodule.library_tools import LibraryToolsService
-from xmodule.modulestore.django import ModuleI18nService, modulestore
-from xmodule.partitions.partitions_service import PartitionService
-from xmodule.services import SettingsService, TeamsConfigurationService
-from xmodule.x_module import ModuleSystem
+from xmodule.library_tools import LibraryToolsService  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.django import ModuleI18nService, modulestore  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.partitions.partitions_service import PartitionService  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.services import SettingsService, TeamsConfigurationService  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.x_module import ModuleSystem  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 def handler_url(block, handler_name, suffix='', query='', thirdparty=False):
@@ -45,7 +45,7 @@ def handler_url(block, handler_name, suffix='', query='', thirdparty=False):
         # to ask for handler URLs without a student context.
         func = getattr(block.__class__, handler_name, None)
         if not func:
-            raise ValueError(u"{!r} is not a function name".format(handler_name))
+            raise ValueError(f"{handler_name!r} is not a function name")
 
         # Is the following necessary? ProxyAttribute causes an UndefinedContext error
         # if trying this without the module system.
@@ -57,8 +57,8 @@ def handler_url(block, handler_name, suffix='', query='', thirdparty=False):
         view_name = 'xblock_handler_noauth'
 
     url = reverse(view_name, kwargs={
-        'course_id': six.text_type(block.location.course_key),
-        'usage_id': quote_slashes(six.text_type(block.scope_ids.usage_id)),
+        'course_id': str(block.location.course_key),
+        'usage_id': quote_slashes(str(block.scope_ids.usage_id)),
         'handler': handler_name,
         'suffix': suffix,
     })
@@ -90,7 +90,7 @@ def local_resource_url(block, uri):
     return xblock_local_resource_url(block, uri)
 
 
-class UserTagsService(object):
+class UserTagsService:
     """
     A runtime class that provides an interface to the user service.  It handles filling in
     the current course id and current user.
@@ -98,13 +98,9 @@ class UserTagsService(object):
 
     COURSE_SCOPE = user_course_tag_api.COURSE_SCOPE
 
-    def __init__(self, runtime):
-        self.runtime = runtime
-
-    def _get_current_user(self):
-        """Returns the real, not anonymized, current user."""
-        real_user = self.runtime.get_real_user(self.runtime.anonymous_student_id)
-        return real_user
+    def __init__(self, user, course_id):
+        self._user = user
+        self._course_id = course_id
 
     def get_tag(self, scope, key):
         """
@@ -114,11 +110,11 @@ class UserTagsService(object):
             key: the key for the value we want
         """
         if scope != user_course_tag_api.COURSE_SCOPE:
-            raise ValueError(u"unexpected scope {0}".format(scope))
+            raise ValueError(f"unexpected scope {scope}")
 
         return user_course_tag_api.get_course_tag(
-            self._get_current_user(),
-            self.runtime.course_id, key
+            self._user,
+            self._course_id, key
         )
 
     def set_tag(self, scope, key, value):
@@ -130,11 +126,11 @@ class UserTagsService(object):
             value: the value to set
         """
         if scope != user_course_tag_api.COURSE_SCOPE:
-            raise ValueError(u"unexpected scope {0}".format(scope))
+            raise ValueError(f"unexpected scope {scope}")
 
         return user_course_tag_api.set_course_tag(
-            self._get_current_user(),
-            self.runtime.course_id, key, value
+            self._user,
+            self._course_id, key, value
         )
 
 
@@ -142,31 +138,35 @@ class LmsModuleSystem(ModuleSystem):  # pylint: disable=abstract-method
     """
     ModuleSystem specialized to the LMS
     """
-    def __init__(self, **kwargs):
+    def __init__(self, user, **kwargs):
         request_cache_dict = DEFAULT_REQUEST_CACHE.data
         store = modulestore()
+        course_id = kwargs.get('course_id')
 
         services = kwargs.setdefault('services', {})
-        user = kwargs.get('user')
         if user and user.is_authenticated:
-            services['completion'] = CompletionService(user=user, context_key=kwargs.get('course_id'))
+            services['completion'] = CompletionService(user=user, context_key=course_id)
         services['fs'] = xblock.reference.plugins.FSService()
         services['i18n'] = ModuleI18nService
-        services['library_tools'] = LibraryToolsService(store)
+        services['library_tools'] = LibraryToolsService(store, user_id=user.id if user else None)
         services['partitions'] = PartitionService(
-            course_id=kwargs.get('course_id'),
+            course_id=course_id,
             cache=request_cache_dict
         )
         services['settings'] = SettingsService()
-        services['user_tags'] = UserTagsService(self)
+        services['user_tags'] = UserTagsService(
+            user=user,
+            course_id=course_id,
+        )
         if badges_enabled():
-            services['badging'] = BadgingService(course_id=kwargs.get('course_id'), modulestore=store)
+            services['badging'] = BadgingService(course_id=course_id, modulestore=store)
         self.request_token = kwargs.pop('request_token', None)
         services['teams'] = TeamsService()
         services['teams_configuration'] = TeamsConfigurationService()
-        super(LmsModuleSystem, self).__init__(**kwargs)
+        services['call_to_action'] = CallToActionService()
+        super().__init__(**kwargs)
 
-    def handler_url(self, *args, **kwargs):
+    def handler_url(self, *args, **kwargs):  # lint-amnesty, pylint: disable=signature-differs
         """
         Implement the XBlock runtime handler_url interface.
 
@@ -203,8 +203,8 @@ class LmsModuleSystem(ModuleSystem):  # pylint: disable=abstract-method
 
         runtime_class = 'LmsRuntime'
         extra_data = {
-            'block-id': quote_slashes(six.text_type(block.scope_ids.usage_id)),
-            'course-id': quote_slashes(six.text_type(block.course_id)),
+            'block-id': quote_slashes(str(block.scope_ids.usage_id)),
+            'course-id': quote_slashes(str(block.course_id)),
             'url-selector': 'asideBaseUrl',
             'runtime-class': runtime_class,
         }
@@ -217,7 +217,7 @@ class LmsModuleSystem(ModuleSystem):  # pylint: disable=abstract-method
             view,
             frag,
             context,
-            usage_id_serializer=six.text_type,
+            usage_id_serializer=str,
             request_token=self.request_token,
             extra_data=extra_data,
         )
@@ -242,6 +242,6 @@ class LmsModuleSystem(ModuleSystem):  # pylint: disable=abstract-method
         # (see https://openedx.atlassian.net/browse/TE-811)
         return [
             aside_type
-            for aside_type in super(LmsModuleSystem, self).applicable_aside_types(block)
+            for aside_type in super().applicable_aside_types(block)
             if aside_type != 'acid_aside'
         ]

@@ -7,14 +7,14 @@ from factory import SubFactory
 from factory.django import DjangoModelFactory
 
 from openedx.core.djangoapps.site_configuration.tests.factories import SiteFactory
-from third_party_auth.models import SAMLConfiguration, SAMLProviderConfig
+from common.djangoapps.third_party_auth.models import SAMLConfiguration, SAMLProviderConfig
 
 
 class SAMLConfigurationFactory(DjangoModelFactory):
     """
     Factory or SAMLConfiguration model in third_party_auth app.
     """
-    class Meta(object):
+    class Meta:
         model = SAMLConfiguration
 
     site = SubFactory(SiteFactory)
@@ -25,7 +25,7 @@ class SAMLProviderConfigFactory(DjangoModelFactory):
     """
     Factory or SAMLProviderConfig model in third_party_auth app.
     """
-    class Meta(object):
+    class Meta:
         model = SAMLProviderConfig
         django_get_or_create = ('slug', 'metadata_source', "entity_id")
 

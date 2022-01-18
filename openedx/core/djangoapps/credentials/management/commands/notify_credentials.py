@@ -12,35 +12,24 @@ signals.)
 
 
 import logging
-import math
-import sys
-import time
+import shlex
+import sys  # lint-amnesty, pylint: disable=unused-import
 
 from datetime import datetime, timedelta
 import dateutil.parser
-from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from pytz import UTC
-from six.moves import range
 
-from lms.djangoapps.certificates.api import get_recently_modified_certificates
-from lms.djangoapps.grades.api import get_recently_modified_grades
 from openedx.core.djangoapps.credentials.models import NotifyCredentialsConfig
-from openedx.core.djangoapps.credentials.signals import handle_cert_change, send_grade_if_interesting
-from openedx.core.djangoapps.programs.signals import handle_course_cert_changed
-from openedx.core.djangoapps.site_configuration.models import SiteConfiguration
+from openedx.core.djangoapps.credentials.tasks.v1.tasks import handle_notify_credentials
+from openedx.core.djangoapps.catalog.api import (
+    get_programs_from_cache_by_uuid,
+    get_course_run_key_for_program_from_cache,
+)
 
 log = logging.getLogger(__name__)
-
-
-def certstr(cert):
-    return '{} for user {}'.format(cert.course_id, cert.user.username)
-
-
-def gradestr(grade):
-    return '{} for user {}'.format(grade.course_id, grade.user_id)
 
 
 def parsetime(timestr):
@@ -48,27 +37,6 @@ def parsetime(timestr):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt
-
-
-def paged_query(queryset, delay, page_size):
-    """
-    A generator that iterates through a queryset but only resolves chunks of it at once, to avoid overwhelming memory
-    with a giant query. Also adds an optional delay between yields, to help with load.
-    """
-    count = queryset.count()
-    pages = int(math.ceil(count / page_size))
-
-    for page in range(pages):
-        page_start = page * page_size
-        page_end = page_start + page_size
-        subquery = queryset[page_start:page_end]
-
-        if delay and page:
-            time.sleep(delay)
-        index = 0
-        for item in subquery.iterator():
-            index += 1
-            yield page_start + index, item
 
 
 class Command(BaseCommand):
@@ -87,17 +55,17 @@ class Command(BaseCommand):
 
         DRY-RUN: This command would have handled changes for...
         3 Certificates:
-            course-v1:edX+RecordsSelfPaced+1 for user records_one_cert
-            course-v1:edX+RecordsSelfPaced+1 for user records
-            course-v1:edX+RecordsSelfPaced+1 for user records_unverified
+            course-v1:edX+RecordsSelfPaced+1 for user 14
+            course-v1:edX+RecordsSelfPaced+1 for user 17
+            course-v1:edX+RecordsSelfPaced+1 for user 18
         3 Grades:
             course-v1:edX+RecordsSelfPaced+1 for user 14
             course-v1:edX+RecordsSelfPaced+1 for user 17
             course-v1:edX+RecordsSelfPaced+1 for user 18
     """
     help = (
-        u"Simulate certificate/grade changes without actually modifying database "
-        u"content. Specifically, trigger the handlers that send data to Credentials."
+        "Simulate certificate/grade changes without actually modifying database "
+        "content. Specifically, trigger the handlers that send data to Credentials."
     )
 
     def add_arguments(self, parser):
@@ -114,7 +82,12 @@ class Command(BaseCommand):
         parser.add_argument(
             '--courses',
             nargs='+',
-            help='Send information only for specific courses.',
+            help='Send information only for specific course runs.',
+        )
+        parser.add_argument(
+            '--program_uuids',
+            nargs='+',
+            help='Send user data for course runs for courses within a program based on program uuids provided.',
         )
         parser.add_argument(
             '--start-date',
@@ -153,6 +126,17 @@ class Command(BaseCommand):
             action='store_true',
             help='Run grade/cert change signal in verbose mode',
         )
+        parser.add_argument(
+            '--notify_programs',
+            action='store_true',
+            help='Send program award notifications with course notification tasks',
+        )
+        parser.add_argument(
+            '--user_ids',
+            default=None,
+            nargs='+',
+            help='Run the command for the given user or list of users',
+        )
 
     def get_args_from_database(self):
         """ Returns an options dictionary from the current NotifyCredentialsConfig model. """
@@ -160,9 +144,9 @@ class Command(BaseCommand):
         if not config.enabled:
             raise CommandError('NotifyCredentialsConfig is disabled, but --args-from-database was requested.')
 
-        # We don't need fancy shell-style whitespace/quote handling - none of our arguments are complicated
-        argv = config.arguments.split()
-
+        # This split will allow for quotes to wrap datetimes, like "2020-10-20 04:00:00" and other
+        # arguments as if it were the command line
+        argv = shlex.split(config.arguments)
         parser = self.create_parser('manage.py', 'notify_credentials')
         return parser.parse_args(argv).__dict__   # we want a dictionary, not a non-iterable Namespace object
 
@@ -171,143 +155,81 @@ class Command(BaseCommand):
             options = self.get_args_from_database()
 
         if options['auto']:
-            options['end_date'] = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            options['start_date'] = options['end_date'] - timedelta(days=1)
+            options['end_date'] = datetime.now().replace(minute=0, second=0, microsecond=0)
+            options['start_date'] = options['end_date'] - timedelta(hours=4)
 
         log.info(
-            u"notify_credentials starting, dry-run=%s, site=%s, delay=%d seconds, page_size=%d, "
-            u"from=%s, to=%s, execution=%s",
+            "notify_credentials starting, dry-run=%s, site=%s, delay=%d seconds, page_size=%d, "
+            "from=%s, to=%s, notify_programs=%s, user_ids=%s, execution=%s",
             options['dry_run'],
             options['site'],
             options['delay'],
             options['page_size'],
             options['start_date'] if options['start_date'] else 'NA',
             options['end_date'] if options['end_date'] else 'NA',
+            options['notify_programs'],
+            options['user_ids'],
             'auto' if options['auto'] else 'manual',
         )
 
-        try:
-            site_config = SiteConfiguration.objects.get(site__domain=options['site']) if options['site'] else None
-        except SiteConfiguration.DoesNotExist:
-            log.error(u'No site configuration found for site %s', options['site'])
+        program_course_run_keys = self._get_course_run_keys_for_programs(options["program_uuids"])
 
-        course_keys = self.get_course_keys(options['courses'])
-        if not (course_keys or options['start_date'] or options['end_date']):
-            raise CommandError('You must specify a filter (e.g. --courses= or --start-date)')
+        course_runs = options["courses"]
+        if not course_runs:
+            course_runs = []
+        if program_course_run_keys:
+            course_runs.extend(program_course_run_keys)
 
-        certs = get_recently_modified_certificates(course_keys, options['start_date'], options['end_date'])
-        grades = get_recently_modified_grades(course_keys, options['start_date'], options['end_date'])
-
-        if options['dry_run']:
-            self.print_dry_run(certs, grades)
-        else:
-            self.send_notifications(certs, grades,
-                                    site_config=site_config,
-                                    delay=options['delay'],
-                                    page_size=options['page_size'],
-                                    verbose=options['verbose'])
-
-        log.info('notify_credentials finished')
-
-    def send_notifications(self, certs, grades, site_config=None, delay=0, page_size=0, verbose=False):
-        """ Run actual handler commands for the provided certs and grades. """
-
-        course_cert_info = {}
-        # First, do certs
-        for i, cert in paged_query(certs, delay, page_size):
-            if site_config and not site_config.has_org(cert.course_id.org):
-                log.info(u"Skipping credential changes %d for certificate %s", i, certstr(cert))
-                continue
-
-            log.info(
-                u"Handling credential changes %d for certificate %s",
-                i, certstr(cert),
+        course_run_keys = self._get_validated_course_run_keys(course_runs)
+        if not (
+            course_run_keys or
+            options['start_date'] or
+            options['end_date'] or
+            options['user_ids']
+        ):
+            raise CommandError(
+                'You must specify a filter (e.g. --courses, --program_uuids, --start-date, or --user_ids)'
             )
 
-            signal_args = {
-                'sender': None,
-                'user': cert.user,
-                'course_key': cert.course_id,
-                'mode': cert.mode,
-                'status': cert.status,
-                'verbose': verbose,
-            }
+        handle_notify_credentials.delay(options, course_run_keys)
 
-            data = {
-                'mode': cert.mode,
-                'status': cert.status
-            }
-
-            course_cert_info[(cert.user.id, str(cert.course_id))] = data
-            handle_course_cert_changed(**signal_args)
-
-        # Then do grades
-        for i, grade in paged_query(grades, delay, page_size):
-            if site_config and not site_config.has_org(grade.course_id.org):
-                log.info(u"Skipping grade changes %d for grade %s", i, gradestr(grade))
-                continue
-
-            log.info(
-                u"Handling grade changes %d for grade %s",
-                i, gradestr(grade),
-            )
-
-            user = User.objects.get(id=grade.user_id)
-
-            # Grab mode/status from cert call
-            key = (user.id, str(grade.course_id))
-            cert_info = course_cert_info.get(key, {})
-            mode = cert_info.get('mode', None)
-            status = cert_info.get('status', None)
-
-            send_grade_if_interesting(
-                user,
-                grade.course_id,
-                mode,
-                status,
-                grade.letter_grade,
-                grade.percent_grade,
-                verbose=verbose
-            )
-
-    def get_course_keys(self, courses=None):
+    def _get_course_run_keys_for_programs(self, uuids):
         """
-        Return a list of CourseKeys that we will emit signals to.
+        Retrieve all course runs for all of the given program UUIDs.
 
-        `courses` is an optional list of strings that can be parsed into
-        CourseKeys. If `courses` is empty or None, we will default to returning
-        all courses in the modulestore (which can be very expensive). If one of
-        the strings passed in the list for `courses` does not parse correctly,
-        it is a fatal error and will cause us to exit the entire process.
+        Params:
+            uuids (list): List of programs UUIDs.
+
+        Returns:
+            (list): List of Course Run Keys as Strings.
+
         """
-        # Use specific courses if specified, but fall back to all courses.
-        if not courses:
-            courses = []
-        course_keys = []
+        program_course_run_keys = []
+        if uuids:
+            programs = get_programs_from_cache_by_uuid(uuids=uuids)
+            for program in programs:
+                program_course_run_keys.extend(get_course_run_key_for_program_from_cache(program))
+        return program_course_run_keys
 
-        log.info(u"%d courses specified: %s", len(courses), ", ".join(courses))
-        for course_id in courses:
+    def _get_validated_course_run_keys(self, course_run_keys):
+        """
+        Validates a list of course run keys and returns the validated keys.
+
+        Params:
+            courses (list):  list of strings that can be parsed by CourseKey to verify the keys.
+        Returns:
+            (list): Containing a series of validated course keys as strings.
+        """
+        if not course_run_keys:
+            course_run_keys = []
+        validated_course_run_keys = []
+
+        log.info("%d courses specified: %s", len(course_run_keys), ", ".join(course_run_keys))
+        for course_run_key in course_run_keys:
             try:
-                course_keys.append(CourseKey.from_string(course_id))
-            except InvalidKeyError:
-                log.fatal(u"%s is not a parseable CourseKey", course_id)
-                sys.exit(1)
-
-        return course_keys
-
-    def print_dry_run(self, certs, grades):
-        """Give a preview of what certs/grades we will handle."""
-        print("DRY-RUN: This command would have handled changes for...")
-        ITEMS_TO_SHOW = 10
-
-        print(certs.count(), "Certificates:")
-        for cert in certs[:ITEMS_TO_SHOW]:
-            print("   ", certstr(cert))
-        if certs.count() > ITEMS_TO_SHOW:
-            print(u"    (+ {} more)".format(certs.count() - ITEMS_TO_SHOW))
-
-        print(grades.count(), "Grades:")
-        for grade in grades[:ITEMS_TO_SHOW]:
-            print("   ", gradestr(grade))
-        if grades.count() > ITEMS_TO_SHOW:
-            print(u"    (+ {} more)".format(grades.count() - ITEMS_TO_SHOW))
+                # Use CourseKey to check if the course_id is parsable, but just
+                # keep the string; the celery task needs JSON serializable data.
+                validated_course_run_keys.append(str(CourseKey.from_string(course_run_key)))
+            except InvalidKeyError as exc:
+                raise CommandError("{} is not a parsable CourseKey".format(course_run_key)) from exc
+        return validated_course_run_keys

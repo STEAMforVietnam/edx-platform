@@ -1,22 +1,20 @@
 """
 Tests the forum notification signals.
 """
-
-
-import mock
+from unittest import mock
 from django.test import TestCase
 from edx_django_utils.cache import RequestCache
 
 from lms.djangoapps.discussion.signals.handlers import ENABLE_FORUM_NOTIFICATIONS_FOR_SITE_KEY
 from openedx.core.djangoapps.django_comment_common import models, signals
 from openedx.core.djangoapps.site_configuration.tests.factories import SiteConfigurationFactory, SiteFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
-class SendMessageHandlerTestCase(TestCase):
+class SendMessageHandlerTestCase(TestCase):  # lint-amnesty, pylint: disable=missing-class-docstring
 
-    def setUp(self):
+    def setUp(self):  # lint-amnesty, pylint: disable=super-method-not-called
         self.sender = mock.Mock()
         self.user = mock.Mock()
         self.post = mock.Mock()
@@ -38,10 +36,10 @@ class SendMessageHandlerTestCase(TestCase):
 
     @mock.patch('lms.djangoapps.discussion.signals.handlers.get_current_site', return_value=None)
     @mock.patch('lms.djangoapps.discussion.signals.handlers.send_message')
-    def test_comment_created_signal_message_not_sent_without_site(self, mock_send_message, mock_get_current_site):
+    def test_comment_created_signal_message_not_sent_without_site(self, mock_send_message, mock_get_current_site):  # lint-amnesty, pylint: disable=unused-argument
         signals.comment_created.send(sender=self.sender, user=self.user, post=self.post)
 
-        self.assertFalse(mock_send_message.called)
+        assert not mock_send_message.called
 
     @mock.patch('lms.djangoapps.discussion.signals.handlers.get_current_site')
     @mock.patch('lms.djangoapps.discussion.signals.handlers.send_message')
@@ -49,7 +47,7 @@ class SendMessageHandlerTestCase(TestCase):
         mock_get_current_site.return_value = self.site
         signals.comment_created.send(sender=self.sender, user=self.user, post=self.post)
 
-        self.assertFalse(mock_send_message.called)
+        assert not mock_send_message.called
 
     @mock.patch('lms.djangoapps.discussion.signals.handlers.get_current_site')
     @mock.patch('lms.djangoapps.discussion.signals.handlers.send_message')
@@ -63,7 +61,7 @@ class SendMessageHandlerTestCase(TestCase):
         mock_get_current_site.return_value = self.site
         signals.comment_created.send(sender=self.sender, user=self.user, post=self.post)
 
-        self.assertFalse(mock_send_message.called)
+        assert not mock_send_message.called
 
 
 class CoursePublishHandlerTestCase(ModuleStoreTestCase):
@@ -78,7 +76,7 @@ class CoursePublishHandlerTestCase(ModuleStoreTestCase):
 
         # create course
         course = CourseFactory(emit_signals=True, **course_key_args)
-        self.assertEqual(course.id, course_key)
+        assert course.id == course_key
         self._assert_discussion_id_map(course_key, {})
 
         # create discussion block

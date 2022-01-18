@@ -4,17 +4,17 @@ Tests for logout
 
 
 import unittest
-
+import urllib
+from unittest import mock
 import ddt
-import mock
-import six
+import bleach
 from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
 from openedx.core.djangoapps.oauth_dispatch.tests.factories import ApplicationFactory
-from student.tests.factories import UserFactory
+from common.djangoapps.student.tests.factories import UserFactory
 
 
 @unittest.skipUnless(settings.ROOT_URLCONF == 'lms.urls', 'Test only valid in lms')
@@ -24,7 +24,7 @@ class LogoutTests(TestCase):
 
     def setUp(self):
         """ Create a course and user, then log in. """
-        super(LogoutTests, self).setUp()
+        super().setUp()
         self.user = UserFactory()
         self.client.login(username=self.user.username, password='test')
 
@@ -39,7 +39,7 @@ class LogoutTests(TestCase):
         # Logging out should remove the session variables, and send a list of logout URLs to the template.
         # The template will handle loading those URLs and redirecting the user. That functionality is not tested here.
         response = self.client.get(reverse('logout'), **logout_headers)
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
 
         return response
 
@@ -53,7 +53,7 @@ class LogoutTests(TestCase):
         }
         # Authenticate with OAuth to set the appropriate session values
         response = self.client.post(reverse('oauth2_provider:authorize'), data, follow=True)
-        self.assertEqual(response.status_code, 200)
+        assert response.status_code == 200
 
     @ddt.data(
         ('%2Fcourses', 'testserver'),
@@ -75,7 +75,7 @@ class LogoutTests(TestCase):
         )
         response = self.client.get(url, HTTP_HOST=host)
         expected = {
-            'target': six.moves.urllib.parse.unquote(redirect_url),
+            'target': urllib.parse.unquote(redirect_url),
         }
         self.assertDictContainsSubset(expected, response.context_data)
 
@@ -180,7 +180,7 @@ class LogoutTests(TestCase):
         Test when learner logout from learner portal having active SSO session
         logout page should have link to logout url IdP.
         """
-        learner_portal_logout_url = '{}/logout'.format(settings.LEARNER_PORTAL_URL_ROOT)
+        learner_portal_logout_url = f'{settings.LEARNER_PORTAL_URL_ROOT}/logout'
         idp_logout_url = 'http://mock-idp.com/logout'
         client = self._create_oauth_client()
 
@@ -194,3 +194,21 @@ class LogoutTests(TestCase):
                 'show_tpa_logout_link': True,
             }
             self.assertDictContainsSubset(expected, response.context_data)
+
+    @ddt.data(
+        ('%22%3E%3Cscript%3Ealert(%27xss%27)%3C/script%3E', 'edx.org'),
+    )
+    @ddt.unpack
+    def test_logout_redirect_failure_with_xss_vulnerability(self, redirect_url, host):
+        """
+        Verify that it will block the XSS attack on edX’s LMS logout page
+        """
+        url = '{logout_path}?redirect_url={redirect_url}'.format(
+            logout_path=reverse('logout'),
+            redirect_url=redirect_url
+        )
+        response = self.client.get(url, HTTP_HOST=host)
+        expected = {
+            'target': bleach.clean(urllib.parse.unquote(redirect_url)),
+        }
+        self.assertDictContainsSubset(expected, response.context_data)

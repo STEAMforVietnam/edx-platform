@@ -40,8 +40,8 @@ class StubYouTubeHandler(StubHttpRequestHandler):
         """
         Allow callers to delete all the server configurations using the /del_config URL.
         """
-        if self.path == "/del_config" or self.path == "/del_config/":
-            self.server.config = dict()
+        if self.path in ("/del_config", "/del_config/"):
+            self.server.config = {}
             self.log_message("Reset Server Configuration.")
             self.send_response(200)
         else:
@@ -52,7 +52,7 @@ class StubYouTubeHandler(StubHttpRequestHandler):
         Handle a GET request from the client and sends response back.
         """
         self.log_message(
-            "Youtube provider received GET request to path {}".format(self.path)
+            f"Youtube provider received GET request to path {self.path}"
         )
 
         if 'get_config' in self.path:
@@ -91,7 +91,7 @@ class StubYouTubeHandler(StubHttpRequestHandler):
             youtube_id = params.path.split('/').pop()
 
             if self.server.config.get('youtube_api_private_video'):
-                self._send_private_video_response(youtube_id, "I'm youtube private video.")
+                self._send_private_video_response(youtube_id, "I'm youtube private video.")  # lint-amnesty, pylint: disable=too-many-function-args
             else:
                 self._send_video_response(youtube_id, "I'm youtube.")
 
@@ -134,10 +134,10 @@ class StubYouTubeHandler(StubHttpRequestHandler):
                 })
             )
         })
-        response = "{cb}({data})".format(cb=callback, data=json.dumps(data)).encode('utf-8')
+        response = f"{callback}({json.dumps(data)})".encode('utf-8')
 
         self.send_response(200, content=response, headers={'Content-type': 'text/html'})
-        self.log_message("Youtube: sent response {}".format(message))
+        self.log_message(f"Youtube: sent response {message}")
 
     def _send_private_video_response(self, message):
         """
@@ -158,10 +158,10 @@ class StubYouTubeHandler(StubHttpRequestHandler):
                 "message": message,
             })
         })
-        response = "{cb}({data})".format(cb=callback, data=json.dumps(data)).encode('utf-8')
+        response = f"{callback}({json.dumps(data)})".encode('utf-8')
 
         self.send_response(200, content=response, headers={'Content-type': 'text/html'})
-        self.log_message("Youtube: sent response {}".format(message))
+        self.log_message(f"Youtube: sent response {message}")
 
 
 class StubYouTubeService(StubHttpService):

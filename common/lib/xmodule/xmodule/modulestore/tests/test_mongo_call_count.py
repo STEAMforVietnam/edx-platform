@@ -6,12 +6,12 @@ when using the Split modulestore.
 
 from shutil import rmtree
 from tempfile import mkdtemp
-from unittest import TestCase, skip
+from unittest import skip
 
 import ddt
-import six
-from django.test import TestCase
+from django.test import TestCase  # lint-amnesty, pylint: disable=reimported
 
+from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.factories import check_mongo_calls
 from xmodule.modulestore.tests.utils import (
     TEST_DATA_DIR,
@@ -35,7 +35,7 @@ class CountMongoCallsXMLRoundtrip(TestCase):
     """
 
     def setUp(self):
-        super(CountMongoCallsXMLRoundtrip, self).setUp()
+        super().setUp()
         self.export_dir = mkdtemp()
         self.addCleanup(rmtree, self.export_dir, ignore_errors=True)
 
@@ -56,7 +56,7 @@ class CountMongoCallsXMLRoundtrip(TestCase):
                 with check_mongo_calls(import_reads, first_import_writes):
                     import_course_from_xml(
                         source_store,
-                        'test_user',
+                        ModuleStoreEnum.UserID.test,
                         TEST_DATA_DIR,
                         source_dirs=['manual-testing-complete'],
                         static_content_store=source_content,
@@ -77,7 +77,7 @@ class CountMongoCallsXMLRoundtrip(TestCase):
                 with check_mongo_calls(import_reads, second_import_writes):
                     import_course_from_xml(
                         dest_store,
-                        'test_user',
+                        ModuleStoreEnum.UserID.test,
                         self.export_dir,
                         source_dirs=['exported_source_course'],
                         static_content_store=dest_content,
@@ -112,7 +112,7 @@ class CountMongoCallsCourseTraversal(TestCase):
         if access_all_block_fields:
             # Read the fields on each block in order to ensure each block and its definition is loaded.
             for xblock in all_blocks:
-                for __, field in six.iteritems(xblock.fields):
+                for __, field in xblock.fields.items():
                     if field.is_set_on(xblock):
                         __ = field.read_from(xblock)
 
@@ -124,7 +124,7 @@ class CountMongoCallsCourseTraversal(TestCase):
         course_key = modulestore.make_course_key('a', 'course', 'course')
         import_course_from_xml(
             modulestore,
-            'test_user',
+            ModuleStoreEnum.UserID.test,
             TEST_DATA_DIR,
             source_dirs=['manual-testing-complete'],
             static_content_store=content_store,
@@ -161,7 +161,7 @@ class CountMongoCallsCourseTraversal(TestCase):
         (MIXED_SPLIT_MODULESTORE_BUILDER, None, False, False, 3),
         (MIXED_SPLIT_MODULESTORE_BUILDER, None, True, False, 3),
         (MIXED_SPLIT_MODULESTORE_BUILDER, 0, False, False, 3),
-        (MIXED_SPLIT_MODULESTORE_BUILDER, 0, True, False, 3)
+        (MIXED_SPLIT_MODULESTORE_BUILDER, 0, True, False, 3),
     )
     @ddt.unpack
     def test_number_mongo_calls(self, store_builder, depth, lazy, access_all_block_fields, num_mongo_calls):

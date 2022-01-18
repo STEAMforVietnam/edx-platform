@@ -41,7 +41,7 @@ class TestSuite:
 
         i.e. Checking for and defining required directories.
         """
-        print("\nSetting up for {suite_name}".format(suite_name=self.root))
+        print(f"\nSetting up for {self.root}")
         self.failed_suites = []
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -54,7 +54,7 @@ class TestSuite:
 
         i.e. Cleaning mongo after the lms tests run.
         """
-        print("\nCleaning up after {suite_name}".format(suite_name=self.root))
+        print(f"\nCleaning up after {self.root}")
 
     @property
     def cmd(self):
@@ -99,7 +99,7 @@ class TestSuite:
         process = None
 
         try:
-            process = subprocess.Popen(cmd, **kwargs)
+            process = subprocess.Popen(cmd, **kwargs)  # lint-amnesty, pylint: disable=consider-using-with
             return self.is_success(process.wait())
         except KeyboardInterrupt:
             kill_process(process)

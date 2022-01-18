@@ -10,11 +10,12 @@ from opaque_keys.edx.keys import CourseKey
 from rest_framework import status
 from rest_framework.response import Response
 
+from lms.djangoapps.course_goals.models import UserActivity
 from lms.djangoapps.courseware.courses import get_course_with_access
 from lms.djangoapps.courseware.courseware_access_exception import CoursewareAccessException
 from lms.djangoapps.courseware.exceptions import CourseAccessRedirect
 from openedx.core.lib.api.view_utils import view_auth_classes
-from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 def mobile_course_access(depth=0):
@@ -41,6 +42,10 @@ def mobile_course_access(depth=0):
                         depth=depth,
                         check_if_enrolled=True,
                     )
+                    # Record user activity for tracking progress towards a user's course goals (for mobile app)
+                    UserActivity.record_user_activity(
+                        request.user, course_id, request=request, only_if_mobile_app=True
+                    )
                 except CoursewareAccessException as error:
                     return Response(data=error.to_json(), status=status.HTTP_404_NOT_FOUND)
                 except CourseAccessRedirect as error:
@@ -49,7 +54,7 @@ def mobile_course_access(depth=0):
                     if error.access_error is not None:
                         return Response(data=error.access_error.to_json(), status=status.HTTP_404_NOT_FOUND)
                     # Raise a 404 if the user does not have course access
-                    raise Http404
+                    raise Http404  # lint-amnesty, pylint: disable=raise-missing-from
                 return func(self, request, course=course, *args, **kwargs)
 
         return _wrapper

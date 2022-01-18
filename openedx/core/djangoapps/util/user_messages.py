@@ -15,12 +15,14 @@ There are two common use cases:
 """
 
 
+import warnings
 from abc import abstractmethod
 from enum import Enum
 
-import six
+from django.conf import settings
 from django.contrib import messages
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
+from edx_toggles.toggles import SettingToggle
 
 from openedx.core.djangolib.markup import HTML, Text
 
@@ -54,7 +56,7 @@ class UserMessage():
     """
     Representation of a message to be shown to a user.
     """
-    def __init__(self, type, message_html):
+    def __init__(self, type, message_html):  # lint-amnesty, pylint: disable=redefined-builtin
         assert isinstance(type, UserMessageType)
         self.type = type
         self.message_html = message_html
@@ -80,7 +82,7 @@ class UserMessageCollection():
     """
     @classmethod
     @abstractmethod
-    def get_namespace(self):
+    def get_namespace(self):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Returns the namespace of the message collection.
 
@@ -125,35 +127,35 @@ class UserMessageCollection():
             messages.add_message(request, message_type.value, Text(message), extra_tags=cls.get_namespace())
 
     @classmethod
-    def register_info_message(self, request, message, **kwargs):
+    def register_info_message(self, request, message, **kwargs):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Registers an information message to be shown to the user.
         """
         self.register_user_message(request, UserMessageType.INFO, message, **kwargs)
 
     @classmethod
-    def register_success_message(self, request, message, **kwargs):
+    def register_success_message(self, request, message, **kwargs):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Registers a success message to be shown to the user.
         """
         self.register_user_message(request, UserMessageType.SUCCESS, message, **kwargs)
 
     @classmethod
-    def register_warning_message(self, request, message, **kwargs):
+    def register_warning_message(self, request, message, **kwargs):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Registers a warning message to be shown to the user.
         """
         self.register_user_message(request, UserMessageType.WARNING, message, **kwargs)
 
     @classmethod
-    def register_error_message(self, request, message, **kwargs):
+    def register_error_message(self, request, message, **kwargs):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Registers an error message to be shown to the user.
         """
         self.register_user_message(request, UserMessageType.ERROR, message, **kwargs)
 
     @classmethod
-    def user_messages(self, request):
+    def user_messages(self, request):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Returns any outstanding user messages.
 
@@ -164,10 +166,10 @@ class UserMessageCollection():
             """
             Returns the user message type associated with a level.
             """
-            for __, type in UserMessageType.__members__.items():
+            for __, type in UserMessageType.__members__.items():  # lint-amnesty, pylint: disable=redefined-builtin, no-member
                 if type.value is level:
                     return type
-            raise Exception(u'Unable to find UserMessageType for level {level}'.format(level=level))
+            raise Exception(f'Unable to find UserMessageType for level {level}')
 
         def _create_user_message(message):
             """
@@ -175,11 +177,27 @@ class UserMessageCollection():
             """
             return UserMessage(
                 type=_get_message_type_for_level(message.level),
-                message_html=six.text_type(message.message),
+                message_html=str(message.message),
             )
 
         django_messages = messages.get_messages(request)
         return (_create_user_message(message) for message in django_messages if self.get_namespace() in message.tags)
+
+
+# .. toggle_name: GLOBAL_NOTICE_ENABLED
+# .. toggle_implementation: SettingToggle
+# .. toggle_default: False
+# .. toggle_description: When enabled, show the contents of GLOBAL_NOTICE_MESSAGE
+#   as a message on every page. This is intended to be used as a way of
+#   communicating an upcoming or currently active maintenance window or to
+#   warn of known site issues. HTML is not supported for the message content,
+#   only plaintext. Message styling can be controlled with GLOBAL_NOTICE_TYPE,
+#   set to one of INFO, SUCCESS, WARNING, or ERROR (defaulting to INFO). Also
+#   see openedx.core.djangoapps.util.maintenance_banner.add_maintenance_banner
+#   for a variation that only shows a message on specific views.
+# .. toggle_use_cases: open_edx
+# .. toggle_creation_date: 2021-09-08
+GLOBAL_NOTICE_ENABLED = SettingToggle('GLOBAL_NOTICE_ENABLED', default=False)
 
 
 class PageLevelMessages(UserMessageCollection):
@@ -189,12 +207,38 @@ class PageLevelMessages(UserMessageCollection):
     NAMESPACE = 'page_level_messages'
 
     @classmethod
+    def user_messages(cls, request):
+        """
+        Returns outstanding user messages, along with any persistent site-wide messages.
+        """
+        msgs = list(super().user_messages(request))
+
+        # Add a global notice message to the returned list, if enabled.
+        try:
+            if GLOBAL_NOTICE_ENABLED.is_enabled():
+                if notice_message := getattr(settings, 'GLOBAL_NOTICE_MESSAGE', None):
+                    notice_type_str = getattr(settings, 'GLOBAL_NOTICE_TYPE', None)
+                    # If an invalid type is given, better to show a
+                    # message with the default type than to fail to
+                    # show it at all.
+                    notice_type = getattr(UserMessageType, notice_type_str, UserMessageType.INFO)
+
+                msgs.append(UserMessage(
+                    type=notice_type,
+                    message_html=str(cls.get_message_html(Text(notice_message))),
+                ))
+        except BaseException as e:
+            warnings.warn(f"Could not register global notice: {e!r}", UserWarning)
+
+        return msgs
+
+    @classmethod
     def get_message_html(cls, body_html, title=None, dismissable=False, **kwargs):
         """
         Returns the entire HTML snippet for the message.
         """
         if title:
-            title_area = Text(_(u'{header_open}{title}{header_close}')).format(
+            title_area = Text(_('{header_open}{title}{header_close}')).format(
                 header_open=HTML('<div class="message-header">'),
                 title=title,
                 header_close=HTML('</div>')
@@ -203,11 +247,11 @@ class PageLevelMessages(UserMessageCollection):
             title_area = ''
         if dismissable:
             dismiss_button = HTML(
-                u'<div class="message-actions">'
-                u'<button class="btn-link action-dismiss">'
-                u'<span class="sr">{dismiss_text}</span>'
-                u'<span class="icon fa fa-times" aria-hidden="true"></span></button>'
-                u'</div>'
+                '<div class="message-actions">'
+                '<button class="btn-link action-dismiss">'
+                '<span class="sr">{dismiss_text}</span>'
+                '<span class="icon fa fa-times" aria-hidden="true"></span></button>'
+                '</div>'
             ).format(
                 dismiss_text=Text(_("Dismiss"))
             )
@@ -215,14 +259,14 @@ class PageLevelMessages(UserMessageCollection):
             dismiss_button = ''
         return Text('{title_area}{body_area}{dismiss_button}').format(
             title_area=title_area,
-            body_area=HTML(u'<div class="message-content">{body_html}</div>').format(
+            body_area=HTML('<div class="message-content">{body_html}</div>').format(
                 body_html=body_html,
             ),
             dismiss_button=dismiss_button,
         )
 
     @classmethod
-    def get_namespace(self):
+    def get_namespace(self):  # lint-amnesty, pylint: disable=bad-classmethod-argument
         """
         Returns the namespace of the message collection.
         """

@@ -4,12 +4,12 @@ Forms for configuring courses for verified track cohorting
 
 
 from django import forms
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 
 from openedx.core.djangoapps.verified_track_content.models import VerifiedTrackCohortedCourse
-from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.django import modulestore  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 class VerifiedTrackCourseForm(forms.ModelForm):
@@ -23,7 +23,7 @@ class VerifiedTrackCourseForm(forms.ModelForm):
     error message instead.
 
     """
-    class Meta(object):
+    class Meta:
         model = VerifiedTrackCohortedCourse
         fields = '__all__'
 
@@ -46,7 +46,7 @@ class VerifiedTrackCourseForm(forms.ModelForm):
         try:
             course_key = CourseKey.from_string(cleaned_id)
         except InvalidKeyError:
-            raise forms.ValidationError(error_msg)
+            raise forms.ValidationError(error_msg)  # lint-amnesty, pylint: disable=raise-missing-from
 
         if not modulestore().has_course(course_key):
             raise forms.ValidationError(error_msg)

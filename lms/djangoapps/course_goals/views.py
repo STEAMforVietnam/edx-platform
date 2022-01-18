@@ -3,23 +3,17 @@ Course Goals Views - includes REST API
 """
 
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.http import JsonResponse
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from eventtracking import tracker
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 
+from lms.djangoapps.course_goals.api import get_course_goal_options
+from lms.djangoapps.course_goals.models import GOAL_KEY_CHOICES, CourseGoal
 from openedx.core.lib.api.permissions import IsStaffOrOwner
-from track import segment
-
-from .api import get_course_goal_options
-from .models import GOAL_KEY_CHOICES, CourseGoal
 
 User = get_user_model()
 
@@ -58,21 +52,23 @@ class CourseGoalViewSet(viewsets.ModelViewSet):
     queryset = CourseGoal.objects.all()
     serializer_class = CourseGoalSerializer
 
-    def create(self, post_data):
+    # Another version of this endpoint exists in ../course_home_api/outline/views.py
+    # This version is used by the legacy frontend and is deprecated
+    def create(self, post_data):  # lint-amnesty, pylint: disable=arguments-differ
         """ Create a new goal if one does not exist, otherwise update the existing goal. """
         # Ensure goal_key is valid
         goal_options = get_course_goal_options()
         goal_key = post_data.data.get('goal_key')
         if not goal_key:
             return Response(
-                u'Please provide a valid goal key from following options. (options= {goal_options}).'.format(
+                'Please provide a valid goal key from following options. (options= {goal_options}).'.format(
                     goal_options=goal_options,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
         elif goal_key not in goal_options:
             return Response(
-                u'Provided goal key, {goal_key}, is not a valid goal key (options= {goal_options}).'.format(
+                'Provided goal key, {goal_key}, is not a valid goal key (options= {goal_options}).'.format(
                     goal_key=goal_key,
                     goal_options=goal_options,
                 ),
@@ -83,7 +79,7 @@ class CourseGoalViewSet(viewsets.ModelViewSet):
         course_key = CourseKey.from_string(post_data.data['course_key'])
         if not course_key:
             return Response(
-                u'Provided course_key ({course_key}) does not map to a course.'.format(
+                'Provided course_key ({course_key}) does not map to a course.'.format(
                     course_key=course_key
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
@@ -105,17 +101,4 @@ class CourseGoalViewSet(viewsets.ModelViewSet):
             'goal_text': str(goal_options[goal_key]),
             'is_unsure': goal_key == GOAL_KEY_CHOICES.unsure,
         }
-        return JsonResponse(data, content_type="application/json", status=(200 if goal else 201))
-
-
-@receiver(post_save, sender=CourseGoal, dispatch_uid="emit_course_goals_event")
-def emit_course_goal_event(sender, instance, **kwargs):
-    """Emit events for both tracking logs and for Segment."""
-    name = 'edx.course.goal.added' if kwargs.get('created', False) else 'edx.course.goal.updated'
-    tracker.emit(
-        name,
-        {
-            'goal_key': instance.goal_key,
-        }
-    )
-    segment.track(instance.user.id, name)
+        return JsonResponse(data, content_type="application/json", status=(200 if goal else 201))  # lint-amnesty, pylint: disable=redundant-content-type-for-json-response

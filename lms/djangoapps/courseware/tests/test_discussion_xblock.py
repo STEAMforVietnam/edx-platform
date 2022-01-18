@@ -10,22 +10,25 @@ functionalities.
 import json
 import uuid
 
+from unittest import mock
 import ddt
-import mock
-import six
+from django.test import override_settings
 from django.urls import reverse
-from six.moves import range
+from edx_toggles.toggles.testutils import override_waffle_flag
+from opaque_keys.edx.keys import CourseKey
 from web_fragments.fragment import Fragment
 from xblock.field_data import DictFieldData
 
-from course_api.blocks.tests.helpers import deserialize_usage_key
+from lms.djangoapps.course_api.blocks.tests.helpers import deserialize_usage_key
 from lms.djangoapps.courseware.module_render import get_module_for_descriptor_internal
 from lms.djangoapps.courseware.tests.helpers import XModuleRenderingTestBase
-from student.tests.factories import CourseEnrollmentFactory, UserFactory
-from xblock_discussion import DiscussionXBlock, loader
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
-from xmodule.modulestore.tests.factories import ItemFactory, ToyCourseFactory
+from lms.djangoapps.discussion.toggles import ENABLE_DISCUSSIONS_MFE
+from common.djangoapps.student.tests.factories import CourseEnrollmentFactory, UserFactory
+
+from xblock_discussion import DiscussionXBlock, loader  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore import ModuleStoreEnum  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase  # lint-amnesty, pylint: disable=wrong-import-order
+from xmodule.modulestore.tests.factories import ItemFactory, ToyCourseFactory  # lint-amnesty, pylint: disable=wrong-import-order
 
 
 @ddt.ddt
@@ -40,11 +43,10 @@ class TestDiscussionXBlock(XModuleRenderingTestBase):
         """
         Set up the xblock runtime, test course, discussion, and user.
         """
-        super(TestDiscussionXBlock, self).setUp()
+        super().setUp()
         self.patchers = []
-        self.course_id = "test_course"
+        self.course_id = CourseKey.from_string("course-v1:test+test+test_course")
         self.runtime = self.new_module_runtime()
-        self.runtime.modulestore = mock.Mock()
 
         self.discussion_id = str(uuid.uuid4())
         self.data = DictFieldData({
@@ -77,7 +79,7 @@ class TestDiscussionXBlock(XModuleRenderingTestBase):
         """
         Tears down any patchers added during tests.
         """
-        super(TestDiscussionXBlock, self).tearDown()
+        super().tearDown()
         for patcher in self.patchers:
             patcher.stop()
 
@@ -93,7 +95,7 @@ class TestGetDjangoUser(TestDiscussionXBlock):
         """
         Mock the user service and runtime.
         """
-        super(TestGetDjangoUser, self).setUp()
+        super().setUp()
         self.django_user = object()
         self.user_service = mock.Mock()
         self.add_patcher(
@@ -107,16 +109,16 @@ class TestGetDjangoUser(TestDiscussionXBlock):
         of the user service.
         """
         actual_user = self.block.django_user
-        self.runtime.service.assert_called_once_with(
+        self.runtime.service.assert_called_once_with(  # lint-amnesty, pylint: disable=no-member
             self.block, 'user')
-        self.assertEqual(actual_user, self.django_user)
+        assert actual_user == self.django_user
 
     def test_django_user_handles_missing_service(self):
         """
         Tests that get_django gracefully handles missing user service.
         """
         self.runtime.service.return_value = None
-        self.assertEqual(self.block.django_user, None)
+        assert self.block.django_user is None
 
 
 @ddt.ddt
@@ -129,11 +131,12 @@ class TestViews(TestDiscussionXBlock):
         """
         Mock the methods needed for these tests.
         """
-        super(TestViews, self).setUp()
-        self.template_canary = u'canary'
+        super().setUp()
+        self.template_canary = 'canary'
         self.render_template = mock.Mock()
         self.render_template.return_value = self.template_canary
-        self.block.runtime.render_template = self.render_template
+        self.runtime = self.new_module_runtime(render_template=self.render_template)
+        self.block.runtime = self.runtime
         self.has_permission_mock = mock.Mock()
         self.has_permission_mock.return_value = False
         self.block.has_permission = self.has_permission_mock
@@ -143,14 +146,14 @@ class TestViews(TestDiscussionXBlock):
         Returns context passed to rendering of the django template
         (rendered by runtime).
         """
-        self.assertEqual(self.render_template.call_count, 1)
+        assert self.render_template.call_count == 1
         return self.render_template.call_args_list[0][0][1]
 
     def get_rendered_template(self):
         """
         Returns the name of the template rendered by runtime.
         """
-        self.assertEqual(self.render_template.call_count, 1)
+        assert self.render_template.call_count == 1
         return self.render_template.call_args_list[0][0][0]
 
     def test_studio_view(self):
@@ -158,8 +161,8 @@ class TestViews(TestDiscussionXBlock):
         Test for the studio view.
         """
         fragment = self.block.author_view()
-        self.assertIsInstance(fragment, Fragment)
-        self.assertEqual(fragment.content, self.template_canary)
+        assert isinstance(fragment, Fragment)
+        assert fragment.content == self.template_canary
         self.render_template.assert_called_once_with(
             'discussion/_discussion_inline_studio.html',
             {'discussion_id': self.discussion_id}
@@ -194,7 +197,7 @@ class TestViews(TestDiscussionXBlock):
         context = self.get_template_context()
 
         for permission_name, expected_value in expected_permissions.items():
-            self.assertEqual(expected_value, context[permission_name])
+            assert expected_value == context[permission_name]
 
     def test_js_init(self):
         """
@@ -202,7 +205,7 @@ class TestViews(TestDiscussionXBlock):
         """
         with mock.patch.object(loader, 'render_template', mock.Mock):
             fragment = self.block.student_view()
-        self.assertEqual(fragment.js_init_fn, 'DiscussionInlineBlock')
+        assert fragment.js_init_fn == 'DiscussionInlineBlock'
 
 
 @ddt.ddt
@@ -221,13 +224,13 @@ class TestTemplates(TestDiscussionXBlock):
             return_value=permission_canary,
         ) as has_perm:
             actual_permission = self.block.has_permission("test_permission")
-        self.assertEqual(actual_permission, permission_canary)
-        has_perm.assert_called_once_with(self.django_user_canary, 'test_permission', 'test_course')
+        assert actual_permission == permission_canary
+        has_perm.assert_called_once_with(self.django_user_canary, 'test_permission', self.course_id)
 
     def test_studio_view(self):
         """Test for studio view."""
         fragment = self.block.author_view({})
-        self.assertIn('data-discussion-id="{}"'.format(self.discussion_id), fragment.content)
+        assert f'data-discussion-id="{self.discussion_id}"' in fragment.content
 
     @ddt.data(
         (True, False, False),
@@ -247,10 +250,10 @@ class TestTemplates(TestDiscussionXBlock):
         self.block.has_permission = lambda perm: permission_dict[perm]
         fragment = self.block.student_view()
         read_only = 'false' if permissions[0] else 'true'
-        self.assertIn('data-discussion-id="{}"'.format(self.discussion_id), fragment.content)
-        self.assertIn('data-user-create-comment="{}"'.format(json.dumps(permissions[1])), fragment.content)
-        self.assertIn('data-user-create-subcomment="{}"'.format(json.dumps(permissions[2])), fragment.content)
-        self.assertIn('data-read-only="{read_only}"'.format(read_only=read_only), fragment.content)
+        assert f'data-discussion-id="{self.discussion_id}"' in fragment.content
+        assert f'data-user-create-comment="{json.dumps(permissions[1])}"' in fragment.content
+        assert f'data-user-create-subcomment="{json.dumps(permissions[2])}"' in fragment.content
+        assert f'data-read-only="{read_only}"' in fragment.content
 
 
 @ddt.ddt
@@ -264,7 +267,7 @@ class TestXBlockInCourse(SharedModuleStoreTestCase):
         """
         Set up a user, course, and discussion XBlock for use by tests.
         """
-        super(TestXBlockInCourse, cls).setUpClass()
+        super().setUpClass()
         cls.user = UserFactory()
         cls.course = ToyCourseFactory.create()
         cls.course_key = cls.course.id
@@ -297,14 +300,41 @@ class TestXBlockInCourse(SharedModuleStoreTestCase):
             student_data=mock.Mock(name='student_data'),
             course_id=self.course.id,
             track_function=mock.Mock(name='track_function'),
-            xqueue_callback_url_prefix=mock.Mock(name='xqueue_callback_url_prefix'),
             request_token='request_token',
         )
 
         fragment = discussion_xblock.render('student_view')
         html = fragment.content
-        self.assertIn('data-user-create-comment="false"', html)
-        self.assertIn('data-user-create-subcomment="false"', html)
+        assert 'data-user-create-comment="false"' in html
+        assert 'data-user-create-subcomment="false"' in html
+
+    @override_settings(DISCUSSIONS_MICROFRONTEND_URL="http://test.url")
+    @override_waffle_flag(ENABLE_DISCUSSIONS_MFE, True)
+    def test_embed_mfe_in_course(self):
+        """
+        Test that the xblock embeds the MFE UI when the flag is enabled
+        """
+        discussion_xblock = get_module_for_descriptor_internal(
+            user=self.user,
+            descriptor=self.discussion,
+            student_data=mock.Mock(name='student_data'),
+            course_id=self.course.id,
+            track_function=mock.Mock(name='track_function'),
+            request_token='request_token',
+        )
+
+        fragment = discussion_xblock.render('student_view')
+        html = fragment.content
+        self.assertInHTML(
+            """
+            <iframe
+                id='discussions-mfe-tab-embed'
+                title='Discussions'
+                src='http://test.url/edX/toy/2012_Fall/topics/test_discussion_xblock_id'
+            />
+            """,
+            html,
+        )
 
     @ddt.data(ModuleStoreEnum.Type.mongo, ModuleStoreEnum.Type.split)
     def test_discussion_render_successfully_with_orphan_parent(self, default_store):
@@ -333,8 +363,8 @@ class TestXBlockInCourse(SharedModuleStoreTestCase):
 
             root = self.get_root(discussion)
             # Assert that orphan sequential is root of the discussion xblock.
-            self.assertEqual(orphan_sequential.location.block_type, root.location.block_type)
-            self.assertEqual(orphan_sequential.location.block_id, root.location.block_id)
+            assert orphan_sequential.location.block_type == root.location.block_type
+            assert orphan_sequential.location.block_id == root.location.block_id
 
             # Get xblock bound to a user and a descriptor.
             discussion_xblock = get_module_for_descriptor_internal(
@@ -343,23 +373,22 @@ class TestXBlockInCourse(SharedModuleStoreTestCase):
                 student_data=mock.Mock(name='student_data'),
                 course_id=self.course.id,
                 track_function=mock.Mock(name='track_function'),
-                xqueue_callback_url_prefix=mock.Mock(name='xqueue_callback_url_prefix'),
                 request_token='request_token',
             )
 
             fragment = discussion_xblock.render('student_view')
             html = fragment.content
 
-            self.assertIsInstance(discussion_xblock, DiscussionXBlock)
-            self.assertIn('data-user-create-comment="false"', html)
-            self.assertIn('data-user-create-subcomment="false"', html)
+            assert isinstance(discussion_xblock, DiscussionXBlock)
+            assert 'data-user-create-comment="false"' in html
+            assert 'data-user-create-subcomment="false"' in html
 
     def test_discussion_student_view_data(self):
         """
         Tests that course block api returns student_view_data for discussion xblock
         """
         self.client.login(username=self.user.username, password='test')
-        url = reverse('blocks_in_block_tree', kwargs={'usage_key_string': six.text_type(self.course_usage_key)})
+        url = reverse('blocks_in_block_tree', kwargs={'usage_key_string': str(self.course_usage_key)})
         query_params = {
             'depth': 'all',
             'username': self.user.username,
@@ -367,14 +396,14 @@ class TestXBlockInCourse(SharedModuleStoreTestCase):
             'student_view_data': 'discussion'
         }
         response = self.client.get(url, query_params)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['root'], six.text_type(self.course_usage_key))
-        for block_key_string, block_data in six.iteritems(response.data['blocks']):
+        assert response.status_code == 200
+        assert response.data['root'] == str(self.course_usage_key)
+        for block_key_string, block_data in response.data['blocks'].items():
             block_key = deserialize_usage_key(block_key_string, self.course_key)
-            self.assertEqual(block_data['id'], block_key_string)
-            self.assertEqual(block_data['type'], block_key.block_type)
-            self.assertEqual(block_data['display_name'], self.store.get_item(block_key).display_name or '')
-            self.assertEqual(block_data['student_view_data'], {"topic_id": self.discussion_id})
+            assert block_data['id'] == block_key_string
+            assert block_data['type'] == block_key.block_type
+            assert block_data['display_name'] == (self.store.get_item(block_key).display_name or '')
+            assert block_data['student_view_data'] == {'topic_id': self.discussion_id}
 
 
 class TestXBlockQueryLoad(SharedModuleStoreTestCase):
@@ -393,7 +422,7 @@ class TestXBlockQueryLoad(SharedModuleStoreTestCase):
         discussions = []
 
         for counter in range(5):
-            discussion_id = 'test_discussion_{}'.format(counter)
+            discussion_id = f'test_discussion_{counter}'
             discussions.append(ItemFactory.create(
                 parent_location=course_usage_key,
                 category='discussion',
@@ -402,11 +431,12 @@ class TestXBlockQueryLoad(SharedModuleStoreTestCase):
                 discussion_target='Target Discussion',
             ))
 
-        # 3 queries are required to do first discussion xblock render:
+        # 4 queries are required to do first discussion xblock render:
+        # * waffle_utils_wafflecourseoverridemodel
+        # * waffle_flag
         # * django_comment_client_role
-        # * django_comment_client_permission
         # * lms_xblock_xblockasidesconfig
-        num_queries = 2
+        num_queries = 4
         for discussion in discussions:
             discussion_xblock = get_module_for_descriptor_internal(
                 user=user,
@@ -414,15 +444,15 @@ class TestXBlockQueryLoad(SharedModuleStoreTestCase):
                 student_data=mock.Mock(name='student_data'),
                 course_id=course.id,
                 track_function=mock.Mock(name='track_function'),
-                xqueue_callback_url_prefix=mock.Mock(name='xqueue_callback_url_prefix'),
                 request_token='request_token',
             )
             with self.assertNumQueries(num_queries):
                 fragment = discussion_xblock.render('student_view')
 
-            # Permissions are cached, so no queries required for subsequent renders
-            num_queries = 0
+            # Permissions are cached, so only 1  query required for subsequent renders
+            # to check the waffle flag
+            num_queries = 1
 
             html = fragment.content
-            self.assertIn('data-user-create-comment="false"', html)
-            self.assertIn('data-user-create-subcomment="false"', html)
+            assert 'data-user-create-comment="false"' in html
+            assert 'data-user-create-subcomment="false"' in html
