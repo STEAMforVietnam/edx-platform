@@ -78,6 +78,8 @@ IDA_LOGOUT_URI_LIST = []
 
 # Features
 FEATURES = {
+    'ENABLE_COURSEWARE_MICROFRONTEND': True,
+
     # .. toggle_name: FEATURES['DISPLAY_DEBUG_INFO_TO_STAFF']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: True

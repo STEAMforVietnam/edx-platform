@@ -21,6 +21,8 @@ from path import Path as path
 
 from openedx.core.lib.cache_utils import request_cached
 
+from lms.djangoapps.grades.api import CourseGradeFactory
+
 from lms.djangoapps import branding
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.access_response import (
@@ -71,7 +73,7 @@ log = logging.getLogger(__name__)
 # Used by get_course_assignments below. You shouldn't need to use this type directly.
 _Assignment = namedtuple(
     'Assignment', ['block_key', 'title', 'url', 'date', 'contains_gated_content', 'complete', 'past_due',
-                   'assignment_type', 'extra_info', 'first_component_block_id']
+                   'assignment_type', 'extra_info', 'first_component_block_id', 'section_name', 'earned', 'possible']
 )
 
 
@@ -501,6 +503,10 @@ def get_course_assignment_date_blocks(course, user, request, num_return=None,
     date_blocks = []
     for assignment in get_course_assignments(course.id, user, include_access=include_access):
         date_block = CourseAssignmentDate(course, user)
+        date_block.earned = assignment.earned
+        date_block.possible = assignment.possible
+        date_block.section_name = assignment.section_name
+        date_block.block_key = assignment.block_key
         date_block.date = assignment.date
         date_block.contains_gated_content = assignment.contains_gated_content
         date_block.first_component_block_id = assignment.first_component_block_id
@@ -566,10 +572,14 @@ def get_course_assignments(course_key, user, include_access=False):  # lint-amne
     course_usage_key = store.make_course_usage_key(course_key)
     block_data = get_course_blocks(user, course_usage_key, allow_start_dates_in_future=True, include_completion=True)
 
+    course_grade = CourseGradeFactory().read(user, course_key=course_key)
     now = datetime.now(pytz.UTC)
     assignments = []
     for section_key in block_data.get_children(course_usage_key):  # lint-amnesty, pylint: disable=too-many-nested-blocks
+        section_name = block_data.get_xblock_field(section_key, 'display_name', _('Assignment'))
         for subsection_key in block_data.get_children(section_key):
+            grade = course_grade.subsection_grade(subsection_key).graded_total
+
             due = block_data.get_xblock_field(subsection_key, 'due')
             graded = block_data.get_xblock_field(subsection_key, 'graded', False)
             if due and graded:
@@ -590,13 +600,14 @@ def get_course_assignments(course_key, user, include_access=False):  # lint-amne
                 past_due = not complete and due < now
                 assignments.append(_Assignment(
                     subsection_key, title, url, due, contains_gated_content,
-                    complete, past_due, assignment_type, None, first_component_block_id
+                    complete, past_due, assignment_type, None, first_component_block_id, section_name, grade.earned, grade.possible
                 ))
 
             # Load all dates for ORA blocks as separate assignments
             descendents = block_data.get_children(subsection_key)
             while descendents:
                 descendent = descendents.pop()
+                grade = course_grade.subsection_grade(descendent).graded_total
                 descendents.extend(block_data.get_children(descendent))
                 if block_data.get_xblock_field(descendent, 'category', None) == 'openassessment':
                     graded = block_data.get_xblock_field(descendent, 'graded', False)
@@ -660,6 +671,9 @@ def get_course_assignments(course_key, user, include_access=False):  # lint-amne
                             assignment_type,
                             _("Open Response Assessment due dates are set by your instructor and can't be shifted."),
                             first_component_block_id,
+                            section_name,
+                            grade.earned,
+                            grade.possible
                         ))
 
     return assignments

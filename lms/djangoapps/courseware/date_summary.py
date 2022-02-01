@@ -388,6 +388,11 @@ class CourseAssignmentDate(DateSummary):
         self.assignment_link = ''
         self.assignment_title = None
         self.assignment_title_html = None
+        self.earned = None
+        self.possible = None
+        self.assignment_type = None
+        self.block_key = None
+        self.section_name = None
         self.first_component_block_id = None
         self.contains_gated_content = False
         self.complete = None

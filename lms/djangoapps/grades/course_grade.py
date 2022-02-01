@@ -102,6 +102,14 @@ class CourseGradeBase:
             grades[chapter_key] = self._get_chapter_grade_info(course_structure[chapter_key], course_structure)
         return grades
 
+    def subsection_grade(self, subsection_key):
+        """
+        Return total_grade of a subsection (earned and possible)
+        """
+        course_structure = self.course_data.structure
+        grade = self._get_subsection_grade(course_structure[subsection_key], self.force_update_subsections)
+        return grade
+
     @lazy
     def subsection_grades(self):
         """
