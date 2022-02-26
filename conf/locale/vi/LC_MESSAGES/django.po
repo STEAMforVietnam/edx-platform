@@ -5750,7 +5750,7 @@ msgstr "Giáo Trình"
 
 #: lms/djangoapps/courseware/tabs.py
 msgid "Dates"
-msgstr ""
+msgstr "Lịch bài tập"
 
 #: lms/djangoapps/courseware/views/index.py
 #, python-brace-format
@@ -11745,7 +11745,7 @@ msgstr ""
 
 #: lms/templates/_gated_content.html
 msgid "Go to Prerequisite Section"
-msgstr "Đi đến Mục trước."
+msgstr "Đi đến mục bắt buộc."
 
 #: lms/templates/annotatable.html
 msgid "Collapse Instructions"
@@ -14361,7 +14361,7 @@ msgstr "{section_format} hạn chót {{date}}"
 #: lms/templates/courseware/accordion.html
 #: openedx/features/course_experience/templates/course_experience/course-outline-fragment.html
 msgid "This content is graded"
-msgstr "Nội dung đã được chấm điểm"
+msgstr "Nội dung được chấm điểm"
 
 #: lms/templates/courseware/course_about.html
 msgid "An error has occurred. Please ensure that you are logged in to enroll."
