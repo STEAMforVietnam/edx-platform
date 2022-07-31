@@ -26,6 +26,7 @@ from common.djangoapps.student.helpers import (
 )
 from common.djangoapps.util.course import get_link_for_about_page, get_encoded_course_sharing_utm_params
 from lms.djangoapps.experiments.utils import UPSELL_TRACKING_FLAG
+from lms.djangoapps.course_home_api.toggles import course_home_mfe_is_active
 %>
 
 <%
@@ -292,16 +293,21 @@ from lms.djangoapps.experiments.utils import UPSELL_TRACKING_FLAG
           </div>
 
           <div class="continue-button">
-              % if (show_courseware_link or is_unfulfilled_entitlement) and not is_course_expired:
-                % if course_overview.has_ended():
-                  % if not is_unfulfilled_entitlement:
-                    <a href="${course_target}" class="enter-course archived course-target-link" data-course-key="${enrollment.course_id}">${_('View Archived Course')}<span class="sr">&nbsp;${course_overview.display_name_with_default}</span></a>
-                  % endif
-
-                % else:
-                  <%include file="_dashboard_course_resume.html" args="resume_button_url=resume_button_url, course_overview=course_overview, enrollment=enrollment, is_unfulfilled_entitlement=is_unfulfilled_entitlement, course_target=course_target, related_programs=related_programs"/>
+            <%
+              home_url = course_target
+              if course_home_mfe_is_active(enrollment.course_id):
+                home_url = "{0}/course/{1}/home".format(settings.LEARNING_MICROFRONTEND_URL, six.text_type(course_overview.id))
+            %>
+            % if (show_courseware_link or is_unfulfilled_entitlement) and not is_course_expired:
+              % if course_overview.has_ended():
+                % if not is_unfulfilled_entitlement:
+                  <a href="${home_url}" class="enter-course archived course-target-link" data-course-key="${enrollment.course_id}">${_('View Archived Course')}<span class="sr">&nbsp;${course_overview.display_name_with_default}</span></a>
                 % endif
+
+              % else:
+                <%include file="_dashboard_course_resume.html" args="resume_button_url=resume_button_url, course_overview=course_overview, enrollment=enrollment, is_unfulfilled_entitlement=is_unfulfilled_entitlement, course_target=home_url, related_programs=related_programs"/>
               % endif
+            % endif
           </div>
         </div>
       </div>
