@@ -413,6 +413,7 @@ def get_password_validation_error(password, username=None, email=None):
     """
     return _validate(_validate_password, errors.AccountPasswordInvalid, password, username, email)
 
+
 def get_country_validation_error(country):
     """Get the built-in validation error message for when
     the country is invalid in some way.
@@ -576,6 +577,7 @@ def _validate_password(password, username=None, email=None):
         raise errors.AccountPasswordInvalid(str(invalid_password_err))
     except ValidationError as validation_err:
         raise errors.AccountPasswordInvalid(' '.join(validation_err.messages))
+
 
 def _validate_country(country):
     """Validate the country selection.
