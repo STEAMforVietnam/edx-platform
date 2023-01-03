@@ -22,7 +22,6 @@
                         name: 'Xsy M. Education',
                         username: 'Xsy',
                         password: 'xsyisawesome',
-                        confirm_password: 'xsyisawesome',
                         level_of_education: 'p',
                         gender: 'm',
                         year_of_birth: 2014,
@@ -66,8 +65,7 @@
                             email: '',
                             username: '',
                             password: '',
-                            confirm_email: '',
-                            confirm_password: ''
+                            confirm_email: ''
                         }
                     },
                     VALIDATION_DECISIONS_NEGATIVE = {
