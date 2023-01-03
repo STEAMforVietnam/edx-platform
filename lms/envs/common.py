@@ -3381,8 +3381,7 @@ LOGIN_REDIRECT_WHITELIST = []
 #   includes a paragraph that links to the honor code page (defined my MKTG_URLS["HONOR"]). This page might not be
 #   available for all Open edX platforms. In such cases, the "honor_code" registration field should be "hidden".
 REGISTRATION_EXTRA_FIELDS = {
-    'confirm_email': 'required',
-    'confirm_password': 'required',
+    'confirm_email': 'hidden',
     'level_of_education': 'optional',
     'gender': 'optional',
     'year_of_birth': 'optional',
@@ -3402,7 +3401,6 @@ REGISTRATION_FIELD_ORDER = [
     "email",
     "confirm_email",
     "password",
-    "confirm_password",
     "city",
     "state",
     "country",
