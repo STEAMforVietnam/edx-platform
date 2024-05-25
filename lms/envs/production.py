@@ -1073,3 +1073,5 @@ CHROME_DISABLE_SUBFRAME_DIALOG_SUPPRESSION_TOKEN = ENV_TOKENS.get(
 
 ############## DRF overrides ##############
 REST_FRAMEWORK.update(ENV_TOKENS.get('REST_FRAMEWORK', {}))
+
+LEARNING_MICROFRONTEND_URL = "http://apps.local.overhang.io/learning"

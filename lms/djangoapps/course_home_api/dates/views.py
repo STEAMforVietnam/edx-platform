@@ -23,6 +23,13 @@ from lms.djangoapps.courseware.masquerade import setup_masquerade
 from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
 from openedx.features.content_type_gating.models import ContentTypeGatingConfig
 
+from common.djangoapps.student.models import CourseEnrollment
+from lms.djangoapps.grades.api import CourseGradeFactory
+
+from lms.djangoapps.courseware.courses import (
+    get_course_with_access,
+)
+
 
 class DatesTabView(RetrieveAPIView):
     """
@@ -100,6 +107,12 @@ class DatesTabView(RetrieveAPIView):
         if not CourseEnrollment.is_enrolled(request.user, course_key) and not is_staff:
             return Response('User not enrolled.', status=401)
 
+        ##########
+
+        course_grade = CourseGradeFactory().read(request.user, course)
+
+        ##########
+
         blocks = get_course_date_blocks(course, request.user, request, include_access=True, include_past_dates=True)
 
         learner_is_full_access = not ContentTypeGatingConfig.enabled_for_enrollment(
@@ -116,9 +129,12 @@ class DatesTabView(RetrieveAPIView):
             'course_date_blocks': [block for block in blocks if not isinstance(block, TodaysDate)],
             'learner_is_full_access': learner_is_full_access,
             'user_timezone': user_timezone,
+            'section_scores': list(course_grade.chapter_grades.values()),
         }
         context = self.get_serializer_context()
         context['learner_is_full_access'] = learner_is_full_access
+        context['staff_access'] = is_staff
+        context['course_key'] = course_key
         serializer = self.get_serializer_class()(data, context=context)
 
         return Response(serializer.data)

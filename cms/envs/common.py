@@ -269,13 +269,13 @@ FEATURES = {
     'ENABLE_CONTENT_LIBRARIES_LTI_TOOL': False,
 
     # Milestones application flag
-    'MILESTONES_APP': False,
+    'MILESTONES_APP': True,
 
     # Prerequisite courses feature flag
-    'ENABLE_PREREQUISITE_COURSES': False,
+    'ENABLE_PREREQUISITE_COURSES': True,
 
     # Toggle course entrance exams feature
-    'ENTRANCE_EXAMS': False,
+    'ENTRANCE_EXAMS': True,
 
     # Toggle platform-wide course licensing
     'LICENSING': False,
@@ -301,7 +301,7 @@ FEATURES = {
     'ALLOW_COURSE_RERUNS': True,
 
     # Certificates Web/HTML Views
-    'CERTIFICATES_HTML_VIEW': False,
+    'CERTIFICATES_HTML_VIEW': True,
 
     # Teams feature
     'ENABLE_TEAMS': True,
@@ -320,6 +320,8 @@ FEATURES = {
 
     # Special Exams, aka Timed and Proctored Exams
     'ENABLE_SPECIAL_EXAMS': False,
+
+    'ORGANIZATIONS_APP': True,
 
     # Show the language selector in the header
     'SHOW_HEADER_LANGUAGE_SELECTOR': False,
@@ -354,11 +356,12 @@ FEATURES = {
     'ENABLE_GRADE_DOWNLOADS': True,
     'ENABLE_MKTG_SITE': False,
     'ENABLE_DISCUSSION_HOME_PANEL': True,
-    'ENABLE_CORS_HEADERS': False,
-    'ENABLE_CROSS_DOMAIN_CSRF_COOKIE': False,
+    'ENABLE_CORS_HEADERS': True,
+    'ENABLE_CROSS_DOMAIN_CSRF_COOKIE': True,
     'ENABLE_COUNTRY_ACCESS': False,
     'ENABLE_CREDIT_API': False,
     'ENABLE_OAUTH2_PROVIDER': False,
+    'ENABLE_SYSADMIN_DASHBOARD': False,
     'ENABLE_MOBILE_REST_API': False,
     'CUSTOM_COURSES_EDX': False,
     'ENABLE_READING_FROM_MULTIPLE_HISTORY_TABLES': True,
@@ -384,7 +387,7 @@ FEATURES = {
     # .. toggle_use_cases: open_edx
     # .. toggle_creation_date: 2020-02-21
     # .. toggle_tickets: 'https://github.com/edx/edx-platform/pull/21616'
-    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': False,
+    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': True,
 
     ### ORA Feature Flags ###
     # .. toggle_name: FEATURES['ENABLE_ORA_ALL_FILE_URLS']
@@ -398,7 +401,7 @@ FEATURES = {
     # .. toggle_target_removal_date: None
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
-    'ENABLE_ORA_ALL_FILE_URLS': False,
+    'ENABLE_ORA_ALL_FILE_URLS': True,
 
     # .. toggle_name: FEATURES['ENABLE_ORA_USER_STATE_UPLOAD_DATA']
     # .. toggle_implementation: DjangoSetting
@@ -410,7 +413,7 @@ FEATURES = {
     # .. toggle_target_removal_date: None
     # .. toggle_tickets: https://openedx.atlassian.net/browse/EDUCATOR-4951
     # .. toggle_warnings: This temporary feature toggle does not have a target removal date.
-    'ENABLE_ORA_USER_STATE_UPLOAD_DATA': False,
+    'ENABLE_ORA_USER_STATE_UPLOAD_DATA': True,
 
     # .. toggle_name: FEATURES['DEPRECATE_OLD_COURSE_KEYS_IN_STUDIO']
     # .. toggle_implementation: DjangoSetting
@@ -484,6 +487,9 @@ FEATURES = {
     #   in the LMS and CMS.
     # .. toggle_tickets: 'https://github.com/open-craft/edx-platform/pull/429'
     'DISABLE_UNENROLLMENT': False,
+
+    # S4V Certificate
+    'CUSTOM_CERTIFICATE_TEMPLATES_ENABLED': True,
 }
 
 ENABLE_JASMINE = False
@@ -819,7 +825,7 @@ MIDDLEWARE = [
 EXTRA_MIDDLEWARE_CLASSES = []
 
 # Clickjacking protection can be disabled by setting this to 'ALLOW'
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = 'ALLOW'
 
 # Platform for Privacy Preferences header
 P3P_HEADER = 'CP="Open EdX does not have a P3P policy."'

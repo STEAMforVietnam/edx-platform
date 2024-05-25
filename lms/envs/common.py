@@ -78,6 +78,8 @@ IDA_LOGOUT_URI_LIST = []
 
 # Features
 FEATURES = {
+    'ENABLE_COURSEWARE_MICROFRONTEND': True,
+
     # .. toggle_name: FEATURES['DISPLAY_DEBUG_INFO_TO_STAFF']
     # .. toggle_implementation: DjangoSetting
     # .. toggle_default: True
@@ -228,7 +230,7 @@ FEATURES = {
 
     # Allows to configure the LMS to provide CORS headers to serve requests from other
     # domains
-    'ENABLE_CORS_HEADERS': False,
+    'ENABLE_CORS_HEADERS': True,
 
     # Can be turned off if course lists need to be hidden. Effects views and templates.
     # .. toggle_name: FEATURES['COURSES_ARE_BROWSABLE']
@@ -547,10 +549,13 @@ FEATURES = {
     'ENABLE_PUBLISHER': False,
 
     # Milestones application flag
-    'MILESTONES_APP': False,
+    'MILESTONES_APP': True,
 
     # Prerequisite courses feature flag
-    'ENABLE_PREREQUISITE_COURSES': False,
+    'ENABLE_PREREQUISITE_COURSES': True,
+
+    # Entrance exams feature flag
+    'ENTRANCE_EXAMS': True,
 
     # For easily adding modes to courses during acceptance testing
     'MODE_CREATION_FOR_TESTING': False,
@@ -621,7 +626,7 @@ FEATURES = {
     # .. toggle_creation_date: 2015-03-13
     # .. toggle_target_removal_date: None
     # .. toggle_tickets: https://github.com/edx/edx-platform/pull/7113
-    'CERTIFICATES_HTML_VIEW': False,
+    'CERTIFICATES_HTML_VIEW': True,
 
     # .. toggle_name: FEATURES['CUSTOM_CERTIFICATE_TEMPLATES_ENABLED']
     # .. toggle_implementation: DjangoSetting
@@ -790,7 +795,7 @@ FEATURES = {
     # .. toggle_use_cases: open_edx
     # .. toggle_creation_date: 2017-06-26
     # .. toggle_tickets: https://openedx.atlassian.net/browse/OSPR-1735
-    'ALLOW_EMAIL_ADDRESS_CHANGE': True,
+    'ALLOW_EMAIL_ADDRESS_CHANGE': False,
 
     # .. toggle_name: FEATURES['ENABLE_BULK_ENROLLMENT_VIEW']
     # .. toggle_implementation: DjangoSetting
@@ -800,7 +805,7 @@ FEATURES = {
     # .. toggle_use_cases: open_edx
     # .. toggle_creation_date: 2017-07-15
     # .. toggle_tickets: https://github.com/edx/edx-platform/pull/15006
-    'ENABLE_BULK_ENROLLMENT_VIEW': False,
+    'ENABLE_BULK_ENROLLMENT_VIEW': True,
 
     # Set to enable Enterprise integration
     'ENABLE_ENTERPRISE_INTEGRATION': False,
@@ -854,7 +859,7 @@ FEATURES = {
     # .. toggle_use_cases: open_edx
     # .. toggle_creation_date: 2020-02-21
     # .. toggle_tickets: 'https://github.com/edx/edx-platform/pull/21616'
-    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': False,
+    'ENABLE_CHANGE_USER_PASSWORD_ADMIN': True,
 
     # .. toggle_name: FEATURES['ENABLE_AUTHN_MICROFRONTEND']
     # .. toggle_implementation: DjangoSetting
@@ -1343,9 +1348,9 @@ COURSE_MODE_DEFAULTS = {
     'description': None,
     'expiration_datetime': None,
     'min_price': 0,
-    'name': _('Audit'),
+    'name': _('Honor'),
     'sku': None,
-    'slug': 'audit',
+    'slug': 'honor',
     'suggested_prices': '',
 }
 

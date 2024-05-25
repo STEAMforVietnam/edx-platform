@@ -73,7 +73,8 @@
                             email: 'Error.',
                             username: 'Error.',
                             password: 'Error.',
-                            confirm_email: 'Error'
+                            confirm_email: 'Error',
+                            confirm_password: 'Error.'
                         }
                     },
                     FORM_DESCRIPTION = {
@@ -134,6 +135,16 @@
                                 required: true,
                                 exposed: true,
                                 instructions: 'Enter your password.',
+                                restrictions: {}
+                            },
+                            {
+                                placeholder: '',
+                                name: 'confirm_password',
+                                label: 'Confirm Password',
+                                defaultValue: '',
+                                type: 'text',
+                                required: true,
+                                instructions: 'Re-enter your password.',
                                 restrictions: {}
                             },
                             {
@@ -259,6 +270,7 @@
                     $name = $('#register-name');
                     $username = $('#register-username');
                     $password = $('#register-password');
+                    $confirmPassword = $('#register-confirm_password');
                     $levelOfEducation = $('#register-level_of_education');
                     $gender = $('#register-gender');
                     $yearOfBirth = $('#register-year_of_birth');
