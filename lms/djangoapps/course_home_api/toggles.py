@@ -37,3 +37,7 @@ def course_home_mfe_progress_tab_is_active(course_key):
         COURSE_HOME_MICROFRONTEND_PROGRESS_TAB.is_enabled(course_key) and
         not DisableProgressPageStackedConfig.current(course_key=course_key).disabled
     )
+
+
+def course_home_mfe_is_active(course_key):
+    return not(course_home_legacy_is_active(course_key))
